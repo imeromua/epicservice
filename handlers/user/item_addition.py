@@ -183,6 +183,11 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
     try:
         quantity = int(message.text)
         
+        # --- ВИПРАВЛЕННЯ: Додана перевірка на <= 0 ---
+        if quantity <= 0:
+            await message.answer("❌ Кількість повинна бути більше 0.")
+            return
+
         # --- ВИПРАВЛЕННЯ: Створюємо "фейковий" callback, але правильно ---
         # Він потрібен, щоб передати ID чату та повідомлення в _add_item_logic
         # для подальшого редагування картки товару.
