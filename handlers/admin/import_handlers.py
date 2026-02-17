@@ -18,6 +18,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from config import ADMIN_IDS
 from database.orm import (orm_get_all_products_sync, orm_get_all_users_sync,
                           orm_get_users_with_active_lists, orm_smart_import)
+# --- ЗМІНА: Імпортуємо SmartColumnMapper для перевірки ---
+from database.orm.products import SmartColumnMapper
 from handlers.admin.core import _show_admin_panel
 from keyboards.inline import (get_admin_lock_kb, get_admin_main_kb,
                               get_notify_confirmation_kb, get_user_main_kb)
@@ -40,30 +42,37 @@ class AdminImportStates(StatesGroup):
 
 
 def _validate_excel_columns(df: pd.DataFrame) -> tuple[bool, str]:
-    df_columns_lower = {str(col).lower() for col in df.columns}
-    required_columns = {"в", "г", "н", "к"}
+    """
+    Використовує SmartColumnMapper для перевірки наявності необхідних даних.
+    """
+    mapping = SmartColumnMapper.map_columns(df)
     
-    if not required_columns.issubset(df_columns_lower):
-        missing_columns = required_columns - df_columns_lower
-        return False, ", ".join(missing_columns)
+    # Мінімально необхідний набір: (Артикул + (Кількість або Сума)) або (Назва + (Кількість або Сума))
+    # Але оскільки артикул може бути всередині назви, то головне - знайти хоча б назву або артикул
+    
+    has_identity = "article" in mapping or "name" in mapping
+    has_quantity = "quantity" in mapping or "stock_sum" in mapping
+    
+    if not has_identity:
+        return False, "Не знайдено колонку з Артикулом або Назвою товару."
+        
+    if not has_quantity:
+        return False, "Не знайдено колонку з Кількістю або Сумою залишку."
+        
     return True, ""
 
 
 def _validate_excel_data(df: pd.DataFrame) -> List[str]:
-    errors = []
-    df_copy = df.copy()
-    df_copy.rename(columns={"в": "відділ", "н": "назва"}, inplace=True)
-
-    for index, row in df_copy.iterrows():
-        if pd.notna(row["назва"]) and not isinstance(row.get("відділ"), (int, float)):
-            errors.append(f"Рядок {index + 2}: 'відділ' має бути числом, а не '{row.get('відділ')}'")
-        if len(errors) >= 10:
-            errors.append("... та інші помилки.")
-            break
-    return errors
+    # Оскільки тепер ми "всеїдні", строга валідація даних не потрібна.
+    # SmartColumnMapper сам розбереться з типами.
+    # Можна додати хіба що попередження, якщо мапер не впевнений.
+    return []
 
 
 def _format_admin_report(result: dict) -> str:
+    if not result:
+        return "❌ Помилка імпорту. Перевірте формат файлу."
+
     report_lines = [
         LEXICON.IMPORT_REPORT_TITLE,
         LEXICON.IMPORT_REPORT_ADDED.format(added=result.get('added', 0)),
@@ -72,13 +81,14 @@ def _format_admin_report(result: dict) -> str:
         LEXICON.IMPORT_REPORT_REACTIVATED.format(reactivated=result.get('reactivated', 0)),
         LEXICON.IMPORT_REPORT_TOTAL.format(total=result.get('total_in_db', 0)),
     ]
-    if result.get('total_in_db') == result.get('total_in_file'):
-        report_lines.append(LEXICON.IMPORT_REPORT_SUCCESS_CHECK.format(count=result.get('total_in_file', 0)))
-    else:
-        report_lines.append(LEXICON.IMPORT_REPORT_FAIL_CHECK.format(
-            db_count=result.get('total_in_db', 0),
-            file_count=result.get('total_in_file', 0)
-        ))
+    
+    # Додаємо статистику по відділах, якщо вона є і не порожня
+    dep_stats = result.get('department_stats', {})
+    if dep_stats:
+        report_lines.append("\n📁 *По відділах:*")
+        for dep, count in sorted(dep_stats.items()):
+            report_lines.append(f"  • Відділ {dep}: {count} шт.")
+
     return "\n".join(report_lines)
 
 
@@ -217,22 +227,20 @@ async def process_import_file(message: Message, state: FSMContext, bot: Bot):
 
     try:
         await bot.download(message.document, destination=temp_file_path)
-        df = await asyncio.to_thread(pd.read_excel, temp_file_path, engine='openpyxl')
+        # Використовуємо engine='openpyxl' для xlsx, для xls pandas сам підбере (якщо встановлено xlrd)
+        df = await asyncio.to_thread(pd.read_excel, temp_file_path)
 
         is_valid, missing_cols = _validate_excel_columns(df)
         if not is_valid:
             await message.answer(LEXICON.IMPORT_INVALID_COLUMNS.format(columns=missing_cols))
             return
 
-        errors = _validate_excel_data(df)
-        if errors:
-            await message.answer(LEXICON.IMPORT_VALIDATION_ERRORS_TITLE + "\n".join(errors))
-            return
+        # Валідацію даних прибрали, бо ми тепер всеїдні
 
         await message.answer(LEXICON.IMPORT_STARTING)
         result = await orm_smart_import(df)
         if not result:
-            await message.answer(LEXICON.IMPORT_SYNC_ERROR.format(error="невідома помилка."))
+            await message.answer(LEXICON.IMPORT_SYNC_ERROR.format(error="не вдалося розпізнати дані."))
             return
         
         admin_report = _format_admin_report(result)
