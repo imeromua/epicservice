@@ -161,7 +161,10 @@ async def cancel_list_confirmed(callback: CallbackQuery, state: FSMContext, bot:
     try:
         await orm_clear_temp_list(user_id)
         # --- ЗМІНА: Видаляємо клавіатуру, а не повідомлення ---
-        await callback.message.edit_reply_markup(reply_markup=None)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except:
+            pass
         await callback.message.answer(LEXICON.LIST_CANCELED)
         
         user = callback.from_user
@@ -183,6 +186,9 @@ async def cancel_list_declined(callback: CallbackQuery, state: FSMContext, bot: 
     # Не скидаємо стан повністю
     await state.set_state(None) 
     # --- ЗМІНА: Видаляємо клавіатуру, а не повідомлення ---
-    await callback.message.edit_reply_markup(reply_markup=None)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except:
+        pass
     await _display_user_list(bot, callback.message.chat.id, callback.from_user.id, state)
     await callback.answer()
