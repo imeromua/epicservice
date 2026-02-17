@@ -12,12 +12,38 @@ from sqlalchemy import delete, func, select
 from config import ADMIN_IDS
 from database.engine import async_session, sync_session
 from database.models import Product, SavedList, SavedListItem
-# --- ВИПРАВЛЕННЯ: Імпортуємо нову функцію _extract_article_and_name ---
 from database.orm.products import _extract_article_and_name
 from database.orm.temp_lists import orm_add_item_to_temp_list, orm_get_temp_list
 from lexicon.lexicon import LEXICON
 
 logger = logging.getLogger(__name__)
+
+
+async def orm_add_saved_list(user_id: int):
+    """
+    Зберігає поточний тимчасовий список у базу даних (архів).
+    """
+    async with async_session() as session:
+        temp_items = await orm_get_temp_list(user_id)
+        if not temp_items:
+            return False
+
+        # Створюємо новий запис про список
+        new_list = SavedList(user_id=user_id)
+        session.add(new_list)
+        await session.flush()  # Щоб отримати ID нового списку
+
+        # Переносимо товари з тимчасового списку в збережений
+        for item in temp_items:
+            saved_item = SavedListItem(
+                saved_list_id=new_list.id,
+                product_id=item.product_id,
+                quantity=item.quantity
+            )
+            session.add(saved_item)
+        
+        await session.commit()
+        return True
 
 
 async def orm_get_user_lists_archive(user_id: int):
