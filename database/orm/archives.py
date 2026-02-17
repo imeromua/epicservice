@@ -2,16 +2,16 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 
 import pandas as pd
 from aiogram import Bot
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update, and_
 
 from config import ADMIN_IDS
 from database.engine import async_session, sync_session
-from database.models import Product, SavedList, SavedListItem
+from database.models import Product, SavedList, SavedListItem, User
 from database.orm.products import _extract_article_and_name
 from database.orm.temp_lists import orm_add_item_to_temp_list, orm_get_temp_list
 from lexicon.lexicon import LEXICON
@@ -108,6 +108,101 @@ def orm_delete_all_saved_lists_sync():
         return False
 
 
+def orm_delete_lists_older_than_sync(hours: int):
+    """
+    Видаляє списки, які старіші за вказану кількість годин.
+    """
+    try:
+        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        with sync_session() as session:
+            session.execute(delete(SavedList).where(SavedList.created_at < cutoff_time))
+            session.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Помилка при видаленні старих списків: {e}")
+        return False
+
+
+def orm_get_all_collected_items_sync():
+    """
+    Отримує всі зібрані товари з усіх збережених списків.
+    Повертає список кортежів (Product, sum_quantity).
+    """
+    try:
+        with sync_session() as session:
+            # Групуємо по товарах і сумуємо кількість
+            stmt = (
+                select(Product, func.sum(SavedListItem.quantity))
+                .join(SavedListItem, Product.id == SavedListItem.product_id)
+                .join(SavedList, SavedListItem.saved_list_id == SavedList.id)
+                .group_by(Product.id)
+            )
+            result = session.execute(stmt).all()
+            return result # [(Product, quantity), ...]
+    except Exception as e:
+        logger.error(f"Помилка отримання зібраних товарів: {e}")
+        return []
+
+
+async def orm_get_all_files_for_user(user_id: int):
+    """
+    Аліас для отримання архівів користувача.
+    Можливо, в оригіналі повертав шляхи до файлів, але тут повернемо списки.
+    """
+    return await orm_get_user_lists_archive(user_id)
+
+
+def orm_get_users_for_warning_sync(hours: int):
+    """
+    Повертає користувачів, у яких є списки, що скоро будуть видалені (старіші за hours).
+    """
+    try:
+        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        with sync_session() as session:
+            stmt = (
+                select(User.id)
+                .join(SavedList, User.id == SavedList.user_id)
+                .where(SavedList.created_at < cutoff_time)
+                .distinct()
+            )
+            result = session.execute(stmt).scalars().all()
+            return result
+    except Exception as e:
+        logger.error(f"Помилка пошуку користувачів для попередження: {e}")
+        return []
+
+
+async def orm_get_users_with_archives():
+    """
+    Повертає список користувачів (id, count), які мають збережені списки.
+    """
+    async with async_session() as session:
+        stmt = (
+            select(SavedList.user_id, func.count(SavedList.id))
+            .group_by(SavedList.user_id)
+        )
+        result = await session.execute(stmt)
+        return result.all()
+
+
+def orm_update_reserved_quantity(product_id: int, quantity: float):
+    """
+    Оновлює поле 'відкладено' для товару.
+    """
+    try:
+        with sync_session() as session:
+            session.execute(
+                update(Product)
+                .where(Product.id == product_id)
+                .values(відкладено=quantity)
+            )
+            session.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Помилка оновлення резерву: {e}")
+        return False
+
+
 # --- Функції для експорту та роботи з файлами ---
 
 def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
@@ -116,11 +211,7 @@ def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
     """
     try:
         df = pd.read_excel(BytesIO(file_content))
-        # Спрощена логіка: шукаємо колонку з артикулом/назвою та кількістю
-        # Тут ми можемо використати SmartColumnMapper, але він в products.py
-        # Для простоти поки залишимо базову логіку або скопіюємо частину
         
-        # Але оскільки ми тут використовуємо _extract_article_and_name, то:
         found_items = []
         not_found_count = 0
         
@@ -147,7 +238,6 @@ def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
                 val = row[col_name]
                 qty = row[col_qty]
                 
-                # --- ВИПРАВЛЕННЯ: Використовуємо нову функцію ---
                 article, _ = _extract_article_and_name(val)
                 
                 if article:
