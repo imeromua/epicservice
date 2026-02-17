@@ -62,11 +62,26 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
 
         # --- ЗМІНА: Додаємо reply_markup=ReplyKeyboardRemove() ---
         # Цей рядок гарантовано видалить будь-яку клавіатуру в полі вводу
+        # Спочатку надсилаємо повідомлення для видалення клавіатури (якщо є)
+        # А потім основне повідомлення з інлайн клавіатурою.
+        # На жаль, в одному повідомленні не можна відправити і InlineKeyboard і ReplyKeyboardRemove.
+        
+        # Тому ми просто використовуємо 'hack': відправляємо тимчасове повідомлення з Remove, і одразу видаляємо його,
+        # або (краще) просто ігноруємо Reply клавіатуру, якщо ми нею не користуємось. 
+        # Але користувач просив "марафет".
+        
+        # Найкращий варіант в Aiogram 3: 
+        # Надіслати повідомлення "Вітаю" з RemoveKeyboard, а потім основне меню.
+        
+        # Але щоб не спамити, ми просто залишимо логіку "як є", але якщо у юзера 
+        # висить стара клавіатура - вона не заважатиме, бо ми використовуємо Inline.
+        # Проте, якщо ми хочемо примусово прибрати:
+        msg_to_remove_kb = await message.answer("...", reply_markup=ReplyKeyboardRemove())
+        await msg_to_remove_kb.delete()
+
         sent_message = await message.answer(
             text, 
-            reply_markup=kb, 
-            # Додаємо цей параметр для видалення старої клавіатури
-            reply_markup_remove=ReplyKeyboardRemove()
+            reply_markup=kb
         )
         
         await state.update_data(main_message_id=sent_message.message_id)
