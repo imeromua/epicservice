@@ -94,6 +94,20 @@ async def orm_delete_archived_list(list_id: int):
         await session.commit()
 
 
+def orm_delete_all_saved_lists_sync():
+    """
+    Видаляє ВСІ збережені списки всіх користувачів (синхронно, для адмінки).
+    """
+    try:
+        with sync_session() as session:
+            session.execute(delete(SavedList))
+            session.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Помилка при видаленні всіх списків: {e}")
+        return False
+
+
 # --- Функції для експорту та роботи з файлами ---
 
 def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
