@@ -6,10 +6,11 @@ import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
-from aiogram.types import BotCommand
+from aiogram.fsm.storage.redis import RedisStorage
+from redis.asyncio import Redis
 from sqlalchemy import text
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, REDIS_URL
 from database.engine import async_session
 from handlers import (archive, common, error_handler, user_search)
 from handlers.admin import (archive_handlers as admin_archive,
@@ -61,11 +62,24 @@ async def main():
         logger.critical("Помилка підключення до бази даних: %s", e, exc_info=True)
         sys.exit(1)
 
+    # Ініціалізація Redis для FSM
+    try:
+        redis = Redis.from_url(REDIS_URL)
+        # Перевірка з'єднання
+        await redis.ping()
+        storage = RedisStorage(redis=redis)
+        logger.info(f"Підключення до Redis успішне: {REDIS_URL}")
+    except Exception as e:
+        logger.critical("Помилка підключення до Redis: %s", e, exc_info=True)
+        sys.exit(1)
+
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(
         parse_mode="Markdown",
         link_preview_is_disabled=True
     ))
-    dp = Dispatcher()
+    
+    # Використовуємо RedisStorage замість стандартного MemoryStorage
+    dp = Dispatcher(storage=storage)
 
     dp.update.middleware(LoggingMiddleware())
 
@@ -95,6 +109,8 @@ async def main():
     finally:
         logger.info("Завершення роботи бота...")
         await bot.session.close()
+        # Закриваємо з'єднання з Redis при зупинці
+        await redis.aclose()
         logger.info("Сесія бота закрита.")
 
 if __name__ == "__main__":
