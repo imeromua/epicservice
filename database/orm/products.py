@@ -30,60 +30,70 @@ class SmartColumnMapper:
             "артикул", "код", "code", "articul", "id", "sku", "item_code", "товар"
         ],
         "name": [
-            "назва", "name", "title", "найменування", "product", "description", "опис", "номенклатура", "товар"
+            "назва", "name", "title", "найменування", "product", "description", "опис", "номенклатура", "товар",
+            "наименование", "full name"
         ],
         "department": [
-            "відділ", "department", "dep", "секція", "група", "group", "div", "підрозділ"
+            "відділ", "department", "dep", "секція", "група", "group", "div", "підрозділ",
+            "віділ", "отдел", "ceкцiя"
         ],
         "group": [
-            "група", "group", "category", "категорія", "клас", "підгрупа"
+            "група", "group", "category", "категорія", "клас", "підгрупа",
+            "группа", "категория"
         ],
         "quantity": [
             "кількість", "к-ть", "count", "qty", "quantity", "залишок", "amount", 
-            "залишок (кількість)", "залишок к-ть", "кть", "штук", "шт"
+            "залишок (кількість)", "залишок к-ть", "кть", "штук", "шт", 
+            "залишок, к-ть", "кол-во", "остаток"
         ],
         "price": [
-            "ціна", "price", "cost", "вартість", "price_unit", "ціна за од"
+            "ціна", "price", "cost", "вартість", "price_unit", "ціна за од",
+            "цена", "розница"
         ],
         "stock_sum": [
-            "сума", "sum", "total", "залишок сума", "сума залишку", "вартість залишку"
+            "сума", "sum", "total", "залишок сума", "сума залишку", "вартість залишку",
+            "залишок, сума", "сумма", "итог"
         ],
         "months_without_sale": [
-            "місяці", "місяців", "м", "без руху", "months", "no sale", "неліквід", "період"
+            "місяці", "місяців", "м", "без руху", "months", "no sale", "неліквід", "період",
+            "міс без продажу", "міс. без продажу", "мес без продаж"
         ]
     }
 
     @staticmethod
     def normalize_header(header: str) -> str:
         """Приводить заголовок до нижнього регістру та видаляє зайві символи."""
-        return str(header).lower().strip()
+        # Замінюємо всі не-буквено-цифрові символи на пробіли, потім strip і lower
+        return re.sub(r'[^\w\s]', ' ', str(header)).lower().strip()
 
     @classmethod
-    def find_best_match(cls, headers: list[str], target_field: str, threshold: float = 0.8) -> str | None:
+    def find_best_match(cls, headers: list[str], target_field: str, threshold: float = 0.75) -> str | None:
         """
         Знаходить найкращий відповідник серед заголовків файлу для заданого поля.
         Використовує точний збіг, входження підрядка та нечіткий пошук.
         """
         synonyms = cls.COLUMN_SYNONYMS.get(target_field, [])
-        normalized_headers = {h: cls.normalize_header(h) for h in headers}
+        # Створюємо словник {оригінал: нормалізований}
+        normalized_headers_map = {h: cls.normalize_header(h) for h in headers}
         
-        # 1. Точний збіг (пріоритет)
-        for original, normalized in normalized_headers.items():
+        # 1. Точний збіг нормалізованих рядків (пріоритет)
+        for original, normalized in normalized_headers_map.items():
             if normalized in synonyms:
                 return original
         
         # 2. Частковий збіг (наприклад, "Залишок (к-ть)" містить "к-ть")
-        for original, normalized in normalized_headers.items():
+        for original, normalized in normalized_headers_map.items():
             for synonym in synonyms:
-                # Перевіряємо, чи синонім є окремим словом у заголовку
-                if re.search(r'\b' + re.escape(synonym) + r'\b', normalized):
+                # Перевіряємо, чи синонім є у заголовку (але не як частина іншого слова, якщо можливо)
+                # Тут просто перевіряємо входження для спрощення
+                if synonym in normalized:
                     return original
 
         # 3. Нечіткий пошук (SequenceMatcher)
         best_match = None
         best_score = 0.0
         
-        for original, normalized in normalized_headers.items():
+        for original, normalized in normalized_headers_map.items():
             for synonym in synonyms:
                 score = SequenceMatcher(None, normalized, synonym).ratio()
                 if score > best_score and score >= threshold:
@@ -112,11 +122,6 @@ class SmartColumnMapper:
             # Шукаємо найкращий збіг, ігноруючи вже використані колонки
             available_headers = [h for h in headers if h not in used_headers]
             match = cls.find_best_match(available_headers, field)
-            
-            # Спеціальна логіка для "Товар" -> Артикул vs Назва
-            # Якщо "Товар" містить цифри - це артикул, якщо текст - назва.
-            # Але на етапі заголовків ми це не знаємо точно, тому покладаємось на порядок:
-            # спочатку шукаємо артикул (він частіше має унікальні назви типу code), потім назву.
             
             if match:
                 mapping[field] = match
@@ -152,11 +157,14 @@ def _normalize_value(value: any, is_float: bool = True) -> float | str:
     if pd.isna(value):
         return 0.0 if is_float else "0"
 
-    s_value = str(value).replace(',', '.').strip()
+    # Замінюємо нерозривні пробіли (NBSP) та коми
+    s_value = str(value).replace(',', '.').replace('\xa0', '').replace(' ', '').strip()
+    
     # Видаляємо все, крім цифр, мінуса та крапки
     s_value = re.sub(r'[^0-9.-]', '', s_value)
     
     try:
+        if not s_value: return 0.0 if is_float else "0"
         return float(s_value) if is_float else s_value
     except (ValueError, TypeError):
         return 0.0 if is_float else "0"
@@ -174,9 +182,12 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
         mapping = SmartColumnMapper.map_columns(dataframe)
         logger.info(f"Знайдено колонки: {mapping}")
         
-        # Перевірка критично важливих полів (хоча б кількість має бути)
-        if "quantity" not in mapping and "stock_sum" not in mapping:
-             logger.error("Не знайдено колонку з кількістю або сумою.")
+        # Перевірка критично важливих полів (хоча б кількість або сума має бути)
+        has_qty_or_sum = "quantity" in mapping or "stock_sum" in mapping
+        has_identity = "article" in mapping or "name" in mapping
+
+        if not has_qty_or_sum or not has_identity:
+             logger.error(f"Не вистачає колонок. Mapping: {mapping}")
              return {}
 
         file_articles_data = {}
@@ -196,12 +207,18 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
                         name = n
             
             # --- Спроба 2: Артикул разом з назвою в колонці Name ---
-            if not article and "name" in mapping:
+            # Якщо артикул ще не знайдено, або знайдено, але назви немає
+            if "name" in mapping:
                 val = row[mapping["name"]]
                 if pd.notna(val):
-                    a, n = _extract_article_and_name(str(val))
-                    article = a
-                    name = n or str(val) # Якщо не розбилось, то весь рядок - назва
+                    # Якщо артикул вже є, то це точно назва
+                    if article:
+                        if not name: name = str(val)
+                    else:
+                        # Якщо артикулу немає, пробуємо витягти з назви
+                        a, n = _extract_article_and_name(str(val))
+                        article = a
+                        name = n or str(val)
             
             # Якщо після всіх спроб артикулу немає - пропускаємо рядок
             if not article:
@@ -211,7 +228,6 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
             department = 0
             if "department" in mapping:
                 try:
-                    # Відділ - завжди цифра, очищаємо від сміття
                     dep_val = row[mapping["department"]]
                     department = int(_normalize_value(dep_val))
                 except:
@@ -241,15 +257,12 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
                 price = float(_normalize_value(row[mapping["price"]]))
             
             # Евристика: розрахунок відсутніх даних
-            # 1. Є Сума і Кількість -> Рахуємо Ціну
             if price == 0 and qty > 0 and stock_sum > 0:
                 price = stock_sum / qty
             
-            # 2. Є Ціна і Кількість -> Рахуємо Суму
             if stock_sum == 0 and price > 0 and qty > 0:
                 stock_sum = price * qty
             
-            # 3. Є Сума і Ціна -> Рахуємо Кількість (рідкісний кейс)
             if qty == 0 and stock_sum > 0 and price > 0:
                 qty = stock_sum / price
 
@@ -262,7 +275,7 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
                 "назва": name.strip(),
                 "відділ": department,
                 "група": group,
-                "кількість": str(qty) if qty % 1 != 0 else str(int(qty)), # Якщо ціле число - без .0
+                "кількість": str(qty) if qty % 1 != 0 else str(int(qty)),
                 "місяці_без_руху": months,
                 "сума_залишку": stock_sum,
                 "ціна": price,
@@ -280,7 +293,7 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
 
             articles_to_add = file_articles - db_articles
             articles_to_update = db_articles.intersection(file_articles)
-            articles_to_deactivate = db_articles - file_articles # Нема у файлі, є в БД -> Вимикаємо
+            articles_to_deactivate = db_articles - file_articles
 
             # 1. Деактивація (Soft Delete)
             if articles_to_deactivate:
@@ -298,20 +311,16 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
                     product_db = existing_products[article]
                     new_data = file_articles_data[article]
 
-                    # Якщо товар був неактивний - активуємо
                     if not product_db.активний:
                         reactivated_count += 1
                     
-                    # Логіка збереження старої ціни, якщо нова 0
                     if new_data["ціна"] == 0.0 and product_db.ціна and product_db.ціна > 0.0:
                          new_data["ціна"] = product_db.ціна
-                         # Перераховуємо суму, якщо зберегли стару ціну
                          try:
                              qty_float = float(new_data["кількість"])
                              new_data["сума_залишку"] = qty_float * new_data["ціна"]
                          except: pass
 
-                    # Логіка збереження місяців, якщо в файлі немає колонки
                     if new_data["місяці_без_руху"] is None:
                         new_data["місяці_без_руху"] = product_db.місяці_без_руху or 0
 
@@ -335,13 +344,11 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
                     session.bulk_save_objects(products_to_add_objects)
                     added_count = len(products_to_add_objects)
             
-            # Скидаємо резерви (відкладено) в нуль, бо прийшов свіжий файл залишків
             session.execute(update(Product).values(відкладено=0))
             session.commit()
 
             total_in_db = session.execute(select(func.count(Product.id)).where(Product.активний == True)).scalar_one()
 
-            # Статистика по відділах для звіту
             for data in file_articles_data.values():
                 dep = data["відділ"]
                 department_stats[dep] = department_stats.get(dep, 0) + 1
@@ -359,32 +366,27 @@ def _sync_smart_import(dataframe: pd.DataFrame) -> dict:
 
 
 async def orm_smart_import(dataframe: pd.DataFrame) -> dict:
-    """
-    Асинхронна обгортка для запуску синхронної функції імпорту.
-    """
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _sync_smart_import, dataframe)
 
 
 def _sync_subtract_collected_from_stock(dataframe: pd.DataFrame) -> dict:
-    """
-    Синхронно віднімає кількість зібраних товарів від залишків
-    та перераховує суму залишку.
-    """
     processed_count, not_found_count, error_count = 0, 0, 0
-    
-    # Використовуємо той самий мапер для пошуку колонок
     mapping = SmartColumnMapper.map_columns(dataframe)
+    
+    # Використовуємо SmartColumnMapper
     col_article = mapping.get("article")
+    # Якщо артикулу немає, спробуємо Name (там може бути злитий)
+    if not col_article: col_article = mapping.get("name")
+    
     col_qty = mapping.get("quantity")
     
     if not col_article or not col_qty:
-        logger.error("Віднімання: не знайдено колонки артикулу або кількості.")
+        logger.error("Віднімання: не знайдено колонки артикулу/назви або кількості.")
         return {'processed': 0, 'not_found': 0, 'errors': 0, 'msg': 'Колонки не знайдено'}
 
     with sync_session() as session:
         for _, row in dataframe.iterrows():
-            # Отримання артикулу (може бути злитий з назвою)
             val = row[col_article]
             article_cand, _ = _extract_article_and_name(val)
             article = article_cand if article_cand else str(val).strip()
@@ -402,8 +404,6 @@ def _sync_subtract_collected_from_stock(dataframe: pd.DataFrame) -> dict:
                 quantity_to_subtract = float(_normalize_value(row[col_qty]))
                 
                 new_stock = current_stock - quantity_to_subtract
-                # Захист від від'ємних залишків? (Можна залишити як є, раптом пересорт)
-                
                 price = product.ціна or 0.0
                 new_stock_sum = new_stock * price
 
@@ -411,7 +411,7 @@ def _sync_subtract_collected_from_stock(dataframe: pd.DataFrame) -> dict:
                     update(Product)
                     .where(Product.id == product.id)
                     .values(
-                        кількість=str(new_stock), # Зберігаємо як рядок для сумісності з поточним полем
+                        кількість=str(new_stock),
                         сума_залишку=new_stock_sum
                     )
                 )
@@ -432,9 +432,6 @@ async def orm_subtract_collected(dataframe: pd.DataFrame) -> dict:
 # --- Функції пошуку та отримання товарів ---
 
 async def orm_find_products(search_query: str) -> list[Product]:
-    """
-    Виконує нечіткий пошук товарів у базі даних серед активних товарів.
-    """
     async with async_session() as session:
         like_query = f"%{search_query}%"
         stmt = select(Product).where(
