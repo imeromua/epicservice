@@ -86,7 +86,13 @@ def validate_db_port(port_str: str) -> int:
         raise
 
 DB_USER = get_required_env("DB_USER")
-DB_PASS = get_required_env("DB_PASS")
+# Fix: use DB_PASSWORD to match .env.example, fallback to DB_PASS for compatibility
+DB_PASS = os.getenv("DB_PASSWORD") or os.getenv("DB_PASS")
+if not DB_PASS:
+    error_msg = "Критична помилка: відсутня обов'язкова змінна оточення: DB_PASSWORD (або DB_PASS)"
+    logger.critical(error_msg)
+    raise ValueError(error_msg)
+
 DB_HOST = get_required_env("DB_HOST")
 DB_PORT = validate_db_port(get_required_env("DB_PORT"))
 DB_NAME = get_required_env("DB_NAME")
