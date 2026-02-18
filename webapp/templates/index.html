@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpicService</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+        
+        .header {
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: var(--tg-theme-button-color, #0088cc);
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--tg-theme-link-color, #0088cc);
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #999999);
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: var(--tg-theme-hint-color, #999999);
+            cursor: pointer;
+            font-size: 16px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            color: var(--tg-theme-button-color, #0088cc);
+            border-bottom-color: var(--tg-theme-button-color, #0088cc);
+        }
+        
+        .content {
+            display: none;
+        }
+        
+        .content.active {
+            display: block;
+        }
+        
+        .product-card {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .product-card:active {
+            transform: scale(0.98);
+        }
+        
+        .product-article {
+            font-weight: bold;
+            color: var(--tg-theme-button-color, #0088cc);
+            margin-bottom: 4px;
+        }
+        
+        .product-name {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: var(--tg-theme-text-color, #000000);
+        }
+        
+        .product-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .product-price {
+            font-weight: bold;
+            color: var(--tg-theme-button-color, #0088cc);
+        }
+        
+        .list-item {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .loader {
+            text-align: center;
+            padding: 20px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .total-box {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--tg-theme-bg-color, #ffffff);
+            border-top: 1px solid var(--tg-theme-hint-color, #999999);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .total-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--tg-theme-bg-color, #ffffff);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+        
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+        
+        .qty-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            background: var(--tg-theme-button-color, #0088cc);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qty-display {
+            font-size: 24px;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .add-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📦 EpicService</h1>
+        <p id="userInfo">Завантаження...</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('search')">🔍 Пошук</button>
+        <button class="tab" onclick="switchTab('list')">📋 Мій список</button>
+    </div>
+
+    <!-- Пошук -->
+    <div id="searchTab" class="content active">
+        <div class="search-box">
+            <input type="text" id="searchInput" class="search-input" placeholder="Введіть артикул або назву...">
+        </div>
+        <div id="searchResults"></div>
+    </div>
+
+    <!-- Мій список -->
+    <div id="listTab" class="content">
+        <div id="listContent"></div>
+    </div>
+
+    <!-- Модальне вікно додавання -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalTitle"></h2>
+            <p id="modalPrice"></p>
+            <p id="modalAvailable"></p>
+            
+            <div class="quantity-selector">
+                <button class="qty-btn" onclick="changeQty(-1)">−</button>
+                <div class="qty-display" id="qtyDisplay">1</div>
+                <button class="qty-btn" onclick="changeQty(1)">+</button>
+            </div>
+            
+            <button class="add-btn" onclick="confirmAdd()">🛒 Додати до списку</button>
+            <button class="add-btn" style="background: #999; margin-top: 8px;" onclick="closeModal()">Скасувати</button>
+        </div>
+    </div>
+
+    <!-- Підсумок -->
+    <div class="total-box" id="totalBox" style="display: none;">
+        <div class="total-text">Всього: <span id="totalSum">0</span> грн</div>
+        <div style="font-size: 14px; color: var(--tg-theme-hint-color, #999999);">
+            <span id="totalItems">0</span> товарів
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        const userId = tg.initDataUnsafe?.user?.id || 0;
+        let currentQuantity = 1;
+        let selectedProduct = null;
+        let searchTimeout = null;
+        
+        // Відображення інфо про користувача
+        document.getElementById('userInfo').textContent = 
+            userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}` : 'Тестовий режим';
+        
+        // Перемикання табів
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'search') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('searchTab').classList.add('active');
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('listTab').classList.add('active');
+                loadList();
+            }
+        }
+        
+        // Пошук з затримкою
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                document.getElementById('searchResults').innerHTML = '';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => search(query), 500);
+        });
+        
+        async function search(query) {
+            const results = document.getElementById('searchResults');
+            results.innerHTML = '<div class="loader">🔍 Пошук...</div>';
+            
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query, user_id: userId})
+                });
+                
+                const data = await response.json();
+                
+                if (!data.products || data.products.length === 0) {
+                    results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>';
+                    return;
+                }
+                
+                results.innerHTML = data.products.map(p => `
+                    <div class="product-card" onclick='openAddModal(${JSON.stringify(p)})'>
+                        <div class="product-article">${p.article}</div>
+                        <div class="product-name">${p.name}</div>
+                        <div class="product-info">
+                            <span>📍 Відділ: ${p.department}</span>
+                            <span class="product-price">${p.price.toFixed(2)} грн</span>
+                        </div>
+                        <div class="product-info">
+                            <span>✅ Доступно: ${p.available} шт.</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>';
+                tg.showAlert('Помилка: ' + error.message);
+            }
+        }
+        
+        function openAddModal(product) {
+            selectedProduct = product;
+            currentQuantity = 1;
+            
+            document.getElementById('modalTitle').textContent = product.article;
+            document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`;
+            document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`;
+            document.getElementById('qtyDisplay').textContent = currentQuantity;
+            
+            document.getElementById('addModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+        
+        function changeQty(delta) {
+            currentQuantity = Math.max(1, Math.min(selectedProduct.available, currentQuantity + delta));
+            document.getElementById('qtyDisplay').textContent = currentQuantity;
+        }
+        
+        async function confirmAdd() {
+            try {
+                const response = await fetch('/api/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: userId,
+                        product_id: selectedProduct.id,
+                        quantity: currentQuantity
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`✅ ${data.message}`);
+                    closeModal();
+                    loadList();
+                } else {
+                    tg.showAlert('❌ ' + data.message);
+                }
+            } catch (error) {
+                tg.showAlert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        async function loadList() {
+            const content = document.getElementById('listContent');
+            content.innerHTML = '<div class="loader">⏳ Завантаження...</div>';
+            
+            try {
+                const response = await fetch(`/api/list/${userId}`);
+                const data = await response.json();
+                
+                if (!data.items || data.items.length === 0) {
+                    content.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>';
+                    document.getElementById('totalBox').style.display = 'none';
+                    return;
+                }
+                
+                content.innerHTML = data.items.map(item => `
+                    <div class="list-item">
+                        <div class="list-header">
+                            <strong>${item.article}</strong>
+                            <span class="product-price">${item.total.toFixed(2)} грн</span>
+                        </div>
+                        <div>${item.name}</div>
+                        <div style="margin-top: 8px; color: var(--tg-theme-hint-color, #999999);">
+                            ${item.quantity} шт. × ${item.price.toFixed(2)} грн
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('totalSum').textContent = data.total.toFixed(2);
+                document.getElementById('totalItems').textContent = data.count;
+                document.getElementById('totalBox').style.display = 'flex';
+                
+            } catch (error) {
+                content.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+            }
+        }
+        
+        // Завантаження списку при старті
+        if (userId) {
+            loadList();
+        }
+    </script>
+</body>
+</html>
