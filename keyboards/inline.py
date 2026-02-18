@@ -116,28 +116,26 @@ def get_search_results_kb(products: list[Product]) -> InlineKeyboardMarkup:
 
 def get_product_card_kb(
     product_id: int,
-    current_qty: int = 1,
+    current_qty: int = 0, # Тепер це кількість У КОШИКУ
     price: float = 0.0,
     max_qty: int = 9999,
     search_query: str | None = None
 ) -> InlineKeyboardMarkup:
     """
-    Генерує інтерактивну клавіатуру картки товару.
-    Рядок 1: - 1 +
-    Рядок 2: Додати (Ціна)
+    Генерує інтерактивну клавіатуру картки товару (Direct Action Mode).
+    Рядок 1: - [У кошику: X] +
+    Рядок 2: Ввести кількість
     Рядок 3: Назад | Головне меню
     """
     
-    # Розраховуємо загальну суму
-    total_price = current_qty * price
-    price_text = f"({total_price:.2f} грн)" if price > 0 else ""
-    
     keyboard = []
     
-    # 1. Рядок керування кількістю
-    # Callback data: дія : тип : id товару : поточна кількість : макс кількість : ціна
-    # Ціну теж передаємо, щоб перераховувати кнопку "Додати" без БД
+    # 1. Рядок керування кількістю (Пряма дія)
+    # Callback data: дія : тип : id товару : поточна_к-сть_в_кошику : макс : ціна
     price_str = str(price)
+    
+    # Визначаємо текст центральної кнопки
+    center_text = f"🛒 У кошику: {current_qty}" if current_qty > 0 else "🛒 0 шт"
     
     qty_row = [
         InlineKeyboardButton(
@@ -145,7 +143,7 @@ def get_product_card_kb(
             callback_data=f"card_qty:dec:{product_id}:{current_qty}:{max_qty}:{price_str}"
         ),
         InlineKeyboardButton(
-            text=f" {current_qty} шт ",
+            text=center_text,
             callback_data="ignore" 
         ),
         InlineKeyboardButton(
@@ -155,13 +153,11 @@ def get_product_card_kb(
     ]
     keyboard.append(qty_row)
     
-    # 2. Кнопка додавання
-    # Змінено текст кнопки на: "Додати X шт (Y грн)"
-    add_button_text = f"🛒 Додати {current_qty} шт. {price_text}"
+    # 2. Кнопка ручного вводу (замість кнопки "Додати", бо додавання тепер на +/-)
     keyboard.append([
         InlineKeyboardButton(
-            text=add_button_text,
-            callback_data=f"card_add:{product_id}:{current_qty}"
+            text=LEXICON.BUTTON_ADD_CUSTOM, # "📝 Ввести іншу кількість"
+            callback_data=f"qty_manual_input:{product_id}" # Використовуємо існуючий callback
         )
     ])
     
