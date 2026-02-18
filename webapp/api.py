@@ -23,7 +23,7 @@ from database.orm import (
     orm_clear_temp_list
 )
 from utils.list_processor import process_and_save_list
-from utils.archive_manager import get_user_archives, ACTIVE_DIR
+from utils.archive_manager import get_user_archives as get_archives_for_user, ACTIVE_DIR
 from sqlalchemy.exc import SQLAlchemyError
 from config import BOT_TOKEN
 
@@ -96,7 +96,7 @@ async def search_products(req: SearchRequest):
         # Формуємо відповідь з детальною інформацією
         result = []
         for product in products:
-            # Розрахуємо доступну кількість
+            # Розраховуємо доступну кількість
             try:
                 total_quantity = float(product.кількість)
             except (ValueError, TypeError):
@@ -191,7 +191,7 @@ async def get_user_archives(user_id: int):
     try:
         print(f"📁 Archives request for user_id={user_id}")
         
-        archives = get_user_archives(user_id)
+        archives = get_archives_for_user(user_id)
         
         if not archives:
             return JSONResponse(content={"archives": []}, status_code=200)
