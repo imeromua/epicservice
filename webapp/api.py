@@ -364,15 +364,18 @@ async def clear_list(user_id: int):
 @app.post("/api/save/{user_id}")
 async def save_list_to_excel(user_id: int):
     """
-    Зберегти список користувача в Excel та відправити в Telegram.
-    Використовує ту саму логіку що й бот: 
+    Зберегти список користувача в Excel.
+    WebApp версія: НЕ відправляє в Telegram чат, тільки зберігає в архів.
+    Користувач може завантажити файл з вкладки "Архів".
+    
+    Виконує:
     - Зберігає в archives/active/
     - Розділяє на основний список та лишки
     - Резервує товари в БД
     - Очищає тимчасовий список
     """
     try:
-        print(f"💾 Save list request for user_id={user_id}")
+        print(f"💾 Save list request for user_id={user_id} (webapp - no Telegram send)")
         
         async with async_session() as session:
             async with session.begin():
@@ -388,39 +391,16 @@ async def save_list_to_excel(user_id: int):
         
         print(f"✅ Files saved: main={main_list_path}, surplus={surplus_list_path}")
         
-        # Відправка файлів через бота
-        try:
-            if main_list_path:
-                document = FSInputFile(main_list_path)
-                await bot.send_document(
-                    chat_id=user_id,
-                    document=document,
-                    caption="📋 Ваш основний список збережено"
-                )
-                print(f"📤 Main list sent to user {user_id}")
-            
-            if surplus_list_path:
-                document = FSInputFile(surplus_list_path)
-                await bot.send_document(
-                    chat_id=user_id,
-                    document=document,
-                    caption="📦 Лишки (товарів не вистачило)"
-                )
-                print(f"📤 Surplus list sent to user {user_id}")
-            
-            return JSONResponse(content={
-                "success": True,
-                "message": "Список збережено та відправлено в чат!",
-                "cleared": True  # Сигнал для фронтенду що треба очистити UI
-            }, status_code=200)
-            
-        except Exception as bot_error:
-            print(f"❌ Error sending file via bot: {bot_error}")
-            traceback.print_exc()
-            return JSONResponse(
-                content={"success": False, "message": "Помилка відправки файлу"},
-                status_code=500
-            )
+        # Формуємо відповідь
+        response_data = {
+            "success": True,
+            "message": "✅ Список збережено!",
+            "cleared": True,  # Сигнал для frontend що треба очистити UI
+            "has_main": bool(main_list_path),
+            "has_surplus": bool(surplus_list_path)
+        }
+        
+        return JSONResponse(content=response_data, status_code=200)
                     
     except Exception as e:
         print(f"❌ ERROR in save_list_to_excel: {type(e).__name__}: {e}")
