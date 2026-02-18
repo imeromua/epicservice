@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from database.engine import async_session
 from database.orm import (orm_find_products, orm_get_product_by_id, 
                           orm_add_item_to_temp_list, orm_get_temp_list_department,
-                          orm_delete_temp_list_item)
+                          orm_delete_temp_list_item, orm_update_temp_list_item_quantity) # Додано імпорт
 from handlers.common import clean_previous_keyboard
 from handlers.user.list_management import back_to_main_menu
 from keyboards.inline import get_search_results_kb, get_product_card_kb
@@ -187,11 +187,6 @@ async def handle_card_qty_change(callback: CallbackQuery, bot: Bot, state: FSMCo
             # Змінюємо в БД
             await orm_add_item_to_temp_list(user_id, product_id, qty_change)
             
-            # Якщо після віднімання стало 0 або менше - можна перевірити і видалити запис, 
-            # але orm_add_item_to_temp_list може залишати запис з 0.
-            # Варто додати чистку, якщо 0.
-            # Але поки що покладаємось на логіку відображення.
-            
             if current_in_cart + qty_change <= 0:
                  await orm_delete_temp_list_item(user_id, product_id)
 
@@ -248,9 +243,6 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
     except TelegramBadRequest:
         pass
     
-    # Видаляємо прохання ввести число (попереднє повідомлення від бота)
-    # Це складніше знайти, тому просто ігноруємо, або треба було зберігати його ID
-    
     try:
         quantity = int(message.text)
         if quantity < 0:
@@ -271,12 +263,6 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
                 await state.set_state(None)
                 return
 
-             # Оновлюємо (перезаписуємо або додаємо? Логіка "Ввести кількість" зазвичай означає "Встановити").
-             # Використаємо orm_add_item_to_temp_list з різницею або нову функцію Set.
-             # Простіше: видалити старе і додати нове, або вирахувати різницю.
-             # Але у нас є функція orm_update_temp_list_item_quantity в temp_lists.py!
-             from database.orm import orm_update_temp_list_item_quantity
-             
              if quantity == 0:
                  await orm_delete_temp_list_item(user_id, product_id)
              else:
@@ -295,11 +281,10 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
                 search_query=last_query
             )
              
-             await message.answer(f"✅ Встановлено кількість: {quantity} шт.", show_alert=True) # Це повідомлення може залишитись в чаті або зникнути
-             # Краще відправити тимчасове повідомлення або просто оновити картку
+             # await message.answer(f"✅ Встановлено кількість: {quantity} шт.", show_alert=True)
              
     except Exception as e:
         logger.error("Помилка обробки ручного вводу кількості: %s", e, exc_info=True)
         await message.answer(LEXICON.UNEXPECTED_ERROR)
     
-    await state.set_state(None) # Повертаємось в звичайний режим
+    await state.set_state(None)
