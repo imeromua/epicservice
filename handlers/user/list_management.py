@@ -12,7 +12,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import ADMIN_IDS
 from database.orm import orm_clear_temp_list, orm_get_temp_list
-# --- ЗМІНА: Імпортуємо наш новий хелпер ---
 from handlers.common import clean_previous_keyboard
 from keyboards.inline import (get_admin_main_kb, get_confirmation_kb,
                               get_my_list_kb, get_user_main_kb)
@@ -20,6 +19,7 @@ from lexicon.lexicon import LEXICON
 
 logger = logging.getLogger(__name__)
 router = Router()
+
 
 class ListManagementStates(StatesGroup):
     confirm_new_list = State()
@@ -105,11 +105,9 @@ async def new_list_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(ListManagementStates.confirm_new_list, F.data == "confirm_new_list")
 async def new_list_confirmed(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
-    # Не скидаємо стан повністю, щоб зберегти main_message_id
-    await state.set_state(None) 
+    await state.set_state(None)
     try:
         await orm_clear_temp_list(user_id)
-        
         back_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
                 text=LEXICON.BUTTON_BACK_TO_MAIN_MENU,
@@ -117,7 +115,7 @@ async def new_list_confirmed(callback: CallbackQuery, state: FSMContext):
             )
         ]])
         await callback.message.edit_text(
-            LEXICON.NEW_LIST_CONFIRMED, 
+            LEXICON.NEW_LIST_CONFIRMED,
             reply_markup=back_kb
         )
         await state.update_data(main_message_id=callback.message.message_id)
@@ -134,11 +132,9 @@ async def my_list_handler(callback: CallbackQuery, bot: Bot, state: FSMContext):
     Обробляє запит "Мій список", видаляючи клавіатуру з попереднього меню.
     """
     try:
-        # --- ЗМІНА: Видаляємо тільки клавіатуру ---
         await callback.message.edit_reply_markup(reply_markup=None)
     except TelegramBadRequest as e:
-        logger.warning("Помилка видалення клавіатури при запиті 'Мій список': %s", e)
-    
+        logger.debug("my_list_handler: не вдалося прибрати клавіатуру: %s", e)
     await _display_user_list(bot, callback.message.chat.id, callback.from_user.id, state)
     await callback.answer()
 
@@ -156,21 +152,19 @@ async def cancel_list_confirm_handler(callback: CallbackQuery, state: FSMContext
 @router.callback_query(ListManagementStates.confirm_cancel_list, F.data == "cancel_list:yes")
 async def cancel_list_confirmed(callback: CallbackQuery, state: FSMContext, bot: Bot):
     user_id = callback.from_user.id
-    # Не скидаємо стан повністю, щоб зберегти main_message_id
     await state.set_state(None)
     try:
         await orm_clear_temp_list(user_id)
-        # --- ЗМІНА: Видаляємо клавіатуру, а не повідомлення ---
         try:
             await callback.message.edit_reply_markup(reply_markup=None)
-        except:
-            pass
+        except TelegramBadRequest as e:
+            logger.debug("cancel_list_confirmed: не вдалося прибрати клавіатуру: %s", e)
         await callback.message.answer(LEXICON.LIST_CANCELED)
-        
+
         user = callback.from_user
         kb = get_admin_main_kb() if user.id in ADMIN_IDS else get_user_main_kb()
         text = LEXICON.CMD_START_ADMIN if user.id in ADMIN_IDS else LEXICON.CMD_START_USER
-        
+
         sent_message = await callback.message.answer(text, reply_markup=kb)
         await state.update_data(main_message_id=sent_message.message_id)
 
@@ -183,12 +177,10 @@ async def cancel_list_confirmed(callback: CallbackQuery, state: FSMContext, bot:
 
 @router.callback_query(ListManagementStates.confirm_cancel_list, F.data == "cancel_list:no")
 async def cancel_list_declined(callback: CallbackQuery, state: FSMContext, bot: Bot):
-    # Не скидаємо стан повністю
-    await state.set_state(None) 
-    # --- ЗМІНА: Видаляємо клавіатуру, а не повідомлення ---
+    await state.set_state(None)
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
-    except:
-        pass
+    except TelegramBadRequest as e:
+        logger.debug("cancel_list_declined: не вдалося прибрати клавіатуру: %s", e)
     await _display_user_list(bot, callback.message.chat.id, callback.from_user.id, state)
     await callback.answer()
