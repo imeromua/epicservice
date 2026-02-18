@@ -7,8 +7,6 @@ import uvicorn
 import sys
 import os
 import traceback
-from datetime import datetime
-import pandas as pd
 from aiogram import Bot
 from aiogram.types import FSInputFile
 
@@ -24,6 +22,7 @@ from database.orm import (
     orm_delete_temp_list_item,
     orm_clear_temp_list
 )
+from utils.list_processor import process_and_save_list
 from sqlalchemy.exc import SQLAlchemyError
 from config import BOT_TOKEN
 
@@ -32,10 +31,6 @@ app = FastAPI()
 # Статичні файли і шаблони
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
-
-# Папка для тимчасових файлів
-TEMP_FILES_DIR = os.path.join(os.path.dirname(__file__), "temp_files")
-os.makedirs(TEMP_FILES_DIR, exist_ok=True)
 
 # Bot instance
 bot = Bot(token=BOT_TOKEN)
@@ -84,7 +79,6 @@ async def search_products(req: SearchRequest):
     try:
         print(f"🔍 Search request: query='{req.query}', user_id={req.user_id}")
         
-        # orm_find_products сама створює сесію
         print(f"📞 Calling orm_find_products...")
         products = await orm_find_products(req.query)
         print(f"✅ orm_find_products returned {len(products) if products else 0} products")
@@ -181,7 +175,6 @@ async def add_to_list(req: AddToListRequest):
         print(f"➕ Add to list request: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
         
         print(f"📞 Calling orm_add_item_to_temp_list...")
-        # orm_add_item_to_temp_list сама створює сесію
         await orm_add_item_to_temp_list(
             user_id=req.user_id,
             product_id=req.product_id,
@@ -285,80 +278,59 @@ async def clear_list(user_id: int):
 @app.post("/api/save/{user_id}")
 async def save_list_to_excel(user_id: int):
     """
-    Згенерувати Excel файл зі списку та відправити його користувачу в Telegram.
+    Зберегти список користувача в Excel та відправити в Telegram.
+    Використовує ту саму логіку що й бот: 
+    - Зберігає в archives/active/
+    - Розділяє на основний список та лишки
+    - Резервує товари в БД
+    - Очищає тимчасовий список
     """
     try:
         print(f"💾 Save list request for user_id={user_id}")
         
-        temp_list = await orm_get_temp_list(user_id)
+        async with async_session() as session:
+            async with session.begin():
+                # Використовуємо ту саму функцію що й бот
+                main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
         
-        if not temp_list:
+        if not main_list_path and not surplus_list_path:
             print(f"⚠️ List is empty for user {user_id}")
             return JSONResponse(
                 content={"success": False, "message": "Список порожній"},
                 status_code=400
             )
         
-        # Підготовка даних
-        items = []
-        total_sum = 0.0
-        department = None
+        print(f"✅ Files saved: main={main_list_path}, surplus={surplus_list_path}")
         
-        for item in temp_list:
-            if department is None:
-                department = item.product.відділ
-            
-            items.append({
-                "Артикул": item.product.артикул,
-                "Кількість": item.quantity
-            })
-            total_sum += float(item.product.ціна) * item.quantity
-        
-        print(f"📊 Processing {len(items)} items, total: {total_sum:.2f} UAH")
-        
-        # Створення DataFrame
-        df = pd.DataFrame(items)
-        
-        # Додавання підсумку
-        summary_df = pd.DataFrame([
-            {"Артикул": "", "Кількість": ""},
-            {"Артикул": "К-ть артикулів:", "Кількість": len(df)},
-            {"Артикул": "Зібрано на суму:", "Кількість": f"{total_sum:.2f} грн"}
-        ])
-        
-        df_final = pd.concat([df, summary_df], ignore_index=True)
-        
-        # Генерація назви файлу
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
-        dept = department if department else "list"
-        file_name = f"{dept}_{user_id}_{timestamp}.xlsx"
-        file_path = os.path.join(TEMP_FILES_DIR, file_name)
-        
-        # Збереження файлу
-        df_final.to_excel(file_path, index=False, header=['Артикул', 'Кількість'])
-        
-        print(f"✅ Excel file created: {file_path}")
-        
-        # Відправка файлу через бота
+        # Відправка файлів через бота
         try:
-            document = FSInputFile(file_path)
-            await bot.send_document(
-                chat_id=user_id,
-                document=document,
-                caption=f"💾 Ваш список\n\n📦 Товарів: {len(items)}\n💰 Сума: {total_sum:.2f} грн"
-            )
-            print(f"📤 File sent to user {user_id} via Telegram")
+            if main_list_path:
+                document = FSInputFile(main_list_path)
+                await bot.send_document(
+                    chat_id=user_id,
+                    document=document,
+                    caption="📋 Ваш основний список збережено"
+                )
+                print(f"📤 Main list sent to user {user_id}")
             
-            # Видаляємо тимчасовий файл
-            os.remove(file_path)
+            if surplus_list_path:
+                document = FSInputFile(surplus_list_path)
+                await bot.send_document(
+                    chat_id=user_id,
+                    document=document,
+                    caption="📦 Лишки (товарів не вистачило)"
+                )
+                print(f"📤 Surplus list sent to user {user_id}")
             
             return JSONResponse(content={
                 "success": True,
-                "message": "Файл відправлено вам в чат!"
+                "message": "Список збережено та відправлено в чат!",
+                "cleared": True  # Сигнал для фронтенду що треба очистити UI
             }, status_code=200)
             
         except Exception as bot_error:
             print(f"❌ Error sending file via bot: {bot_error}")
+            traceback.print_exc()
             return JSONResponse(
                 content={"success": False, "message": "Помилка відправки файлу"},
                 status_code=500
@@ -368,7 +340,7 @@ async def save_list_to_excel(user_id: int):
         print(f"❌ ERROR in save_list_to_excel: {type(e).__name__}: {e}")
         traceback.print_exc()
         return JSONResponse(
-            content={"error": "Помилка генерації файлу", "details": str(e)},
+            content={"error": "Помилка збереження списку", "details": str(e)},
             status_code=500
         )
 
