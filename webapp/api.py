@@ -13,7 +13,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from database.engine import async_session
-from database.orm import orm_search_products, orm_get_temp_list, orm_add_to_temp_list
+from database.orm import orm_find_products, orm_get_temp_list, orm_add_item_to_temp_list
 from sqlalchemy.exc import SQLAlchemyError
 
 app = FastAPI()
@@ -54,7 +54,7 @@ async def search_products(req: SearchRequest):
     """
     try:
         async with async_session() as session:
-            products = await orm_search_products(req.query, session=session)
+            products = await orm_find_products(req.query, session=session)
             
             if not products:
                 return JSONResponse(content={"products": [], "message": "Нічого не знайдено"}, status_code=200)
@@ -134,7 +134,7 @@ async def add_to_list(req: AddToListRequest):
     try:
         async with async_session() as session:
             async with session.begin():
-                result = await orm_add_to_temp_list(
+                result = await orm_add_item_to_temp_list(
                     user_id=req.user_id,
                     product_id=req.product_id,
                     quantity=req.quantity,
