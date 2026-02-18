@@ -74,7 +74,7 @@ async def health_check():
 async def search_products(req: SearchRequest):
     """
     Пошук товарів за артикулом або назвою.
-    Повертає список товарів з інформацією про наявність.
+    Повертає список товарів з детальною інформацією.
     """
     try:
         print(f"🔍 Search request: query='{req.query}', user_id={req.user_id}")
@@ -87,7 +87,12 @@ async def search_products(req: SearchRequest):
             print(f"⚠️ No products found")
             return JSONResponse(content={"products": [], "message": "Нічого не знайдено"}, status_code=200)
         
-        # Формуємо відповідь
+        # Отримуємо temp_list користувача для підрахунку резерву
+        async with async_session() as session:
+            temp_list = await orm_get_temp_list(req.user_id, session=session)
+            user_reserved = {item.product_id: item.quantity for item in temp_list} if temp_list else {}
+        
+        # Формуємо відповідь з детальною інформацією
         result = []
         for product in products:
             # Розрахуємо доступну кількість
@@ -98,13 +103,23 @@ async def search_products(req: SearchRequest):
             
             available = total_quantity - product.відкладено
             
+            # Резерв користувача
+            user_reserved_qty = user_reserved.get(product.id, 0)
+            user_reserved_sum = user_reserved_qty * float(product.ціна)
+            
             result.append({
                 "id": product.id,
                 "article": product.артикул,
                 "name": product.назва,
                 "price": float(product.ціна),
                 "available": available,
-                "department": product.відділ
+                "department": product.відділ,
+                "group": product.група,
+                "months_without_movement": product.місяці_без_руху or 0,
+                "balance_sum": float(product.сума_залишку or 0.0),
+                "reserved": product.відкладено,
+                "user_reserved": user_reserved_qty,
+                "user_reserved_sum": user_reserved_sum
             })
         
         print(f"✅ Returning {len(result)} products")
