@@ -135,19 +135,22 @@ def get_product_card_kb(
     keyboard = []
     
     # 1. Рядок керування кількістю
-    # Callback data: дія : тип : id товару : поточна кількість
+    # Callback data: дія : тип : id товару : поточна кількість : макс кількість : ціна
+    # Ціну теж передаємо, щоб перераховувати кнопку "Додати" без БД
+    price_str = str(price)
+    
     qty_row = [
         InlineKeyboardButton(
             text="➖",
-            callback_data=f"card_qty:dec:{product_id}:{current_qty}"
+            callback_data=f"card_qty:dec:{product_id}:{current_qty}:{max_qty}:{price_str}"
         ),
         InlineKeyboardButton(
             text=f" {current_qty} шт ",
-            callback_data="ignore" # Кнопка неактивна, просто відображає
+            callback_data="ignore" 
         ),
         InlineKeyboardButton(
             text="➕",
-            callback_data=f"card_qty:inc:{product_id}:{current_qty}"
+            callback_data=f"card_qty:inc:{product_id}:{current_qty}:{max_qty}:{price_str}"
         )
     ]
     keyboard.append(qty_row)
@@ -164,9 +167,6 @@ def get_product_card_kb(
     # 3. Навігація
     nav_row = []
     if search_query:
-        # Якщо є пошуковий запит, додаємо кнопку "Назад до пошуку"
-        # Але щоб не захаращувати, можна зробити її окремим рядком, або разом з "Головне меню"
-        # Зробимо окремим рядком, якщо потрібно, або разом
         nav_row.append(
             InlineKeyboardButton(
                 text=LEXICON.BUTTON_BACK_TO_SEARCH,
