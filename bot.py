@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from config import BOT_TOKEN, REDIS_ENABLED, REDIS_URL
 from database.engine import async_session
-from handlers import (archive, common, error_handler, user_search)
+from handlers import (archive, common, error_handler, user_search, webapp_handler)
 from handlers.admin import (archive_handlers as admin_archive,
                             core as admin_core,
                             import_handlers as admin_import,
@@ -117,6 +117,7 @@ async def main():
     dp.include_router(admin_reports.router)
     dp.include_router(admin_archive.router)
     dp.include_router(common.router)
+    dp.include_router(webapp_handler.router)  # Web App handler
     dp.include_router(archive.router)
     dp.include_router(list_management.router)
     dp.include_router(list_editing.router)
