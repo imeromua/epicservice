@@ -1,7 +1,6 @@
 # epicservice/handlers/user/list_saving.py
 
 import logging
-import os
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -62,8 +61,3 @@ async def save_list_callback(callback: CallbackQuery, bot: Bot, state: FSMContex
     except Exception as e:
         logger.error("Неочікувана помилка при збереженні списку для %s: %s", user_id, e, exc_info=True)
         await callback.message.answer(LEXICON.UNEXPECTED_ERROR)
-    finally:
-        if main_list_path and os.path.exists(main_list_path):
-            os.remove(main_list_path)
-        if surplus_list_path and os.path.exists(surplus_list_path):
-            os.remove(surplus_list_path)
