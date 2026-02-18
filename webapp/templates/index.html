@@ -221,6 +221,30 @@
             text-align: center;
         }
         
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .quick-btn {
+            flex: 1;
+            padding: 12px;
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            color: var(--tg-theme-text-color, #000000);
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-btn:active {
+            transform: scale(0.95);
+            background: var(--tg-theme-button-color, #0088cc);
+            color: white;
+        }
+        
         .add-btn {
             width: 100%;
             padding: 16px;
@@ -232,6 +256,18 @@
             font-weight: bold;
             cursor: pointer;
             margin-top: 16px;
+        }
+        
+        .custom-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 8px;
+            font-size: 18px;
+            text-align: center;
+            margin: 16px 0;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
         }
     </style>
 </head>
@@ -266,13 +302,27 @@
             <p id="modalPrice"></p>
             <p id="modalAvailable"></p>
             
-            <div class="quantity-selector">
-                <button class="qty-btn" onclick="changeQty(-1)">−</button>
-                <div class="qty-display" id="qtyDisplay">1</div>
-                <button class="qty-btn" onclick="changeQty(1)">+</button>
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button>
+                <button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button>
             </div>
             
-            <button class="add-btn" onclick="confirmAdd()">🛒 Додати до списку</button>
+            <div id="customInputBox" style="display: none;">
+                <input type="number" id="customQtyInput" class="custom-input" 
+                       placeholder="Введіть кількість" min="1">
+                <button class="add-btn" onclick="applyCustomQty()">✅ Підтвердити</button>
+            </div>
+            
+            <div id="normalSelector">
+                <div class="quantity-selector">
+                    <button class="qty-btn" onclick="changeQty(-1)">−</button>
+                    <div class="qty-display" id="qtyDisplay">1</div>
+                    <button class="qty-btn" onclick="changeQty(1)">+</button>
+                </div>
+                
+                <button class="add-btn" onclick="confirmAdd()">🛍️ Додати до списку</button>
+            </div>
+            
             <button class="add-btn" style="background: #999; margin-top: 8px;" onclick="closeModal()">Скасувати</button>
         </div>
     </div>
@@ -373,6 +423,11 @@
             document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`;
             document.getElementById('qtyDisplay').textContent = currentQuantity;
             
+            // Скидаємо кастомний ввід
+            document.getElementById('customInputBox').style.display = 'none';
+            document.getElementById('normalSelector').style.display = 'block';
+            document.getElementById('customQtyInput').value = '';
+            
             document.getElementById('addModal').classList.add('active');
         }
         
@@ -383,6 +438,39 @@
         function changeQty(delta) {
             currentQuantity = Math.max(1, Math.min(selectedProduct.available, currentQuantity + delta));
             document.getElementById('qtyDisplay').textContent = currentQuantity;
+        }
+        
+        function addAllAvailable() {
+            currentQuantity = selectedProduct.available;
+            document.getElementById('qtyDisplay').textContent = currentQuantity;
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+        
+        function showCustomInput() {
+            document.getElementById('customInputBox').style.display = 'block';
+            document.getElementById('normalSelector').style.display = 'none';
+            document.getElementById('customQtyInput').focus();
+        }
+        
+        function applyCustomQty() {
+            const input = document.getElementById('customQtyInput');
+            const value = parseInt(input.value);
+            
+            if (isNaN(value) || value < 1) {
+                tg.showAlert('❌ Введіть коректне число');
+                return;
+            }
+            
+            if (value > selectedProduct.available) {
+                tg.showAlert(`⚠️ Максимум доступно: ${selectedProduct.available} шт.`);
+                return;
+            }
+            
+            currentQuantity = value;
+            document.getElementById('qtyDisplay').textContent = currentQuantity;
+            document.getElementById('customInputBox').style.display = 'none';
+            document.getElementById('normalSelector').style.display = 'block';
+            tg.HapticFeedback.notificationOccurred('success');
         }
         
         async function confirmAdd() {
