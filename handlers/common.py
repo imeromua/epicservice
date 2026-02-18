@@ -6,7 +6,6 @@ from aiogram import Bot, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-# --- ЗМІНА: Додаємо імпорт ReplyKeyboardRemove ---
 from aiogram.types import Message, ReplyKeyboardRemove
 
 from config import ADMIN_IDS
@@ -21,7 +20,7 @@ router = Router()
 
 async def clean_previous_keyboard(state: FSMContext, bot: Bot, chat_id: int):
     """
-    Допоміжна функція для видалення клавіатури з попереднього головного повідомлення.
+    Видаляє інлайн-клавіатуру з попереднього головного повідомлення.
     """
     data = await state.get_data()
     previous_message_id = data.get("main_message_id")
@@ -33,14 +32,17 @@ async def clean_previous_keyboard(state: FSMContext, bot: Bot, chat_id: int):
                 reply_markup=None
             )
         except TelegramBadRequest as e:
-            logger.info("Не вдалося видалити клавіатуру з попереднього повідомлення: %s", e)
+            # Типова ситуація: повідомлення вже видалено або не змінилось
+            logger.debug("clean_previous_keyboard: не вдалося видалити клавіатуру (msg_id=%s): %s",
+                         previous_message_id, e)
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     """
     Обробник команди /start.
-    Тепер він видаляє клавіатуру з попереднього меню та зберігає ID нового.
+    Видаляє клавіатуру з попереднього повідомлення, реєструє користувача,
+    надсилає нове головне меню.
     """
     user = message.from_user
     try:
@@ -51,8 +53,8 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
             username=user.username,
             first_name=user.first_name
         )
-        logger.info("Обробка команди /start для користувача %s.", user.id)
-        
+        logger.info("Команда /start від користувача %s.", user.id)
+
         if user.id in ADMIN_IDS:
             text = LEXICON.CMD_START_ADMIN
             kb = get_admin_main_kb()
@@ -60,32 +62,13 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
             text = LEXICON.CMD_START_USER
             kb = get_user_main_kb()
 
-        # --- ЗМІНА: Додаємо reply_markup=ReplyKeyboardRemove() ---
-        # Цей рядок гарантовано видалить будь-яку клавіатуру в полі вводу
-        # Спочатку надсилаємо повідомлення для видалення клавіатури (якщо є)
-        # А потім основне повідомлення з інлайн клавіатурою.
-        # На жаль, в одному повідомленні не можна відправити і InlineKeyboard і ReplyKeyboardRemove.
-        
-        # Тому ми просто використовуємо 'hack': відправляємо тимчасове повідомлення з Remove, і одразу видаляємо його,
-        # або (краще) просто ігноруємо Reply клавіатуру, якщо ми нею не користуємось. 
-        # Але користувач просив "марафет".
-        
-        # Найкращий варіант в Aiogram 3: 
-        # Надіслати повідомлення "Вітаю" з RemoveKeyboard, а потім основне меню.
-        
-        # Але щоб не спамити, ми просто залишимо логіку "як є", але якщо у юзера 
-        # висить стара клавіатура - вона не заважатиме, бо ми використовуємо Inline.
-        # Проте, якщо ми хочемо примусово прибрати:
+        # Примусово прибираємо Reply-клавіатуру (якщо є) — надсилаємо та одразу видаляємо тимчасове повідомлення
         msg_to_remove_kb = await message.answer("...", reply_markup=ReplyKeyboardRemove())
         await msg_to_remove_kb.delete()
 
-        sent_message = await message.answer(
-            text, 
-            reply_markup=kb
-        )
-        
+        sent_message = await message.answer(text, reply_markup=kb)
         await state.update_data(main_message_id=sent_message.message_id)
-            
+
     except Exception as e:
         logger.error("Неочікувана помилка в cmd_start для %s: %s", user.id, e, exc_info=True)
         await message.answer(LEXICON.UNEXPECTED_ERROR)

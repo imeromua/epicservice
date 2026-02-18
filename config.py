@@ -4,14 +4,13 @@ from typing import List
 
 from dotenv import load_dotenv
 
-# Налаштування логера для цього модуля
-logging.basicConfig(level=logging.INFO)
+# Налаштування логера для цього модуля (БЕЗ basicConfig — він налаштовується тільки в bot.py)
 logger = logging.getLogger(__name__)
 
 # Завантажуємо змінні оточення з файлу .env
-# Функція поверне True, якщо файл .env було знайдено та завантажено.
 if not load_dotenv():
     logger.warning("Файл .env не знайдено або не вдалося завантажити. Використовуються системні змінні оточення.")
+
 
 def get_required_env(var_name: str) -> str:
     """
@@ -33,8 +32,10 @@ def get_required_env(var_name: str) -> str:
         raise ValueError(error_msg)
     return value
 
+
 # --- Конфігурація Бота ---
 BOT_TOKEN = get_required_env("BOT_TOKEN")
+
 
 def get_admin_ids() -> List[int]:
     """
@@ -51,16 +52,16 @@ def get_admin_ids() -> List[int]:
         logger.warning("Змінна ADMIN_IDS не задана. Адмін-панель буде недоступна.")
         return []
     try:
-        # Розділяємо рядок по комі, видаляємо пробіли і перетворюємо на числа
         return [int(admin_id.strip()) for admin_id in admin_ids_str.split(',') if admin_id.strip()]
     except ValueError as e:
         logger.warning(
-            "Некоректний формат ADMIN_IDS. Перевірте ваш .env файл. "
-            "Очікується числовий формат 'ID1,ID2,ID3'. Помилка: %s", e
+            "Некоректний формат ADMIN_IDS. Очікується 'ID1,ID2,ID3'. Помилка: %s", e
         )
         return []
 
+
 ADMIN_IDS = get_admin_ids()
+
 
 # --- Конфігурація Бази Даних ---
 def validate_db_port(port_str: str) -> int:
@@ -85,46 +86,43 @@ def validate_db_port(port_str: str) -> int:
         logger.critical("Невірний формат порту БД: %s", e)
         raise
 
+
 DB_USER = get_required_env("DB_USER")
-# Fix: use DB_PASSWORD to match .env.example, fallback to DB_PASS for compatibility
 DB_PASS = os.getenv("DB_PASSWORD") or os.getenv("DB_PASS")
 if not DB_PASS:
-    error_msg = "Критична помилка: відсутня обов'язкова змінна оточення: DB_PASSWORD (або DB_PASS)"
-    logger.critical(error_msg)
-    raise ValueError(error_msg)
+    _err = "Критична помилка: відсутня обов'язкова змінна оточення: DB_PASSWORD (або DB_PASS)"
+    logger.critical(_err)
+    raise ValueError(_err)
 
 DB_HOST = get_required_env("DB_HOST")
 DB_PORT = validate_db_port(get_required_env("DB_PORT"))
 DB_NAME = get_required_env("DB_NAME")
 
-# Формуємо URL для підключення до БД (асинхронний та синхронний варіанти)
-# Асинхронний драйвер, використовується основним додатком бота
+# Формуємо URL підключення (пароль не логується — тільки host/port/name)
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-# Синхронний драйвер, використовується для Alembic міграцій та деяких фонових завдань
 SYNC_DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+logger.info("БД сконфігурована: %s@%s:%s/%s", DB_USER, DB_HOST, DB_PORT, DB_NAME)
+
 # --- Конфігурація Redis ---
-# Налаштування для підключення до Redis (використовується для FSM)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
-# Перевірка, чи ввімкнено Redis
-REDIS_ENABLED = os.getenv("REDIS_ENABLED", "false").lower() == "true"
+# Якщо REDIS_ENABLED=false — бот використовуватиме MemoryStorage (тільки для dev/тестів)
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true").lower() == "true"
 
-# Виведення інформації про статус Redis
 if REDIS_ENABLED:
-    logger.info("✅ Redis увімкнено")
+    logger.info("Redis увімкнено (%s:%s/%s)", REDIS_HOST, REDIS_PORT, REDIS_DB)
 else:
-    logger.info("ℹ️ Redis вимкнено")
+    logger.warning("Redis ВИМКНЕНО. FSM зберігатиметься тільки в пам'яті (не для продакшену!)")
 
-# URL підключення Redis для aioredis
+# URL підключення Redis
 if REDIS_PASSWORD:
     REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 else:
     REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 # --- Конфігурація Сховища ---
-# Шлях до папки, де будуть зберігатися архіви
 ARCHIVES_PATH = "archives"

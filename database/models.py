@@ -29,21 +29,18 @@ class Product(Base):
     """Модель, що представляє товар на складі."""
     __tablename__ = 'products'
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    # Кирилиця в назвах колонок зберігається навмисно — відповідає структурі БД
     артикул: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     назва: Mapped[str] = mapped_column(String(255))
     відділ: Mapped[int] = mapped_column(BigInteger)
     група: Mapped[str] = mapped_column(String(100))
+    # String(50) навмисно — зберігає дробові значення у вигляді рядка для гнучкості відображення
     кількість: Mapped[str] = mapped_column(String(50))
     відкладено: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # --- ОНОВЛЕНІ ТА НОВІ ПОЛЯ (УКРАЇНСЬКОЮ) ---
-    # "м" - місяців без руху
+
     місяці_без_руху: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
-    # "с" - сума залишку
     сума_залишку: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
-    # "ц" - ціна за одиницю
     ціна: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
-    # Статус активності товару
     активний: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
 
@@ -76,7 +73,8 @@ class TempList(Base):
     __tablename__ = 'temp_lists'
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey('products.id'))
+    # index=True — прискорює запити пошуку за product_id та перевірки резервів
+    product_id: Mapped[int] = mapped_column(ForeignKey('products.id'), index=True)
     quantity: Mapped[int] = mapped_column(Integer)
 
     product: Mapped["Product"] = relationship()
