@@ -156,7 +156,8 @@ def get_product_card_kb(
     keyboard.append(qty_row)
     
     # 2. Кнопка додавання
-    add_button_text = f"🛒 Додати {price_text}"
+    # Змінено текст кнопки на: "Додати X шт (Y грн)"
+    add_button_text = f"🛒 Додати {current_qty} шт. {price_text}"
     keyboard.append([
         InlineKeyboardButton(
             text=add_button_text,
