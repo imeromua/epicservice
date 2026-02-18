@@ -137,8 +137,26 @@
             margin-bottom: 8px;
         }
         
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .save-btn {
+            flex: 1;
+            padding: 12px;
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
         .clear-btn {
-            width: 100%;
+            flex: 1;
             padding: 12px;
             background: #ff3b30;
             color: white;
@@ -147,7 +165,6 @@
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
-            margin-bottom: 16px;
         }
         
         .empty-state {
@@ -615,6 +632,18 @@
             }
         }
         
+        async function saveList() {
+            try {
+                tg.showAlert('📥 Генерую Excel файл...');
+                
+                // Відкриваємо посилання для завантаження
+                window.location.href = `/api/save/${userId}`;
+                
+            } catch (error) {
+                tg.showAlert('❌ Помилка: ' + error.message);
+            }
+        }
+        
         async function clearList() {
             if (!confirm('Очистити весь список?')) return;
             
@@ -650,7 +679,10 @@
                     return;
                 }
                 
-                let html = '<button class="clear-btn" onclick="clearList()">🗑️ Очистити весь список</button>';
+                let html = '<div class="action-buttons">';
+                html += '<button class="save-btn" onclick="saveList()">💾 Зберегти список</button>';
+                html += '<button class="clear-btn" onclick="clearList()">🗑️ Очистити</button>';
+                html += '</div>';
                 
                 html += data.items.map(item => `
                     <div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'>
