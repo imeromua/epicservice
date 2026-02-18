@@ -23,6 +23,7 @@ from database.orm import (
     orm_clear_temp_list
 )
 from utils.list_processor import process_and_save_list
+from utils.archive_manager import get_user_archives, ACTIVE_DIR
 from sqlalchemy.exc import SQLAlchemyError
 from config import BOT_TOKEN
 
@@ -179,6 +180,76 @@ async def get_user_list(user_id: int):
             content={"error": "Помилка отримання списку", "details": str(e)},
             status_code=500
         )
+
+
+@app.get("/api/archives/{user_id}")
+async def get_user_archives(user_id: int):
+    """
+    Отримати список архівних файлів користувача.
+    Повертає список з інформацією: назва файлу, дата створення, тип (основний/лишки).
+    """
+    try:
+        print(f"📁 Archives request for user_id={user_id}")
+        
+        archives = get_user_archives(user_id)
+        
+        if not archives:
+            return JSONResponse(content={"archives": []}, status_code=200)
+        
+        result = []
+        for filename, timestamp in archives:
+            # Визначаємо тип файлу
+            is_surplus = filename.startswith("лишки_")
+            
+            result.append({
+                "filename": filename,
+                "date": timestamp.strftime("%d.%m.%Y %H:%M"),
+                "timestamp": timestamp.isoformat(),
+                "is_surplus": is_surplus,
+                "type": "Лишки" if is_surplus else "Основний список"
+            })
+        
+        print(f"✅ Returning {len(result)} archives")
+        return JSONResponse(content={"archives": result}, status_code=200)
+        
+    except Exception as e:
+        print(f"❌ ERROR in get_user_archives: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            content={"error": "Помилка отримання архівів", "details": str(e)},
+            status_code=500
+        )
+
+
+@app.get("/api/archive/download/{filename}")
+async def download_archive(filename: str):
+    """
+    Завантажити архівний файл.
+    """
+    try:
+        # Перевірка безпеки: заборонити шляхи з '..' та '/' 
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        
+        file_path = os.path.join(ACTIVE_DIR, filename)
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        print(f"📥 Download request: {filename}")
+        
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERROR in download_archive: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Download error")
 
 
 @app.post("/api/add")
