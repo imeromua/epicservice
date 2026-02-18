@@ -53,26 +53,26 @@ async def search_products(req: SearchRequest):
     Повертає список товарів з інформацією про наявність.
     """
     try:
-        async with async_session() as session:
-            products = await orm_find_products(req.query, session=session)
-            
-            if not products:
-                return JSONResponse(content={"products": [], "message": "Нічого не знайдено"}, status_code=200)
-            
-            # Формуємо відповідь
-            result = []
-            for product in products:
-                result.append({
-                    "id": product.id,
-                    "article": product.артикул,
-                    "name": product.назва,
-                    "price": float(product.ціна),
-                    "available": product.доступна_кількість,
-                    "department": product.відділ
-                })
-            
-            return JSONResponse(content={"products": result}, status_code=200)
-            
+        # orm_find_products сама створює сесію
+        products = await orm_find_products(req.query)
+        
+        if not products:
+            return JSONResponse(content={"products": [], "message": "Нічого не знайдено"}, status_code=200)
+        
+        # Формуємо відповідь
+        result = []
+        for product in products:
+            result.append({
+                "id": product.id,
+                "article": product.артикул,
+                "name": product.назва,
+                "price": float(product.ціна),
+                "available": product.доступна_кількість,
+                "department": product.відділ
+            })
+        
+        return JSONResponse(content={"products": result}, status_code=200)
+        
     except SQLAlchemyError as e:
         return JSONResponse(
             content={"error": "Помилка бази даних", "details": str(e)},
