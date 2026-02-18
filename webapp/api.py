@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -7,6 +7,8 @@ import uvicorn
 import sys
 import os
 import traceback
+from datetime import datetime
+import pandas as pd
 
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -27,6 +29,10 @@ app = FastAPI()
 # Статичні файли і шаблони
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
+# Папка для тимчасових файлів
+TEMP_FILES_DIR = os.path.join(os.path.dirname(__file__), "temp_files")
+os.makedirs(TEMP_FILES_DIR, exist_ok=True)
 
 
 class SearchRequest(BaseModel):
@@ -266,6 +272,73 @@ async def clear_list(user_id: int):
         traceback.print_exc()
         return JSONResponse(
             content={"error": "Помилка очищення", "details": str(e)},
+            status_code=500
+        )
+
+
+@app.post("/api/save/{user_id}")
+async def save_list_to_excel(user_id: int):
+    """
+    Згенерувати Excel файл зі списку та повернути його для завантаження.
+    """
+    try:
+        temp_list = await orm_get_temp_list(user_id)
+        
+        if not temp_list:
+            return JSONResponse(
+                content={"success": False, "message": "Список порожній"},
+                status_code=400
+            )
+        
+        # Підготовка даних
+        items = []
+        total_sum = 0.0
+        department = None
+        
+        for item in temp_list:
+            if department is None:
+                department = item.product.відділ
+            
+            items.append({
+                "Артикул": item.product.артикул,
+                "Кількість": item.quantity
+            })
+            total_sum += float(item.product.ціна) * item.quantity
+        
+        # Створення DataFrame
+        df = pd.DataFrame(items)
+        
+        # Додавання підсумку
+        summary_df = pd.DataFrame([
+            {"Артикул": "", "Кількість": ""},
+            {"Артикул": "К-ть артикулів:", "Кількість": len(df)},
+            {"Артикул": "Зібрано на суму:", "Кількість": f"{total_sum:.2f} грн"}
+        ])
+        
+        df_final = pd.concat([df, summary_df], ignore_index=True)
+        
+        # Генерація назви файлу
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
+        dept = department if department else "list"
+        file_name = f"{dept}_{user_id}_{timestamp}.xlsx"
+        file_path = os.path.join(TEMP_FILES_DIR, file_name)
+        
+        # Збереження файлу
+        df_final.to_excel(file_path, index=False, header=['Артикул', 'Кількість'])
+        
+        print(f"✅ Excel file created: {file_path}")
+        
+        return FileResponse(
+            path=file_path,
+            filename=file_name,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+                    
+    except Exception as e:
+        print(f"❌ ERROR in save_list_to_excel: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            content={"error": "Помилка генерації файлу", "details": str(e)},
             status_code=500
         )
 
