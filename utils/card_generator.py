@@ -10,7 +10,7 @@ from aiogram.types import Message
 from database.models import Product
 from database.orm import (orm_get_temp_list_item_quantity,
                           orm_get_total_temp_reservation_for_product)
-from keyboards.inline import get_product_actions_kb
+from keyboards.inline import get_product_card_kb
 from lexicon.lexicon import LEXICON
 from utils.markdown_corrector import escape_markdown
 
@@ -54,6 +54,8 @@ async def send_or_edit_product_card(
             display_available_qty = format_quantity(available_for_anyone_qty)
             display_user_reserved_qty = format_quantity(in_user_temp_list_qty)
             
+            # Для клавіатури використовуємо ціле число, якщо це можливо, або 9999 якщо float
+            # (Логіка кнопок +/- зазвичай працює з цілими кроками, для дробових треба інший підхід)
             int_available_for_button = max(0, int(available_for_anyone_qty))
 
             price = product.ціна or 0.0
@@ -72,6 +74,7 @@ async def send_or_edit_product_card(
             display_stock_sum = "---"
             display_reserved_sum = "---"
             display_months = "---"
+            price = 0.0
 
         card_text = LEXICON.PRODUCT_CARD_TEMPLATE.format(
             name=escape_markdown(product.назва),
@@ -84,9 +87,12 @@ async def send_or_edit_product_card(
             reserved_sum=escape_markdown(display_reserved_sum),
         )
         
-        keyboard = get_product_actions_kb(
-            product.id, 
-            int_available_for_button, 
+        # Використовуємо нову клавіатуру
+        keyboard = get_product_card_kb(
+            product_id=product.id,
+            current_qty=1, # При відкритті картки завжди 1
+            price=price,
+            max_qty=int_available_for_button,
             search_query=search_query
         )
 
