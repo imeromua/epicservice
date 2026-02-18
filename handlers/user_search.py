@@ -152,10 +152,11 @@ async def handle_selector_change(callback: CallbackQuery, bot: Bot, state: FSMCo
                 await callback.answer(f"Максимально доступно: {max_val}", show_alert=True)
                 return
         elif action == "dec":
-            if current_val > 1:
+            if current_val > 0:
                 new_val -= 1
             else:
-                await callback.answer("Мінімум 1 шт.", show_alert=False)
+                # Мінімум 0, тихо ігноруємо
+                await callback.answer()
                 return
 
         if new_val != current_val:
@@ -254,7 +255,7 @@ async def handle_add_to_list(callback: CallbackQuery, bot: Bot, state: FSMContex
                     ))
                 # session.begin() зробить commit автоматично при виході з блоку
 
-        # Оновлюємо картку поза транзакцією
+        # Оновлюємо картку поза транзакцією — скидаємо selector на 0 після успішного додавання
         data = await state.get_data()
         last_query = data.get('last_query')
         async with async_session() as session:
@@ -267,7 +268,7 @@ async def handle_add_to_list(callback: CallbackQuery, bot: Bot, state: FSMContex
                     product=product,
                     message_id=callback.message.message_id,
                     search_query=last_query,
-                    current_selection=1
+                    current_selection=0  # Скидаємо на 0 після додавання
                 )
 
         await callback.answer(f"✅ Додано {quantity_to_add} шт.", show_alert=True)
