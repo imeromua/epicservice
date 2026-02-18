@@ -29,11 +29,7 @@ async def main():
     """Головна асинхронна функція для ініціалізації та запуску бота."""
 
     # --- Налаштування логування (єдиний виклик basicConfig у всьому проекті) ---
-    log_format = (
-        "%(asctime)s - %(levelname)s - "
-        "[User:%(user_id)s | Update:%(update_id)s] - "
-        "%(name)s - %(message)s"
-    )
+    log_format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
     logging.basicConfig(
         level=logging.INFO,
         format=log_format,
@@ -42,16 +38,11 @@ async def main():
             logging.FileHandler('bot.log', mode='a')
         ]
     )
-    # Додаємо UserContextFilter до кореневого логера, щоб усі модулі мали user_id/update_id
-    from middlewares.logging_middleware import UserContextFilter
-    root_logger = logging.getLogger()
-    if not any(isinstance(f, UserContextFilter) for f in root_logger.filters):
-        root_logger.addFilter(UserContextFilter())
 
     logger = logging.getLogger(__name__)
 
     if not BOT_TOKEN:
-        logger.critical("BOT_TOKEN не знайдено! Перевірте .env файл.")
+        logger.critical("БОТ_TOKEN не знайдено! Перевірте .env файл.")
         sys.exit(1)
 
     # --- Перевірка підключення до БД ---
