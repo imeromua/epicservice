@@ -116,52 +116,68 @@ def get_search_results_kb(products: list[Product]) -> InlineKeyboardMarkup:
 
 def get_product_card_kb(
     product_id: int,
-    current_qty: int = 0, # Тепер це кількість У КОШИКУ
+    current_qty: int = 1, # Це "обрана кількість" на селекторі (за замовчуванням 1)
     price: float = 0.0,
-    max_qty: int = 9999,
+    max_qty: int = 9999, # Скільки МОЖНА додати (available)
     search_query: str | None = None
 ) -> InlineKeyboardMarkup:
     """
-    Генерує інтерактивну клавіатуру картки товару (Direct Action Mode).
-    Рядок 1: - [X шт] + (Центральна кнопка викликає ручний ввід)
-    Рядок 2: Додати все (якщо доступно більше)
-    Рядок 3: Назад | Головне меню
+    Генерує інтерактивну клавіатуру картки товару (Selector Mode).
+    Рядок 1: - [X шт] + (Вибір кількості для додавання)
+    Рядок 2: 🛒 Додати до списку (X шт)
+    Рядок 3: Додати все (Max шт) (якщо доступно > 1)
+    Рядок 4: Навігація
     """
     
     keyboard = []
     
-    # 1. Рядок керування кількістю (Пряма дія)
     price_str = str(price)
     
-    # Визначаємо текст центральної кнопки
+    # 1. Рядок вибору кількості
+    # Callback data: selector:inc/dec:product_id:current_val:max_val
+    
     center_text = f"📝 {current_qty} шт" 
     
     qty_row = [
         InlineKeyboardButton(
             text="➖",
-            callback_data=f"card_qty:dec:{product_id}:{current_qty}:{max_qty}:{price_str}"
+            callback_data=f"selector:dec:{product_id}:{current_qty}:{max_qty}"
         ),
         InlineKeyboardButton(
             text=center_text,
-            callback_data=f"qty_manual_input:{product_id}" # Клік по числу -> Ручне введення
+            callback_data=f"qty_manual_input:{product_id}" # Ручне введення для селектора
         ),
         InlineKeyboardButton(
             text="➕",
-            callback_data=f"card_qty:inc:{product_id}:{current_qty}:{max_qty}:{price_str}"
+            callback_data=f"selector:inc:{product_id}:{current_qty}:{max_qty}"
         )
     ]
     keyboard.append(qty_row)
     
-    # 2. Кнопка "Додати все" (Якщо поточна менше максимальної)
-    if current_qty < max_qty:
+    # 2. Кнопка ПІДТВЕРДЖЕННЯ (Додати до списку)
+    # Callback data: add_to_list:product_id:quantity
+    
+    total_price_for_selection = current_qty * price
+    add_btn_text = f"🛒 Додати до списку ({total_price_for_selection:.2f} грн)"
+    
+    keyboard.append([
+        InlineKeyboardButton(
+            text=add_btn_text,
+            callback_data=f"add_to_list:{product_id}:{current_qty}"
+        )
+    ])
+    
+    # 3. Кнопка "Додати все" (Якщо на складі є більше ніж те, що ми зараз вибрали, і більше 0)
+    # Тут max_qty - це скільки ВІЛЬНО на складі (available_for_anyone)
+    if max_qty > 0 and max_qty != current_qty:
         keyboard.append([
             InlineKeyboardButton(
                 text=LEXICON.BUTTON_ADD_ALL.format(quantity=max_qty),
-                callback_data=f"card_add_all:{product_id}:{max_qty}"
+                callback_data=f"add_to_list:{product_id}:{max_qty}"
             )
         ])
     
-    # 3. Навігація
+    # 4. Навігація
     nav_row = []
     if search_query:
         nav_row.append(
