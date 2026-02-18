@@ -27,7 +27,7 @@ async def orm_add_saved_list(
 ):
     """
     Зберігає інформацію про збережений файл списку в рамках переданої сесії.
-    items: список словників {"article_name": str, "quantity": float}
+    items: список словників {"product_id": int, "quantity": float}
     """
     try:
         new_list = SavedList(
@@ -39,21 +39,25 @@ async def orm_add_saved_list(
         session.add(new_list)
         await session.flush()
 
+        logger.info("Створено SavedList id=%s для user_id=%s, файл=%s", new_list.id, user_id, filename)
+
         for item in items:
-            name = item.get("article_name")
+            product_id = item.get("product_id")
             qty = item.get("quantity")
 
-            stmt = select(Product.id).where(Product.назва == name).limit(1)
-            product_id = await session.scalar(stmt)
+            if not product_id:
+                logger.warning("Пропущено item без product_id: %s", item)
+                continue
 
-            if product_id:
-                saved_item = SavedListItem(
-                    saved_list_id=new_list.id,
-                    product_id=product_id,
-                    quantity=qty
-                )
-                session.add(saved_item)
+            saved_item = SavedListItem(
+                saved_list_id=new_list.id,
+                product_id=product_id,
+                quantity=qty
+            )
+            session.add(saved_item)
+            logger.debug("Додано SavedListItem: product_id=%s, quantity=%s", product_id, qty)
 
+        logger.info("Успішно збережено архів: %s items для user_id=%s", len(items), user_id)
         return True
     except Exception as e:
         logger.error("Помилка при збереженні архіву в БД: %s", e, exc_info=True)
