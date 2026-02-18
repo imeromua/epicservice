@@ -25,6 +25,12 @@ def get_user_main_kb() -> InlineKeyboardMarkup:
                     callback_data="main:archive"
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="🚀 Веб-додаток",
+                    callback_data="main:webapp"
+                )
+            ],
         ]
     )
 
@@ -51,6 +57,12 @@ def get_admin_main_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text=LEXICON.INLINE_BUTTON_ARCHIVE,
                     callback_data="main:archive"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🚀 Веб-додаток",
+                    callback_data="main:webapp"
                 )
             ],
         ]
