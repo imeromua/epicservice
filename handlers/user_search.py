@@ -10,11 +10,10 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.exc import SQLAlchemyError
 
 from database.engine import async_session
-from database.orm import orm_find_products, orm_get_product_by_id
+from database.orm import orm_find_products, orm_get_product_by_id, orm_add_item_to_temp_list
 from handlers.common import clean_previous_keyboard
-# --- ЗМІНА: Імпортуємо back_to_main_menu для коректної навігації ---
 from handlers.user.list_management import back_to_main_menu
-from keyboards.inline import get_search_results_kb
+from keyboards.inline import get_search_results_kb, get_product_card_kb
 from lexicon.lexicon import LEXICON
 from utils.card_generator import send_or_edit_product_card
 
@@ -132,3 +131,89 @@ async def back_to_results_handler(callback: CallbackQuery, state: FSMContext):
     )
     await state.update_data(main_message_id=callback.message.message_id)
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("card_qty:"))
+async def handle_card_qty_change(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    """Обробка кнопок +/- на картці товару"""
+    # Format: card_qty:action:product_id:current_qty:max_qty:price
+    try:
+        parts = callback.data.split(":")
+        action = parts[1]
+        product_id = int(parts[2])
+        current_qty = int(parts[3])
+        max_qty = int(parts[4])
+        # Ціна може бути float
+        price = float(parts[5])
+        
+        new_qty = current_qty
+        if action == "inc":
+            if current_qty < max_qty:
+                new_qty += 1
+            else:
+                await callback.answer(f"Максимальна доступна кількість: {max_qty}", show_alert=True)
+                return
+        elif action == "dec":
+            if current_qty > 1:
+                new_qty -= 1
+            else:
+                await callback.answer("Мінімальна кількість: 1", show_alert=False)
+                return
+        
+        if new_qty != current_qty:
+             # Отримуємо пошуковий запит з state, щоб кнопка "Назад" працювала коректно
+            data = await state.get_data()
+            last_query = data.get('last_query')
+            
+            new_kb = get_product_card_kb(
+                product_id=product_id,
+                current_qty=new_qty,
+                price=price,
+                max_qty=max_qty,
+                search_query=last_query
+            )
+            
+            try:
+                await callback.message.edit_reply_markup(reply_markup=new_kb)
+            except TelegramBadRequest:
+                pass # Message not modified
+        
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error handling card qty change: {e}", exc_info=True)
+        await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
+
+
+@router.callback_query(F.data.startswith("card_add:"))
+async def handle_card_add_to_cart(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    """Обробка додавання товару в кошик"""
+    # Format: card_add:product_id:quantity
+    try:
+        parts = callback.data.split(":")
+        product_id = int(parts[1])
+        quantity = int(parts[2])
+        
+        await orm_add_item_to_temp_list(callback.from_user.id, product_id, quantity)
+        
+        await callback.answer(f"✅ Додано {quantity} шт. у кошик", show_alert=False)
+        
+        # Оновлюємо картку, щоб показати актуальні залишки
+        async with async_session() as session:
+            product = await orm_get_product_by_id(session, product_id)
+            if product:
+                data = await state.get_data()
+                last_query = data.get('last_query')
+                
+                await send_or_edit_product_card(
+                    bot=bot,
+                    chat_id=callback.message.chat.id,
+                    user_id=callback.from_user.id,
+                    product=product,
+                    message_id=callback.message.message_id,
+                    search_query=last_query
+                )
+                
+    except Exception as e:
+        logger.error(f"Error handling card add: {e}", exc_info=True)
+        await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
