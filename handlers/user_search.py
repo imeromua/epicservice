@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from database.engine import async_session
 from database.orm import (orm_find_products, orm_get_product_by_id, 
                           orm_add_item_to_temp_list, orm_get_temp_list_department,
-                          orm_delete_temp_list_item, orm_update_temp_list_item_quantity) # Додано імпорт
+                          orm_delete_temp_list_item, orm_update_temp_list_item_quantity) 
 from handlers.common import clean_previous_keyboard
 from handlers.user.list_management import back_to_main_menu
 from keyboards.inline import get_search_results_kb, get_product_card_kb
@@ -24,7 +24,7 @@ router = Router()
 
 class SearchStates(StatesGroup):
     showing_results = State()
-    waiting_for_manual_quantity = State() # Додано стан для ручного вводу
+    waiting_for_manual_quantity = State() 
 
 
 @router.message(F.text)
@@ -211,6 +211,58 @@ async def handle_card_qty_change(callback: CallbackQuery, bot: Bot, state: FSMCo
         
     except Exception as e:
         logger.error(f"Error handling card qty change: {e}", exc_info=True)
+        await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
+
+
+@router.callback_query(F.data.startswith("card_add_all:"))
+async def handle_card_add_all(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    """
+    Обробка кнопки 'Додати все'.
+    Встановлює кількість товару рівною max_qty (все доступне + те що в кошику).
+    """
+    try:
+        parts = callback.data.split(":")
+        product_id = int(parts[1])
+        max_qty = int(parts[2]) # Це загальна кількість, яку можна мати (доступно + вже в кошику)
+        
+        user_id = callback.from_user.id
+        
+        async with async_session() as session:
+             product = await orm_get_product_by_id(session, product_id)
+             if not product:
+                 await callback.answer(LEXICON.PRODUCT_NOT_FOUND, show_alert=True)
+                 return
+             
+             # Перевірка відділу
+             allowed_department = await orm_get_temp_list_department(user_id)
+             if allowed_department is not None and product.відділ != allowed_department:
+                await callback.answer(
+                    LEXICON.DEPARTMENT_MISMATCH.format(department=allowed_department), 
+                    show_alert=True
+                )
+                return
+
+             # Встановлюємо кількість = max_qty
+             if max_qty > 0:
+                 await orm_update_temp_list_item_quantity(user_id, product_id, max_qty)
+             
+             # Оновлюємо картку
+             data = await state.get_data()
+             last_query = data.get('last_query')
+             
+             await send_or_edit_product_card(
+                bot=bot,
+                chat_id=callback.message.chat.id,
+                user_id=user_id,
+                product=product,
+                message_id=callback.message.message_id,
+                search_query=last_query
+            )
+             
+             await callback.answer(f"✅ Додано все доступне ({max_qty} шт.)", show_alert=True)
+
+    except Exception as e:
+        logger.error(f"Error handling card add all: {e}", exc_info=True)
         await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
 
 
