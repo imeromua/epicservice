@@ -123,19 +123,18 @@ def get_product_card_kb(
 ) -> InlineKeyboardMarkup:
     """
     Генерує інтерактивну клавіатуру картки товару (Direct Action Mode).
-    Рядок 1: - [У кошику: X] +
-    Рядок 2: Ввести кількість
+    Рядок 1: - [X шт] + (Центральна кнопка викликає ручний ввід)
+    Рядок 2: Додати все (якщо доступно більше)
     Рядок 3: Назад | Головне меню
     """
     
     keyboard = []
     
     # 1. Рядок керування кількістю (Пряма дія)
-    # Callback data: дія : тип : id товару : поточна_к-сть_в_кошику : макс : ціна
     price_str = str(price)
     
     # Визначаємо текст центральної кнопки
-    center_text = f"🛒 У кошику: {current_qty}" if current_qty > 0 else "🛒 0 шт"
+    center_text = f"📝 {current_qty} шт" 
     
     qty_row = [
         InlineKeyboardButton(
@@ -144,7 +143,7 @@ def get_product_card_kb(
         ),
         InlineKeyboardButton(
             text=center_text,
-            callback_data="ignore" 
+            callback_data=f"qty_manual_input:{product_id}" # Клік по числу -> Ручне введення
         ),
         InlineKeyboardButton(
             text="➕",
@@ -153,13 +152,14 @@ def get_product_card_kb(
     ]
     keyboard.append(qty_row)
     
-    # 2. Кнопка ручного вводу (замість кнопки "Додати", бо додавання тепер на +/-)
-    keyboard.append([
-        InlineKeyboardButton(
-            text=LEXICON.BUTTON_ADD_CUSTOM, # "📝 Ввести іншу кількість"
-            callback_data=f"qty_manual_input:{product_id}" # Використовуємо існуючий callback
-        )
-    ])
+    # 2. Кнопка "Додати все" (Якщо поточна менше максимальної)
+    if current_qty < max_qty:
+        keyboard.append([
+            InlineKeyboardButton(
+                text=LEXICON.BUTTON_ADD_ALL.format(quantity=max_qty),
+                callback_data=f"card_add_all:{product_id}:{max_qty}"
+            )
+        ])
     
     # 3. Навігація
     nav_row = []
