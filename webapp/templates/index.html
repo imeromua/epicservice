@@ -634,11 +634,17 @@
         
         async function saveList() {
             try {
-                tg.showAlert('📥 Генерую Excel файл...');
+                const response = await fetch(`/api/save/${userId}`, {
+                    method: 'POST'
+                });
                 
-                // Відкриваємо посилання для завантаження
-                window.location.href = `/api/save/${userId}`;
+                const data = await response.json();
                 
+                if (data.success) {
+                    tg.showAlert(`✅ ${data.message}`);
+                } else {
+                    tg.showAlert('❌ ' + data.message);
+                }
             } catch (error) {
                 tg.showAlert('❌ Помилка: ' + error.message);
             }
