@@ -6,6 +6,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from redis.asyncio import Redis
 from sqlalchemy import text
 
@@ -18,11 +20,24 @@ from handlers.admin import (archive_handlers as admin_archive,
                             report_handlers as admin_reports)
 from handlers.user import (list_editing, list_management, list_saving)
 from middlewares.logging_middleware import LoggingMiddleware
+from utils.archive_manager import cleanup_trash, ensure_archive_dirs
 
 
 async def set_main_menu(bot: Bot):
     """Видаляє меню команд бота (передає порожній список)."""
     await bot.set_my_commands([])
+
+
+async def scheduled_cleanup():
+    """
+    Щодобове очищення trash від файлів старіше 14 днів.
+    """
+    logger = logging.getLogger(__name__)
+    try:
+        logger.info("Запуск щодобового очищення trash...")
+        cleanup_trash(days=14)
+    except Exception as e:
+        logger.error(f"Помилка при щодобовому очищенні trash: {e}", exc_info=True)
 
 
 async def main():
@@ -44,6 +59,9 @@ async def main():
     if not BOT_TOKEN:
         logger.critical("БОТ_TOKEN не знайдено! Перевірте .env файл.")
         sys.exit(1)
+
+    # --- Перевірка та створення архівних папок ---
+    ensure_archive_dirs()
 
     # --- Перевірка підключення до БД ---
     try:
@@ -68,6 +86,18 @@ async def main():
     else:
         storage = MemoryStorage()
         logger.warning("Використовується MemoryStorage — дані FSM не збережуться після перезапуску!")
+
+    # --- Ініціалізація Scheduler для автоочищення ---
+    scheduler = AsyncIOScheduler()
+    # Щодоби о 03:00 викликаємо cleanup_trash
+    scheduler.add_job(
+        scheduled_cleanup,
+        trigger=CronTrigger(hour=3, minute=0),
+        id="daily_trash_cleanup",
+        replace_existing=True
+    )
+    scheduler.start()
+    logger.info("Щодобовий scheduler запущено (очищення trash о 03:00)")
 
     bot = Bot(
         token=BOT_TOKEN,
@@ -102,6 +132,8 @@ async def main():
         logger.critical("Критична помилка під час роботи бота: %s", e, exc_info=True)
     finally:
         logger.info("Завершення роботи бота...")
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler зупинено")
         await bot.session.close()
         if redis is not None:
             await redis.aclose()
