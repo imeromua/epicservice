@@ -65,7 +65,6 @@ async def process_and_save_list(
     Централізована функція для обробки та збереження тимчасового списку.
     Всі операції з БД відбуваються в переданій сесії.
     """
-    # Передаємо session для роботи в транзакції
     temp_list = await orm_get_temp_list(user_id, session=session)
     if not temp_list:
         return None, None
@@ -112,11 +111,11 @@ async def process_and_save_list(
     main_list_path = await _save_list_to_excel(in_stock_items, user_id, department_id, total_in_stock_sum)
     surplus_list_path = await _save_list_to_excel(surplus_items, user_id, department_id, total_surplus_sum, "лишки_")
 
+    # Зберігаємо архів у БД з product_id (надійніше ніж назва)
     if main_list_path and in_stock_items:
-        db_items = [{"article_name": p.product.назва, "quantity": p.quantity} for p in temp_list]
+        db_items = [{"product_id": p.product_id, "quantity": p.quantity} for p in temp_list]
         await orm_add_saved_list(session, user_id, os.path.basename(main_list_path), main_list_path, db_items)
 
-    # Передаємо session для очищення в рамках транзакції
     await orm_clear_temp_list(user_id, session=session)
 
     return main_list_path, surplus_list_path
