@@ -124,7 +124,7 @@ def get_product_card_kb(
     """
     Генерує інтерактивну клавіатуру картки товару (Selector Mode).
     Рядок 1: - [X шт] + (Вибір кількості для додавання)
-    Рядок 2: 🛒 Додати до списку (X шт)
+    Рядок 2: 🛒 Додати X шт. (Y грн)
     Рядок 3: Додати все (Max шт) (якщо доступно > 1)
     Рядок 4: Навігація
     """
@@ -134,8 +134,6 @@ def get_product_card_kb(
     price_str = str(price)
     
     # 1. Рядок вибору кількості
-    # Callback data: selector:inc/dec:product_id:current_val:max_val
-    
     center_text = f"📝 {current_qty} шт" 
     
     qty_row = [
@@ -155,10 +153,9 @@ def get_product_card_kb(
     keyboard.append(qty_row)
     
     # 2. Кнопка ПІДТВЕРДЖЕННЯ (Додати до списку)
-    # Callback data: add_to_list:product_id:quantity
-    
+    # Змінено текст: показуємо штуки і ціну
     total_price_for_selection = current_qty * price
-    add_btn_text = f"🛒 Додати до списку ({total_price_for_selection:.2f} грн)"
+    add_btn_text = f"🛒 Додати {current_qty} шт. ({total_price_for_selection:.2f} грн)"
     
     keyboard.append([
         InlineKeyboardButton(
@@ -167,8 +164,7 @@ def get_product_card_kb(
         )
     ])
     
-    # 3. Кнопка "Додати все" (Якщо на складі є більше ніж те, що ми зараз вибрали, і більше 0)
-    # Тут max_qty - це скільки ВІЛЬНО на складі (available_for_anyone)
+    # 3. Кнопка "Додати все"
     if max_qty > 0 and max_qty != current_qty:
         keyboard.append([
             InlineKeyboardButton(
