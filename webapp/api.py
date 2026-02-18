@@ -108,34 +108,33 @@ async def get_user_list(user_id: int):
     Отримати поточний список товарів користувача.
     """
     try:
-        async with async_session() as session:
-            temp_list = await orm_get_temp_list(user_id, session=session)
+        temp_list = await orm_get_temp_list(user_id)
+        
+        if not temp_list:
+            return JSONResponse(content={"items": [], "total": 0}, status_code=200)
+        
+        items = []
+        total_sum = 0.0
+        
+        for item in temp_list:
+            item_total = float(item.product.ціна) * item.quantity
+            total_sum += item_total
             
-            if not temp_list:
-                return JSONResponse(content={"items": [], "total": 0}, status_code=200)
-            
-            items = []
-            total_sum = 0.0
-            
-            for item in temp_list:
-                item_total = float(item.product.ціна) * item.quantity
-                total_sum += item_total
-                
-                items.append({
-                    "product_id": item.product.id,
-                    "article": item.product.артикул,
-                    "name": item.product.назва,
-                    "quantity": item.quantity,
-                    "price": float(item.product.ціна),
-                    "total": item_total
-                })
-            
-            return JSONResponse(content={
-                "items": items,
-                "total": total_sum,
-                "count": len(items)
-            }, status_code=200)
-            
+            items.append({
+                "product_id": item.product.id,
+                "article": item.product.артикул,
+                "name": item.product.назва,
+                "quantity": item.quantity,
+                "price": float(item.product.ціна),
+                "total": item_total
+            })
+        
+        return JSONResponse(content={
+            "items": items,
+            "total": total_sum,
+            "count": len(items)
+        }, status_code=200)
+        
     except Exception as e:
         return JSONResponse(
             content={"error": "Помилка отримання списку", "details": str(e)},
@@ -151,28 +150,19 @@ async def add_to_list(req: AddToListRequest):
     try:
         print(f"➕ Add to list request: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
         
-        async with async_session() as session:
-            async with session.begin():
-                print(f"📞 Calling orm_add_item_to_temp_list...")
-                result = await orm_add_item_to_temp_list(
-                    user_id=req.user_id,
-                    product_id=req.product_id,
-                    quantity=req.quantity,
-                    session=session
-                )
-                print(f"✅ orm_add_item_to_temp_list result: {result}")
-                
-                if result:
-                    return JSONResponse(content={
-                        "success": True,
-                        "message": f"Додано {req.quantity} шт."
-                    }, status_code=200)
-                else:
-                    print(f"⚠️ orm_add_item_to_temp_list returned False/None")
-                    return JSONResponse(content={
-                        "success": False,
-                        "message": "Не вдалося додати товар"
-                    }, status_code=400)
+        print(f"📞 Calling orm_add_item_to_temp_list...")
+        # orm_add_item_to_temp_list сама створює сесію
+        await orm_add_item_to_temp_list(
+            user_id=req.user_id,
+            product_id=req.product_id,
+            quantity=req.quantity
+        )
+        print(f"✅ Successfully added to temp list")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"Додано {req.quantity} шт."
+        }, status_code=200)
                     
     except Exception as e:
         print(f"❌ ERROR in add_to_list: {type(e).__name__}: {e}")
