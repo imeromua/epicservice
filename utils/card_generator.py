@@ -76,7 +76,9 @@ async def send_or_edit_product_card(
             display_months = "---"
             price = 0.0
 
+        # Додано article в форматування
         card_text = LEXICON.PRODUCT_CARD_TEMPLATE.format(
+            article=escape_markdown(product.артикул), 
             name=escape_markdown(product.назва),
             department=escape_markdown(product.відділ),
             group=escape_markdown(product.група),
