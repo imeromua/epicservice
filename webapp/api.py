@@ -276,15 +276,18 @@ async def clear_list(user_id: int):
         )
 
 
-@app.post("/api/save/{user_id}")
+@app.get("/api/save/{user_id}")
 async def save_list_to_excel(user_id: int):
     """
     Згенерувати Excel файл зі списку та повернути його для завантаження.
     """
     try:
+        print(f"💾 Save list request for user_id={user_id}")
+        
         temp_list = await orm_get_temp_list(user_id)
         
         if not temp_list:
+            print(f"⚠️ List is empty for user {user_id}")
             return JSONResponse(
                 content={"success": False, "message": "Список порожній"},
                 status_code=400
@@ -304,6 +307,8 @@ async def save_list_to_excel(user_id: int):
                 "Кількість": item.quantity
             })
             total_sum += float(item.product.ціна) * item.quantity
+        
+        print(f"📊 Processing {len(items)} items, total: {total_sum:.2f} UAH")
         
         # Створення DataFrame
         df = pd.DataFrame(items)
