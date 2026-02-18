@@ -25,7 +25,7 @@ from database.orm import (
     orm_clear_temp_list
 )
 from sqlalchemy.exc import SQLAlchemyError
-from config import settings
+from config import BOT_TOKEN
 
 app = FastAPI()
 
@@ -38,7 +38,7 @@ TEMP_FILES_DIR = os.path.join(os.path.dirname(__file__), "temp_files")
 os.makedirs(TEMP_FILES_DIR, exist_ok=True)
 
 # Bot instance
-bot = Bot(token=settings.BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN)
 
 
 class SearchRequest(BaseModel):
