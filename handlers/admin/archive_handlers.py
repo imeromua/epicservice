@@ -3,146 +3,181 @@
 import logging
 import os
 import zipfile
+from collections import defaultdict
 from datetime import datetime
-from typing import Optional
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, FSInputFile
-from sqlalchemy.exc import SQLAlchemyError
+from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
 
 from config import ADMIN_IDS, ARCHIVES_PATH
-from database.orm import (orm_get_all_files_for_user,
-                          orm_get_user_lists_archive,
-                          orm_get_users_with_archives)
 from handlers.admin.core import _show_admin_panel
-from keyboards.inline import get_archive_kb, get_users_with_archives_kb
 from lexicon.lexicon import LEXICON
+from utils.archive_manager import ACTIVE_DIR, get_all_archives, get_user_archives
 
-# Налаштовуємо логер
 logger = logging.getLogger(__name__)
 
-# Створюємо роутер
 router = Router()
 router.callback_query.filter(F.from_user.id.in_(ADMIN_IDS))
 
 
-async def _pack_user_files_to_zip(user_id: int) -> Optional[str]:
-    """
-    Пакує всі збережені файли користувача в один ZIP-архів.
-    """
-    try:
-        file_paths = await orm_get_all_files_for_user(user_id)
-        if not file_paths:
-            return None
-
-        os.makedirs(ARCHIVES_PATH, exist_ok=True)
-        zip_filename = f"user_{user_id}_archive_{datetime.now().strftime('%Y%m%d_%H%M')}.zip"
-        zip_path = os.path.join(ARCHIVES_PATH, zip_filename)
-
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
-            for file_path in file_paths:
-                if os.path.exists(file_path):
-                    zipf.write(file_path, os.path.basename(file_path))
-
-        return zip_path
-    except Exception as e:
-        logger.error("Помилка створення ZIP-архіву для користувача %s: %s", user_id, e, exc_info=True)
-        return None
-
-
-# --- Сценарій перегляду архівів користувачів ---
+# --- Адмін: список усіх юзерів з архівами ---
 
 @router.callback_query(F.data == "admin:user_archives")
 async def show_users_archives_list(callback: CallbackQuery, state: FSMContext):
     """
-    Показує адміністратору список користувачів, які мають збережені архіви.
+    Показує адміністратору список юзерів, які мають збережені списки в архіві.
     """
+    await callback.answer()
     try:
-        users = await orm_get_users_with_archives()
-        if not users:
+        logger.info("Адмін запитує список усіх архівів")
+        all_files = get_all_archives()
+
+        if not all_files:
             await callback.answer(LEXICON.NO_USERS_WITH_ARCHIVES, show_alert=True)
             return
 
+        # Групуємо за user_id
+        users_count = defaultdict(int)
+        for _, _, uid in all_files:
+            users_count[uid] += 1
+
+        buttons = []
+        for uid, count in sorted(users_count.items()):
+            buttons.append(
+                [InlineKeyboardButton(
+                    text=f"👤 User {uid} — {count} списків",
+                    callback_data=f"admin:view_user:{uid}"
+                )]
+            )
+
+        buttons.append(
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:back")]
+        )
+
         await callback.message.edit_text(
-            LEXICON.CHOOSE_USER_TO_VIEW_ARCHIVE,
-            reply_markup=get_users_with_archives_kb(users)
+            f"🗂 *Архіви користувачів:*\nОберіть користувача:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
         )
         await state.update_data(main_message_id=callback.message.message_id)
-        await callback.answer()
-    except SQLAlchemyError as e:
-        logger.error("Помилка БД при отриманні списку користувачів з архівами: %s", e, exc_info=True)
+
+    except Exception as e:
+        logger.error(f"Помилка при отриманні списку архівів: {e}", exc_info=True)
         await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
 
 
 @router.callback_query(F.data.startswith("admin:view_user:"))
 async def view_user_archive(callback: CallbackQuery, state: FSMContext):
     """
-    Показує детальний архів обраного користувача.
+    Показує список файлів обраного користувача (адмін-вид).
     """
+    await callback.answer()
     try:
         user_id = int(callback.data.split(":")[-1])
-        archived_lists = await orm_get_user_lists_archive(user_id)
+        files = get_user_archives(user_id)
 
-        if not archived_lists:
+        if not files:
             await callback.answer(LEXICON.USER_HAS_NO_ARCHIVES, show_alert=True)
             await show_users_archives_list(callback, state)
             return
 
-        response_lines = [LEXICON.USER_ARCHIVE_TITLE.format(user_id=user_id)]
-        for i, lst in enumerate(archived_lists, 1):
-            created_date = lst.created_at.strftime("%d.%m.%Y о %H:%M")
-            response_lines.append(
-                LEXICON.ARCHIVE_ITEM.format(i=i, file_name=lst.file_name, created_date=created_date)
+        buttons = []
+        for filename, ts in files:
+            label = f"📄 {ts.strftime('%d.%m %H:%M')} — {filename}"
+            buttons.append(
+                [InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"admin:send:{filename}"
+                )]
             )
 
+        # Кнопка завантажити ZIP
+        buttons.append(
+            [InlineKeyboardButton(
+                text=f"📦 Завантажити всі (ZIP)",
+                callback_data=f"download_zip:{user_id}"
+            )]
+        )
+        buttons.append(
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:user_archives")]
+        )
+
         await callback.message.edit_text(
-            "\n".join(response_lines),
-            reply_markup=get_archive_kb(user_id, is_admin_view=True)
+            f"👤 *User {user_id} — {len(files)} списків:*\nНатисніть для отримання файлу:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
         )
         await state.update_data(main_message_id=callback.message.message_id)
-        await callback.answer()
-    except (ValueError, IndexError, SQLAlchemyError) as e:
-        logger.error("Помилка при перегляді архіву користувача: %s", e, exc_info=True)
+
+    except Exception as e:
+        logger.error(f"Помилка при перегляді архіву user {callback.data}: {e}", exc_info=True)
+        await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
+
+
+@router.callback_query(F.data.startswith("admin:send:"))
+async def admin_send_file(callback: CallbackQuery, bot: Bot):
+    """
+    Адмін отримує окремий файл користувача.
+    """
+    filename = callback.data.split("admin:send:", 1)[1]
+    file_path = os.path.join(ACTIVE_DIR, filename)
+    await callback.answer()
+
+    if not os.path.exists(file_path):
+        await callback.answer("❌ Файл не знайдено", show_alert=True)
+        return
+
+    try:
+        await bot.send_document(
+            chat_id=callback.message.chat.id,
+            document=FSInputFile(file_path),
+            caption=f"📄 {filename}"
+        )
+    except Exception as e:
+        logger.error(f"Помилка відправки файлу адміну {filename}: {e}", exc_info=True)
         await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
 
 
 @router.callback_query(F.data.startswith("download_zip:"))
 async def download_zip_handler(callback: CallbackQuery, state: FSMContext, bot: Bot):
     """
-    Обробляє запит на пакування та відправку ZIP-архіву.
+    Пакує всі файли користувача в ZIP і відправляє адміну.
     """
     zip_path = None
+    await callback.answer()
     try:
         user_id = int(callback.data.split(":")[-1])
-        # --- ОНОВЛЕНО: Редагуємо повідомлення і прибираємо клавіатуру ---
-        await callback.message.edit_text(LEXICON.PACKING_ARCHIVE.format(user_id=user_id), reply_markup=None)
+        files = get_user_archives(user_id)
 
-        zip_path = await _pack_user_files_to_zip(user_id)
-        if not zip_path:
-            await callback.answer(LEXICON.NO_FILES_TO_ARCHIVE, show_alert=True)
-            # Повертаємо до попереднього меню (перегляд архіву)
-            await view_user_archive(callback, state)
+        if not files:
+            await callback.answer("❌ Файлів немає", show_alert=True)
             return
 
-        await bot.send_document(
-            chat_id=callback.from_user.id,
-            document=FSInputFile(zip_path),
-            caption=LEXICON.ZIP_ARCHIVE_CAPTION.format(user_id=user_id)
+        await callback.message.edit_text(
+            f"⌛️ Пакую {len(files)} файлів для user {user_id}...",
+            reply_markup=None
         )
-        
-        # --- ОНОВЛЕНО: Видаляємо тимчасове повідомлення і показуємо нове меню ---
-        await callback.message.delete()
-        await _show_admin_panel(callback, state, bot)
-        await callback.answer()
 
-    except (ValueError, IndexError) as e:
-        logger.error("Некоректний callback_data для завантаження ZIP: %s", callback.data, exc_info=True)
-        await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
-    except Exception as e:
-        await callback.answer(LEXICON.ZIP_ERROR.format(error=str(e)), show_alert=True)
-        # Якщо сталася помилка, все одно показуємо головне меню
+        # Створюємо ZIP
+        zip_filename = f"user_{user_id}_{datetime.now().strftime('%d-%m-%Y_%H-%M')}.zip"
+        zip_path = os.path.join(ARCHIVES_PATH, zip_filename)
+
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for filename, _ in files:
+                fp = os.path.join(ACTIVE_DIR, filename)
+                if os.path.exists(fp):
+                    zipf.write(fp, filename)
+
+        await bot.send_document(
+            chat_id=callback.message.chat.id,
+            document=FSInputFile(zip_path),
+            caption=f"📦 Архів user {user_id} ({len(files)} файлів)"
+        )
+
         await _show_admin_panel(callback, state, bot)
+
+    except Exception as e:
+        logger.error(f"Помилка створення ZIP для user {callback.data}: {e}", exc_info=True)
+        await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
     finally:
         if zip_path and os.path.exists(zip_path):
             os.remove(zip_path)
