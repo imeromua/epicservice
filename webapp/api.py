@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -59,6 +59,12 @@ class DeleteItemRequest(BaseModel):
     product_id: int
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Повертає 204 No Content щоб не була 404 в логах"""
+    return Response(status_code=204)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Головна сторінка Mini App"""
@@ -96,7 +102,6 @@ async def search_products(req: SearchRequest):
         # Формуємо відповідь з детальною інформацією
         result = []
         for product in products:
-            # Розраховуємо доступну кількість
             try:
                 total_quantity = float(product.кількість)
             except (ValueError, TypeError):
@@ -104,7 +109,6 @@ async def search_products(req: SearchRequest):
             
             available = total_quantity - product.відкладено
             
-            # Резерв користувача
             user_reserved_qty = user_reserved.get(product.id, 0)
             user_reserved_sum = user_reserved_qty * float(product.ціна)
             
@@ -129,37 +133,25 @@ async def search_products(req: SearchRequest):
     except SQLAlchemyError as e:
         print(f"❌ SQLAlchemy ERROR: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка бази даних", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка бази даних", "details": str(e)}, status_code=500)
     except Exception as e:
         print(f"❌ ERROR: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Неочікувана помилка", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Неочікувана помилка", "details": str(e)}, status_code=500)
 
 
 @app.get("/api/list/{user_id}")
 async def get_user_list(user_id: int):
-    """
-    Отримати поточний список товарів користувача.
-    """
+    """Отримати поточний список товарів користувача."""
     try:
         temp_list = await orm_get_temp_list(user_id)
-        
         if not temp_list:
             return JSONResponse(content={"items": [], "total": 0}, status_code=200)
-        
         items = []
         total_sum = 0.0
-        
         for item in temp_list:
             item_total = float(item.product.ціна) * item.quantity
             total_sum += item_total
-            
             items.append({
                 "product_id": item.product.id,
                 "article": item.product.артикул,
@@ -168,39 +160,22 @@ async def get_user_list(user_id: int):
                 "price": float(item.product.ціна),
                 "total": item_total
             })
-        
-        return JSONResponse(content={
-            "items": items,
-            "total": total_sum,
-            "count": len(items)
-        }, status_code=200)
-        
+        return JSONResponse(content={"items": items, "total": total_sum, "count": len(items)}, status_code=200)
     except Exception as e:
-        return JSONResponse(
-            content={"error": "Помилка отримання списку", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка отримання списку", "details": str(e)}, status_code=500)
 
 
 @app.get("/api/archives/{user_id}")
 async def get_user_archives(user_id: int):
-    """
-    Отримати список архівних файлів користувача.
-    Повертає список з інформацією: назва файлу, дата створення, тип (основний/лишки).
-    """
+    """Отримати список архівних файлів користувача."""
     try:
         print(f"📁 Archives request for user_id={user_id}")
-        
         archives = get_archives_for_user(user_id)
-        
         if not archives:
             return JSONResponse(content={"archives": []}, status_code=200)
-        
         result = []
         for filename, timestamp in archives:
-            # Визначаємо тип файлу
             is_surplus = filename.startswith("лишки_")
-            
             result.append({
                 "filename": filename,
                 "date": timestamp.strftime("%d.%m.%Y %H:%M"),
@@ -208,42 +183,25 @@ async def get_user_archives(user_id: int):
                 "is_surplus": is_surplus,
                 "type": "Лишки" if is_surplus else "Основний список"
             })
-        
         print(f"✅ Returning {len(result)} archives")
         return JSONResponse(content={"archives": result}, status_code=200)
-        
     except Exception as e:
         print(f"❌ ERROR in get_user_archives: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка отримання архівів", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка отримання архівів", "details": str(e)}, status_code=500)
 
 
 @app.get("/api/archive/download/{filename}")
 async def download_archive(filename: str):
-    """
-    Завантажити архівний файл.
-    """
+    """Завантажити архівний файл."""
     try:
-        # Перевірка безпеки: заборонити шляхи з '..' та '/' 
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
-        
         file_path = os.path.join(ACTIVE_DIR, filename)
-        
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
-        
         print(f"📥 Download request: {filename}")
-        
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        
+        return FileResponse(path=file_path, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except HTTPException:
         raise
     except Exception as e:
@@ -254,161 +212,83 @@ async def download_archive(filename: str):
 
 @app.post("/api/add")
 async def add_to_list(req: AddToListRequest):
-    """
-    Додати товар до списку користувача.
-    """
+    """Додати товар до списку."""
     try:
-        print(f"➕ Add to list request: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
-        
-        print(f"📞 Calling orm_add_item_to_temp_list...")
-        await orm_add_item_to_temp_list(
-            user_id=req.user_id,
-            product_id=req.product_id,
-            quantity=req.quantity
-        )
+        print(f"➕ Add to list: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
+        await orm_add_item_to_temp_list(user_id=req.user_id, product_id=req.product_id, quantity=req.quantity)
         print(f"✅ Successfully added to temp list")
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": f"Додано {req.quantity} шт."
-        }, status_code=200)
-                    
+        return JSONResponse(content={"success": True, "message": f"Додано {req.quantity} шт."}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in add_to_list: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка додавання", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка додавання", "details": str(e)}, status_code=500)
 
 
 @app.post("/api/update")
 async def update_item_quantity(req: UpdateQuantityRequest):
-    """
-    Оновити кількість товару в списку.
-    """
+    """Оновити кількість товару."""
     try:
         if req.quantity < 1:
-            return JSONResponse(
-                content={"success": False, "message": "Кількість має бути більше 0"},
-                status_code=400
-            )
-        
-        await orm_update_temp_list_item_quantity(
-            user_id=req.user_id,
-            product_id=req.product_id,
-            new_quantity=req.quantity
-        )
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": f"Кількість оновлено: {req.quantity} шт."
-        }, status_code=200)
-                    
+            return JSONResponse(content={"success": False, "message": "Кількість має бути більше 0"}, status_code=400)
+        await orm_update_temp_list_item_quantity(user_id=req.user_id, product_id=req.product_id, new_quantity=req.quantity)
+        return JSONResponse(content={"success": True, "message": f"Кількість оновлено: {req.quantity} шт."}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in update_item_quantity: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка оновлення", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка оновлення", "details": str(e)}, status_code=500)
 
 
 @app.post("/api/delete")
 async def delete_item(req: DeleteItemRequest):
-    """
-    Видалити товар зі списку.
-    """
+    """Видалити товар зі списку."""
     try:
-        await orm_delete_temp_list_item(
-            user_id=req.user_id,
-            product_id=req.product_id
-        )
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": "Товар видалено"
-        }, status_code=200)
-                    
+        await orm_delete_temp_list_item(user_id=req.user_id, product_id=req.product_id)
+        return JSONResponse(content={"success": True, "message": "Товар видалено"}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in delete_item: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка видалення", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка видалення", "details": str(e)}, status_code=500)
 
 
 @app.post("/api/clear/{user_id}")
 async def clear_list(user_id: int):
-    """
-    Очистити весь список користувача.
-    """
+    """Очистити список."""
     try:
         await orm_clear_temp_list(user_id)
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": "Список очищено"
-        }, status_code=200)
-                    
+        return JSONResponse(content={"success": True, "message": "Список очищено"}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in clear_list: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка очищення", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка очищення", "details": str(e)}, status_code=500)
 
 
 @app.post("/api/save/{user_id}")
 async def save_list_to_excel(user_id: int):
     """
-    Зберегти список користувача в Excel.
-    WebApp версія: НЕ відправляє в Telegram чат, тільки зберігає в архів.
-    Користувач може завантажити файл з вкладки "Архів".
-    
-    Виконує:
-    - Зберігає в archives/active/
-    - Розділяє на основний список та лишки
-    - Резервує товари в БД
-    - Очищає тимчасовий список
+    Зберегти список в Excel.
+    WebApp: НЕ відправляє в Telegram, тільки зберігає в archives/active/.
+    Файл доступний через вкладку "Архів".
     """
     try:
-        print(f"💾 Save list request for user_id={user_id} (webapp - no Telegram send)")
-        
+        print(f"💾 Save list request for user_id={user_id} (webapp - archive only)")
         async with async_session() as session:
             async with session.begin():
-                # Використовуємо ту саму функцію що й бот
                 main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
-        
         if not main_list_path and not surplus_list_path:
             print(f"⚠️ List is empty for user {user_id}")
-            return JSONResponse(
-                content={"success": False, "message": "Список порожній"},
-                status_code=400
-            )
-        
+            return JSONResponse(content={"success": False, "message": "Список порожній"}, status_code=400)
         print(f"✅ Files saved: main={main_list_path}, surplus={surplus_list_path}")
-        
-        # Формуємо відповідь
-        response_data = {
+        return JSONResponse(content={
             "success": True,
             "message": "✅ Список збережено!",
-            "cleared": True,  # Сигнал для frontend що треба очистити UI
+            "cleared": True,
             "has_main": bool(main_list_path),
             "has_surplus": bool(surplus_list_path)
-        }
-        
-        return JSONResponse(content=response_data, status_code=200)
-                    
+        }, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in save_list_to_excel: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return JSONResponse(
-            content={"error": "Помилка збереження списку", "details": str(e)},
-            status_code=500
-        )
+        return JSONResponse(content={"error": "Помилка збереження списку", "details": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":
