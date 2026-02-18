@@ -39,14 +39,15 @@ async def orm_add_saved_list(
         session.add(new_list)
         await session.flush()
 
-        logger.info("Створено SavedList id=%s для user_id=%s, файл=%s", new_list.id, user_id, filename)
+        logger.info(f"Створено SavedList id={new_list.id} для user_id={user_id}, файл={filename}")
 
+        items_added = 0
         for item in items:
             product_id = item.get("product_id")
             qty = item.get("quantity")
 
             if not product_id:
-                logger.warning("Пропущено item без product_id: %s", item)
+                logger.warning(f"Пропущено item без product_id: {item}")
                 continue
 
             saved_item = SavedListItem(
@@ -55,12 +56,12 @@ async def orm_add_saved_list(
                 quantity=qty
             )
             session.add(saved_item)
-            logger.debug("Додано SavedListItem: product_id=%s, quantity=%s", product_id, qty)
+            items_added += 1
 
-        logger.info("Успішно збережено архів: %s items для user_id=%s", len(items), user_id)
+        logger.info(f"Успішно збережено архів: {items_added} items для user_id={user_id}")
         return True
     except Exception as e:
-        logger.error("Помилка при збереженні архіву в БД: %s", e, exc_info=True)
+        logger.error(f"Помилка при збереженні архіву в БД: {e}", exc_info=True)
         return False
 
 
@@ -119,7 +120,7 @@ def orm_delete_all_saved_lists_sync():
             session.commit()
             return True
     except Exception as e:
-        logger.error("Помилка при видаленні всіх списків: %s", e, exc_info=True)
+        logger.error(f"Помилка при видаленні всіх списків: {e}", exc_info=True)
         return False
 
 
@@ -134,7 +135,7 @@ def orm_delete_lists_older_than_sync(hours: int):
             session.commit()
             return True
     except Exception as e:
-        logger.error("Помилка при видаленні старих списків: %s", e, exc_info=True)
+        logger.error(f"Помилка при видаленні старих списків: {e}", exc_info=True)
         return False
 
 
@@ -153,7 +154,7 @@ def orm_get_all_collected_items_sync():
             result = session.execute(stmt).all()
             return result
     except Exception as e:
-        logger.error("Помилка отримання зібраних товарів: %s", e, exc_info=True)
+        logger.error(f"Помилка отримання зібраних товарів: {e}", exc_info=True)
         return []
 
 
@@ -174,7 +175,7 @@ def orm_get_users_for_warning_sync(hours: int):
             result = session.execute(stmt).scalars().all()
             return result
     except Exception as e:
-        logger.error("Помилка пошуку користувачів для попередження: %s", e, exc_info=True)
+        logger.error(f"Помилка пошуку користувачів для попередження: {e}", exc_info=True)
         return []
 
 
@@ -206,7 +207,7 @@ async def orm_update_reserved_quantity(session: AsyncSession, updates: List[Dict
             await session.execute(stmt)
         return True
     except Exception as e:
-        logger.error("Помилка оновлення резерву: %s", e, exc_info=True)
+        logger.error(f"Помилка оновлення резерву: {e}", exc_info=True)
         raise
 
 
@@ -253,7 +254,7 @@ def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
         return {"items": found_items, "not_found": not_found_count}
 
     except Exception as e:
-        logger.error("Помилка обробки файлу зібраних товарів: %s", e, exc_info=True)
+        logger.error(f"Помилка обробки файлу зібраних товарів: {e}", exc_info=True)
         return {"error": str(e)}
 
 
