@@ -15,8 +15,9 @@
         .search-input { width: 100%; padding: 12px 16px; border: 2px solid var(--tg-theme-button-color, #0088cc); border-radius: 12px; font-size: 16px; background: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #000000); }
         .search-input:focus { outline: none; border-color: var(--tg-theme-link-color, #0088cc); }
         .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--tg-theme-hint-color, #999999); overflow-x: auto; }
-        .tab { padding: 12px 16px; background: none; border: none; color: var(--tg-theme-hint-color, #999999); cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; transition: all 0.3s; white-space: nowrap; }
+        .tab { position: relative; padding: 12px 16px; background: none; border: none; color: var(--tg-theme-hint-color, #999999); cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; transition: all 0.3s; white-space: nowrap; }
         .tab.active { color: var(--tg-theme-button-color, #0088cc); border-bottom-color: var(--tg-theme-button-color, #0088cc); }
+        .tab-badge { position: absolute; top: 6px; right: 8px; background: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
         .content { display: none; }
         .content.active { display: block; }
         .product-card, .list-item, .archive-item { background: var(--tg-theme-secondary-bg-color, #f0f0f0); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: transform 0.2s; }
@@ -59,267 +60,59 @@
         .archive-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-left: 8px; }
         .archive-badge.main { background: #34c759; color: white; }
         .archive-badge.surplus { background: #ff9500; color: white; }
+        .archive-stats { font-size: 12px; color: var(--tg-theme-hint-color, #999999); margin-top: 4px; }
         .success-icon { font-size: 64px; text-align: center; margin-bottom: 12px; }
         .success-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #34c759; }
         .success-subtitle { text-align: center; font-size: 14px; color: var(--tg-theme-hint-color, #999999); margin-bottom: 24px; }
         .archive-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .pull-refresh { text-align: center; padding: 10px; color: var(--tg-theme-hint-color, #999999); font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="header"><h1>📦 EpicService</h1><p id="userInfo">Завантаження...</p></div>
     <div class="tabs">
         <button class="tab active" onclick="switchTab('search')">🔍 Пошук</button>
-        <button class="tab" onclick="switchTab('list')">📋 Список</button>
+        <button class="tab" onclick="switchTab('list')">📋 Список<span class="tab-badge" id="listBadge" style="display:none">0</span></button>
         <button class="tab" onclick="switchTab('archives')">📁 Архів</button>
     </div>
     <div id="searchTab" class="content active"><div class="search-box"><input type="text" id="searchInput" class="search-input" placeholder="Введіть артикул або назву..."></div><div id="searchResults"></div></div>
     <div id="listTab" class="content"><div id="listContent"></div></div>
     <div id="archivesTab" class="content"><div id="archivesContent"></div></div>
 
-    <!-- Модал: Успіх збереження -->
-    <div id="successModal" class="modal">
-        <div class="modal-content">
-            <div class="success-icon">✅</div>
-            <div class="success-title">Список збережено!</div>
-            <div class="success-subtitle">Файл доступний в розділі "Архів"</div>
-            <button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button>
-            <button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button>
-        </div>
-    </div>
-
-    <!-- Модал: Додавання -->
-    <div id="addModal" class="modal">
-        <div class="modal-content">
-            <h2 id="modalTitle"></h2>
-            <p id="modalPrice"></p>
-            <p id="modalAvailable"></p>
-            <div class="quick-actions" style="margin-top:16px">
-                <button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button>
-                <button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button>
-            </div>
-            <div id="customInputBox" style="display:none">
-                <input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1">
-                <button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button>
-            </div>
-            <div id="normalSelector">
-                <div class="quantity-selector">
-                    <button class="qty-btn" onclick="changeQty(-1)">−</button>
-                    <div class="qty-display" id="qtyDisplay">1</div>
-                    <button class="qty-btn" onclick="changeQty(1)">+</button>
-                </div>
-                <button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button>
-            </div>
-            <button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button>
-        </div>
-    </div>
-
-    <!-- Модал: Редагування -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <h2 id="editModalTitle"></h2>
-            <p id="editModalPrice"></p>
-            <div class="quantity-selector">
-                <button class="qty-btn" onclick="changeEditQty(-1)">−</button>
-                <div class="qty-display" id="editQtyDisplay">1</div>
-                <button class="qty-btn" onclick="changeEditQty(1)">+</button>
-            </div>
-            <button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button>
-            <button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button>
-            <button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button>
-        </div>
-    </div>
-
-    <!-- Підсумок -->
-    <div class="total-box" id="totalBox" style="display:none">
-        <div class="total-text">Всього: <span id="totalSum">0</span> грн</div>
-        <div style="font-size:14px; color:var(--tg-theme-hint-color,#999)"><span id="totalItems">0</span> товарів</div>
-    </div>
-
+    <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
+    <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
+    <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
+    <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--tg-theme-hint-color,#999)"><span id="totalItems">0</span> товарів</div></div>
 <script>
-const tg = window.Telegram.WebApp;
-tg.expand();
+const tg = window.Telegram.WebApp; tg.expand();
 const userId = tg.initDataUnsafe?.user?.id || 0;
 let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null;
+document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}` : 'Тестовий режим';
 
-document.getElementById('userInfo').textContent = userId
-    ? `Користувач: ${tg.initDataUnsafe.user.first_name}`
-    : 'Тестовий режим';
-
-function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab']};
-    const [idx, id] = tabs[tab];
-    document.querySelectorAll('.tab')[idx].classList.add('active');
-    document.getElementById(id).classList.add('active');
-    if (tab === 'list') loadList();
-    if (tab === 'archives') loadArchives();
-}
-
+function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
+function switchTab(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab']}; const [idx, id] = tabs[tab]; document.querySelectorAll('.tab')[idx].classList.add('active'); document.getElementById(id).classList.add('active'); if (tab === 'list') loadList(); if (tab === 'archives') loadArchives(); }
 function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
 function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
-
-document.getElementById('searchInput').addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    const query = e.target.value.trim();
-    if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; }
-    searchTimeout = setTimeout(() => search(query), 500);
-});
-
-async function search(query) {
-    const results = document.getElementById('searchResults');
-    results.innerHTML = '<div class="loader">🔍 Пошук...</div>';
-    try {
-        const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) });
-        const data = await response.json();
-        if (!data.products || data.products.length === 0) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; return; }
-        results.innerHTML = data.products.map(p => `
-            <div class="product-card" onclick='openAddModal(${JSON.stringify(p)})'>
-                <div class="product-header"><span class="product-article">🆔 ${p.article}</span><span class="product-status">✅ Знайдено</span></div>
-                <div class="product-name">📝 ${p.name}</div>
-                <div class="product-details">
-                    <div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
-                    <div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div>
-                    <div class="product-detail-row"><span class="product-detail-label">⏳ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div>
-                    <div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div>
-                    <div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>
-                    ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
-                </div>
-            </div>`).join('');
-    } catch (error) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; }
-}
-
-function openAddModal(product) {
-    selectedProduct = product; currentQuantity = 1;
-    document.getElementById('modalTitle').textContent = product.article;
-    document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`;
-    document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`;
-    document.getElementById('qtyDisplay').textContent = 1;
-    document.getElementById('customInputBox').style.display = 'none';
-    document.getElementById('normalSelector').style.display = 'block';
-    document.getElementById('customQtyInput').value = '';
-    document.getElementById('addModal').classList.add('active');
-}
+document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; } searchTimeout = setTimeout(() => search(query), 500); });
+async function search(query) { const results = document.getElementById('searchResults'); results.innerHTML = '<div class="loader">🔍 Пошук...</div>'; try { const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) }); const data = await response.json(); if (!data.products || data.products.length === 0) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; return; } results.innerHTML = data.products.map(p => `<div class="product-card" onclick='openAddModal(${JSON.stringify(p)})'><div class="product-header"><span class="product-article">🆔 ${p.article}</span><span class="product-status">✅ Знайдено</span></div><div class="product-name">📝 ${p.name}</div><div class="product-details"><div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div><div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div><div class="product-detail-row"><span class="product-detail-label">⏳ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div><div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div><div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}</div></div>`).join(''); } catch (error) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; } }
+function openAddModal(product) { selectedProduct = product; currentQuantity = 1; document.getElementById('modalTitle').textContent = product.article; document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`; document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`; document.getElementById('qtyDisplay').textContent = 1; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; document.getElementById('customQtyInput').value = ''; document.getElementById('addModal').classList.add('active'); }
 function closeModal() { document.getElementById('addModal').classList.remove('active'); }
 function changeQty(d) { currentQuantity = Math.max(1, Math.min(selectedProduct.available, currentQuantity + d)); document.getElementById('qtyDisplay').textContent = currentQuantity; }
 function addAllAvailable() { currentQuantity = selectedProduct.available; document.getElementById('qtyDisplay').textContent = currentQuantity; tg.HapticFeedback.notificationOccurred('success'); }
 function showCustomInput() { document.getElementById('customInputBox').style.display = 'block'; document.getElementById('normalSelector').style.display = 'none'; document.getElementById('customQtyInput').focus(); }
-function applyCustomQty() {
-    const v = parseInt(document.getElementById('customQtyInput').value);
-    if (isNaN(v) || v < 1) { tg.showAlert('❌ Введіть коректне число'); return; }
-    if (v > selectedProduct.available) { tg.showAlert(`⚠️ Максимум: ${selectedProduct.available} шт.`); return; }
-    currentQuantity = v;
-    document.getElementById('qtyDisplay').textContent = v;
-    document.getElementById('customInputBox').style.display = 'none';
-    document.getElementById('normalSelector').style.display = 'block';
-    tg.HapticFeedback.notificationOccurred('success');
-}
-async function confirmAdd() {
-    try {
-        const r = await fetch('/api/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: selectedProduct.id, quantity: currentQuantity}) });
-        const d = await r.json();
-        if (d.success) { tg.showAlert(`✅ ${d.message}`); closeModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); }
-    } catch (e) { tg.showAlert('❌ ' + e.message); }
-}
-
-function openEditModal(item) {
-    editingItem = item; editQuantity = item.quantity;
-    document.getElementById('editModalTitle').textContent = item.article;
-    document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`;
-    document.getElementById('editQtyDisplay').textContent = editQuantity;
-    document.getElementById('editModal').classList.add('active');
-}
+function applyCustomQty() { const v = parseInt(document.getElementById('customQtyInput').value); if (isNaN(v) || v < 1) { tg.showAlert('❌ Введіть коректне число'); return; } if (v > selectedProduct.available) { tg.showAlert(`⚠️ Максимум: ${selectedProduct.available} шт.`); return; } currentQuantity = v; document.getElementById('qtyDisplay').textContent = v; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; tg.HapticFeedback.notificationOccurred('success'); }
+async function confirmAdd() { try { const r = await fetch('/api/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: selectedProduct.id, quantity: currentQuantity}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+function openEditModal(item) { editingItem = item; editQuantity = item.quantity; document.getElementById('editModalTitle').textContent = item.article; document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`; document.getElementById('editQtyDisplay').textContent = editQuantity; document.getElementById('editModal').classList.add('active'); }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
 function changeEditQty(d) { editQuantity = Math.max(1, editQuantity + d); document.getElementById('editQtyDisplay').textContent = editQuantity; }
-async function confirmUpdate() {
-    try {
-        const r = await fetch('/api/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id, quantity: editQuantity}) });
-        const d = await r.json();
-        if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); }
-    } catch (e) { tg.showAlert('❌ ' + e.message); }
-}
-async function confirmDelete() {
-    if (!confirm('Видалити товар зі списку?')) return;
-    try {
-        const r = await fetch('/api/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) });
-        const d = await r.json();
-        if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); }
-    } catch (e) { tg.showAlert('❌ ' + e.message); }
-}
-
-async function saveList() {
-    try {
-        const r = await fetch(`/api/save/${userId}`, { method: 'POST' });
-        const d = await r.json();
-        if (d.success) {
-            tg.HapticFeedback.notificationOccurred('success');
-            if (d.cleared) loadList();
-            document.getElementById('successModal').classList.add('active');
-        } else { tg.showAlert('❌ ' + d.message); }
-    } catch (e) { tg.showAlert('❌ ' + e.message); }
-}
-async function clearList() {
-    if (!confirm('Очистити весь список?')) return;
-    try {
-        const r = await fetch(`/api/clear/${userId}`, { method: 'POST' });
-        const d = await r.json();
-        if (d.success) { tg.showAlert(`✅ ${d.message}`); loadList(); } else { tg.showAlert('❌ ' + d.message); }
-    } catch (e) { tg.showAlert('❌ ' + e.message); }
-}
-async function loadList() {
-    const el = document.getElementById('listContent');
-    el.innerHTML = '<div class="loader">⏳ Завантаження...</div>';
-    try {
-        const r = await fetch(`/api/list/${userId}`);
-        const d = await r.json();
-        if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; return; }
-        let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>';
-        html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--tg-theme-hint-color,#999)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join('');
-        el.innerHTML = html;
-        document.getElementById('totalSum').textContent = d.total.toFixed(2);
-        document.getElementById('totalItems').textContent = d.count;
-        document.getElementById('totalBox').style.display = 'flex';
-    } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; }
-}
-
-async function loadArchives() {
-    const el = document.getElementById('archivesContent');
-    el.innerHTML = '<div class="loader">📁 Завантаження...</div>';
-    try {
-        const r = await fetch(`/api/archives/${userId}`);
-        const d = await r.json();
-        if (!d.archives || d.archives.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div>Архів порожній</div>'; return; }
-        el.innerHTML = d.archives.map(a => `
-            <div class="archive-item">
-                <div class="archive-header"><strong>📄 ${a.date}</strong><span class="archive-badge ${a.is_surplus ? 'surplus' : 'main'}">${a.type}</span></div>
-                <div class="archive-actions">
-                    <button class="download-btn" onclick="downloadArchive('${a.filename}')">📥 Завантажити</button>
-                    <button class="delete-archive-btn" onclick="deleteArchive('${a.filename}')">🗑️ Видалити</button>
-                </div>
-            </div>
-        `).join('');
-    } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка</div>'; }
-}
-
+async function confirmUpdate() { try { const r = await fetch('/api/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id, quantity: editQuantity}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function confirmDelete() { if (!confirm('Видалити товар зі списку?')) return; try { const r = await fetch('/api/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function saveList() { try { const r = await fetch(`/api/save/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.HapticFeedback.notificationOccurred('success'); if (d.cleared) loadList(); document.getElementById('successModal').classList.add('active'); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function clearList() { if (!confirm('Очистити весь список?')) return; try { const r = await fetch(`/api/clear/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⏳ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); return; } let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--tg-theme-hint-color,#999)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); } }
+async function loadArchives() { const el = document.getElementById('archivesContent'); el.innerHTML = '<div class="loader">📁 Завантаження...</div>'; try { const r = await fetch(`/api/archives/${userId}`); const d = await r.json(); if (!d.archives || d.archives.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div>Архів порожній</div>'; return; } el.innerHTML = d.archives.map(a => `<div class="archive-item"><div class="archive-header"><strong>📄 ${a.date}</strong><span class="archive-badge ${a.is_surplus ? 'surplus' : 'main'}">${a.type}</span></div><div class="archive-stats">📦 Файл: ${a.filename}</div><div class="archive-actions"><button class="download-btn" onclick="downloadArchive('${a.filename}')">📥 Завантажити</button><button class="delete-archive-btn" onclick="deleteArchive('${a.filename}')">🗑️ Видалити</button></div></div>`).join(''); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка</div>'; } }
 function downloadArchive(f) { window.open(`/api/archive/download/${f}`, '_blank'); tg.HapticFeedback.notificationOccurred('success'); }
-
-async function deleteArchive(filename) {
-    if (!confirm(`Видалити файл "${filename}"?`)) return;
-    try {
-        const r = await fetch(`/api/archive/delete/${filename}?user_id=${userId}`, { method: 'DELETE' });
-        const d = await r.json();
-        if (d.success) {
-            tg.showAlert(`✅ ${d.message}`);
-            tg.HapticFeedback.notificationOccurred('success');
-            loadArchives();
-        } else {
-            tg.showAlert('❌ Помилка видалення');
-        }
-    } catch (e) {
-        tg.showAlert('❌ Помилка: ' + e.message);
-    }
-}
-
+async function deleteArchive(filename) { if (!confirm(`Видалити файл "${filename}"?`)) return; try { const r = await fetch(`/api/archive/delete/${filename}?user_id=${userId}`, { method: 'DELETE' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); tg.HapticFeedback.notificationOccurred('success'); loadArchives(); } else { tg.showAlert('❌ Помилка видалення'); } } catch (e) { tg.showAlert('❌ Помилка: ' + e.message); } }
 if (userId) loadList();
 </script>
 </body>
