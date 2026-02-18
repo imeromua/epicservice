@@ -1,5 +1,3 @@
-# epicservice/webapp/api.py
-
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +6,7 @@ from pydantic import BaseModel
 import uvicorn
 import sys
 import os
+import traceback
 
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -53,10 +52,15 @@ async def search_products(req: SearchRequest):
     Повертає список товарів з інформацією про наявність.
     """
     try:
+        print(f"🔍 Search request: query='{req.query}', user_id={req.user_id}")
+        
         # orm_find_products сама створює сесію
+        print(f"📞 Calling orm_find_products...")
         products = await orm_find_products(req.query)
+        print(f"✅ orm_find_products returned {len(products) if products else 0} products")
         
         if not products:
+            print(f"⚠️ No products found")
             return JSONResponse(content={"products": [], "message": "Нічого не знайдено"}, status_code=200)
         
         # Формуємо відповідь
@@ -71,14 +75,19 @@ async def search_products(req: SearchRequest):
                 "department": product.відділ
             })
         
+        print(f"✅ Returning {len(result)} products")
         return JSONResponse(content={"products": result}, status_code=200)
         
     except SQLAlchemyError as e:
+        print(f"❌ SQLAlchemy ERROR: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return JSONResponse(
             content={"error": "Помилка бази даних", "details": str(e)},
             status_code=500
         )
     except Exception as e:
+        print(f"❌ ERROR: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return JSONResponse(
             content={"error": "Неочікувана помилка", "details": str(e)},
             status_code=500
