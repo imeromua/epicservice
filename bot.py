@@ -17,7 +17,7 @@ from handlers.admin import (archive_handlers as admin_archive,
                             core as admin_core,
                             import_handlers as admin_import,
                             report_handlers as admin_reports)
-from handlers.user import (item_addition, list_editing, list_management,
+from handlers.user import (list_editing, list_management,
                            list_saving)
 from middlewares.logging_middleware import LoggingMiddleware
 
@@ -92,7 +92,7 @@ async def main():
     dp.include_router(common.router)
     dp.include_router(archive.router)
     dp.include_router(list_management.router)
-    dp.include_router(item_addition.router)
+    # ВИДАЛЕНО: dp.include_router(item_addition.router) - файл видалено
     dp.include_router(list_editing.router)
     dp.include_router(list_saving.router)
     dp.include_router(user_search.router)
