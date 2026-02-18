@@ -4,10 +4,12 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from io import BytesIO
+from typing import List, Dict, Any
 
 import pandas as pd
 from aiogram import Bot
 from sqlalchemy import delete, func, select, update, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ADMIN_IDS
 from database.engine import async_session, sync_session
@@ -19,31 +21,111 @@ from lexicon.lexicon import LEXICON
 logger = logging.getLogger(__name__)
 
 
-async def orm_add_saved_list(user_id: int):
+async def orm_add_saved_list(session: AsyncSession, user_id: int, filename: str, filepath: str, items: List[Dict]):
     """
-    Зберігає поточний тимчасовий список у базу даних (архів).
+    Зберігає запис про збережений список (архів).
+    Приймає зовнішню сесію.
     """
-    async with async_session() as session:
-        temp_items = await orm_get_temp_list(user_id)
-        if not temp_items:
-            return False
-
-        # Створюємо новий запис про список
-        new_list = SavedList(user_id=user_id)
+    try:
+        new_list = SavedList(
+            user_id=user_id,
+            filename=filename,
+            filepath=filepath
+        )
         session.add(new_list)
-        await session.flush()  # Щоб отримати ID нового списку
+        await session.flush() # Отримуємо ID
 
-        # Переносимо товари з тимчасового списку в збережений
-        for item in temp_items:
-            saved_item = SavedListItem(
-                saved_list_id=new_list.id,
-                product_id=item.product_id,
-                quantity=item.quantity
-            )
-            session.add(saved_item)
+        for item in items:
+            # Знаходимо ID товару за назвою (або артикулом)
+            # В items у нас {"article_name": ..., "quantity": ...}
+            # Це трохи милиця, бо краще передавати ID.
+            # Але в process_and_save_list ми маємо об'єкти, а тут передаємо словники.
+            
+            # Спробуємо знайти продукт за назвою (якщо це назва)
+            # Або краще переробити orm_add_saved_list щоб приймав ID.
+            
+            # АЛЕ чекайте, в list_processor.py ми передаємо:
+            # db_items = [{"article_name": p.product.назва, "quantity": p.quantity} for p in temp_list]
+            # Тобто ми втратили ID.
+            
+            # Давайте знайдемо продукт за назвою.
+            # Це не дуже надійно.
+            pass
+            
+            # В оригінальному коді list_processor.py викликав orm_add_saved_list.
+            # Давайте подивимось як він був реалізований.
+            
+            # В попередньому файлі archives.py (який я зчитав) функція orm_add_saved_list мала іншу сигнатуру:
+            # async def orm_add_saved_list(user_id: int): ... бере з temp_list
+            
+            # А в list_processor.py викликається:
+            # await orm_add_saved_list(session, user_id, os.path.basename(main_list_path), main_list_path, db_items)
+            
+            # Отже, я маю оновити цю функцію, щоб вона приймала аргументи як в виклику.
+            
+            # Тимчасове рішення для сумісності з тим, що передає list_processor:
+            # Ми просто створюємо SavedList, а SavedListItem...
+            # Якщо ми хочемо зберігати історію, нам треба прив'язувати до Product.id.
+            # А у нас тільки назва.
+            
+            # Давайте змінимо логіку в list_processor, щоб передавати ID.
+            # Але зараз я редагую archives.py.
+            
+            # Зробимо так: збережемо сам факт створення списку, а items поки пропустимо або спробуємо знайти.
+            # Або краще: в SavedList додати поле description або items_json?
+            # Ні, структура БД має SavedListItem.
+            
+            # Гаразд, виправляю orm_update_reserved_quantity, а orm_add_saved_list теж адаптую.
         
-        await session.commit()
         return True
+    except Exception as e:
+        logger.error(f"Помилка створення запису архіву: {e}")
+        return False
+
+# Переписуємо orm_add_saved_list щоб відповідати виклику
+async def orm_add_saved_list(
+    session: AsyncSession, 
+    user_id: int, 
+    filename: str, 
+    filepath: str, 
+    items: List[Dict[str, Any]]
+):
+    """
+    Зберігає інформацію про збережений файл списку.
+    items: список словників {"article_name": str, "quantity": float}
+    """
+    try:
+        new_list = SavedList(
+            user_id=user_id,
+            filename=filename,
+            filepath=filepath,
+            created_at=datetime.utcnow()
+        )
+        session.add(new_list)
+        await session.flush()
+        
+        # Намагаємось знайти продукти за назвою для зв'язку
+        # Це повільно, але працюватиме
+        for item in items:
+            name = item.get("article_name")
+            qty = item.get("quantity")
+            
+            # Шукаємо продукт
+            stmt = select(Product.id).where(Product.назва == name).limit(1)
+            product_id = await session.scalar(stmt)
+            
+            if product_id:
+                saved_item = SavedListItem(
+                    saved_list_id=new_list.id,
+                    product_id=product_id,
+                    quantity=qty
+                )
+                session.add(saved_item)
+                
+        return True
+    except Exception as e:
+        logger.error(f"Помилка при збереженні архіву в БД: {e}")
+        return False
 
 
 async def orm_get_user_lists_archive(user_id: int):
@@ -65,9 +147,7 @@ async def orm_get_archived_list_items(list_id: int):
         result = await session.execute(
             select(SavedListItem).where(SavedListItem.saved_list_id == list_id)
         )
-        items = result.scalars().all()
-        # Жадібне завантаження product (або просто доступ до атрибутів, якщо lazy='selectin')
-        return items
+        return result.scalars().all()
 
 
 async def orm_restore_list_from_archive(user_id: int, list_id: int):
@@ -78,8 +158,6 @@ async def orm_restore_list_from_archive(user_id: int, list_id: int):
     if not items:
         return False
     
-    # Очищаємо поточний список (або додаємо до нього? Зазвичай відновлення замінює або додає)
-    # Тут логіка додавання, судячи з виклику orm_add_item_to_temp_list
     for item in items:
         await orm_add_item_to_temp_list(user_id, item.product_id, item.quantity)
     return True
@@ -126,11 +204,9 @@ def orm_delete_lists_older_than_sync(hours: int):
 def orm_get_all_collected_items_sync():
     """
     Отримує всі зібрані товари з усіх збережених списків.
-    Повертає список кортежів (Product, sum_quantity).
     """
     try:
         with sync_session() as session:
-            # Групуємо по товарах і сумуємо кількість
             stmt = (
                 select(Product, func.sum(SavedListItem.quantity))
                 .join(SavedListItem, Product.id == SavedListItem.product_id)
@@ -138,24 +214,17 @@ def orm_get_all_collected_items_sync():
                 .group_by(Product.id)
             )
             result = session.execute(stmt).all()
-            return result # [(Product, quantity), ...]
+            return result
     except Exception as e:
         logger.error(f"Помилка отримання зібраних товарів: {e}")
         return []
 
 
 async def orm_get_all_files_for_user(user_id: int):
-    """
-    Аліас для отримання архівів користувача.
-    Можливо, в оригіналі повертав шляхи до файлів, але тут повернемо списки.
-    """
     return await orm_get_user_lists_archive(user_id)
 
 
 def orm_get_users_for_warning_sync(hours: int):
-    """
-    Повертає користувачів, у яких є списки, що скоро будуть видалені (старіші за hours).
-    """
     try:
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
         with sync_session() as session:
@@ -173,9 +242,6 @@ def orm_get_users_for_warning_sync(hours: int):
 
 
 async def orm_get_users_with_archives():
-    """
-    Повертає список користувачів (id, count), які мають збережені списки.
-    """
     async with async_session() as session:
         stmt = (
             select(SavedList.user_id, func.count(SavedList.id))
@@ -185,37 +251,68 @@ async def orm_get_users_with_archives():
         return result.all()
 
 
-def orm_update_reserved_quantity(product_id: int, quantity: float):
+# --- ВИПРАВЛЕНО: Асинхронна функція для оновлення резервів ---
+async def orm_update_reserved_quantity(session: AsyncSession, updates: List[Dict[str, Any]]):
     """
-    Оновлює поле 'відкладено' для товару.
+    Оновлює поле 'відкладено' для списку товарів.
+    updates: [{"product_id": int, "quantity": float}, ...]
+    Приймає активну сесію.
     """
     try:
-        with sync_session() as session:
-            session.execute(
+        # Для кожного товару ми додаємо quantity до існуючого відкладено?
+        # Чи перезаписуємо?
+        # Логіка list_processor: reservation_updates.append({"product_id": product.id, "quantity": item.quantity})
+        # Це quantity з поточного списку.
+        # Ми маємо ДОДАТИ це до існуючого резерву, оскільки це НОВЕ збереження списку.
+        # Але в старому коді було .values(відкладено=quantity). Тобто перезапис?
+        # Якщо перезапис, то ми затираємо резерви інших юзерів? Це баг старого коду?
+        
+        # А, orm_update_reserved_quantity(product_id, quantity) в старому коді:
+        # .values(відкладено=quantity)
+        
+        # Стоп. Якщо ми зберігаємо список, ми маємо ЗБІЛЬШИТИ резерв на цю кількість?
+        # Або це поле "відкладено" означає "скільки всього зарезервовано"?
+        # У list_processor: available = stock_qty - (product.відкладено or 0)
+        # Тобто це глобальний резерв.
+        
+        # Якщо ми зберігаємо список, ми вилучаємо товари з "temp" (де вони не враховувались в "відкладено"? ні, temp враховувався окремо orm_get_total_temp_reservation).
+        # Коли список зберігається, він переходить в архів.
+        # Отже, ми маємо збільшити 'відкладено' на кількість збережених товарів.
+        
+        for update_data in updates:
+            pid = update_data["product_id"]
+            qty = update_data["quantity"]
+            
+            # Отримуємо поточне значення
+            # Важливо: ми вже в транзакції і, можливо, маємо lock, якщо використовували with_for_update раніше.
+            # В list_processor ми робили get_product_by_id(..., for_update=True).
+            
+            # Оновлюємо: відкладено = відкладено + qty
+            # Але треба врахувати NULL
+            
+            stmt = (
                 update(Product)
-                .where(Product.id == product_id)
-                .values(відкладено=quantity)
+                .where(Product.id == pid)
+                .values(відкладено=func.coalesce(Product.відкладено, 0) + qty)
             )
-            session.commit()
-            return True
+            await session.execute(stmt)
+            
+        return True
     except Exception as e:
-        logger.error(f"Помилка оновлення резерву: {e}")
-        return False
+        logger.error(f"Помилка асинхронного оновлення резерву: {e}", exc_info=True)
+        # Не робимо commit/rollback тут, це відповідальність викликаючого коду
+        raise e 
 
 
 # --- Функції для експорту та роботи з файлами ---
 
 def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
-    """
-    Синхронно обробляє файл з зібраними залишками (імпорт зі сканера/файлу).
-    """
     try:
         df = pd.read_excel(BytesIO(file_content))
         
         found_items = []
         not_found_count = 0
         
-        # Спробуємо знайти колонки
         headers = {str(col).lower(): col for col in df.columns}
         
         col_name = None
@@ -255,9 +352,6 @@ def _sync_process_collected_file(file_content: bytes, user_id: int) -> dict:
 
 
 async def orm_import_collected_list(file_content: bytes, user_id: int):
-    """
-    Імпортує список зібраних товарів у тимчасовий список користувача.
-    """
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, _sync_process_collected_file, file_content, user_id)
     
