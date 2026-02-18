@@ -642,6 +642,10 @@
                 
                 if (data.success) {
                     tg.showAlert(`✅ ${data.message}`);
+                    // Якщо список був очищений на сервері, оновлюємо UI
+                    if (data.cleared) {
+                        loadList();
+                    }
                 } else {
                     tg.showAlert('❌ ' + data.message);
                 }
