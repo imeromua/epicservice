@@ -66,12 +66,20 @@ async def search_products(req: SearchRequest):
         # Формуємо відповідь
         result = []
         for product in products:
+            # Розрахуємо доступну кількість
+            try:
+                total_quantity = float(product.кількість)
+            except (ValueError, TypeError):
+                total_quantity = 0.0
+            
+            available = total_quantity - product.відкладено
+            
             result.append({
                 "id": product.id,
                 "article": product.артикул,
                 "name": product.назва,
                 "price": float(product.ціна),
-                "available": product.доступна_кількість,
+                "available": available,
                 "department": product.відділ
             })
         
