@@ -36,7 +36,8 @@
         .action-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
         .save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
         .clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .download-btn { width: 100%; padding: 12px; background: var(--tg-theme-button-color, #0088cc); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .download-btn { flex: 1; padding: 12px; background: var(--tg-theme-button-color, #0088cc); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .delete-archive-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
         .empty-state { text-align: center; padding: 40px 20px; color: var(--tg-theme-hint-color, #999999); }
         .empty-icon { font-size: 48px; margin-bottom: 16px; }
         .loader { text-align: center; padding: 20px; color: var(--tg-theme-hint-color, #999999); }
@@ -58,10 +59,10 @@
         .archive-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-left: 8px; }
         .archive-badge.main { background: #34c759; color: white; }
         .archive-badge.surplus { background: #ff9500; color: white; }
-        /* Модальне вікно успіху */
         .success-icon { font-size: 64px; text-align: center; margin-bottom: 12px; }
         .success-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #34c759; }
         .success-subtitle { text-align: center; font-size: 14px; color: var(--tg-theme-hint-color, #999999); margin-bottom: 24px; }
+        .archive-actions { display: flex; gap: 8px; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -106,7 +107,7 @@
                     <div class="qty-display" id="qtyDisplay">1</div>
                     <button class="qty-btn" onclick="changeQty(1)">+</button>
                 </div>
-                <button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛍️ Додати до списку</button>
+                <button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button>
             </div>
             <button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button>
         </div>
@@ -177,12 +178,12 @@ async function search(query) {
                 <div class="product-header"><span class="product-article">🆔 ${p.article}</span><span class="product-status">✅ Знайдено</span></div>
                 <div class="product-name">📝 ${p.name}</div>
                 <div class="product-details">
-                    <div class="product-detail-row"><span class="product-detail-label">🏬 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
+                    <div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
                     <div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div>
                     <div class="product-detail-row"><span class="product-detail-label">⏳ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div>
                     <div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div>
                     <div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>
-                    ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛍️ В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
+                    ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
                 </div>
             </div>`).join('');
     } catch (error) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; }
@@ -280,6 +281,7 @@ async function loadList() {
         document.getElementById('totalBox').style.display = 'flex';
     } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; }
 }
+
 async function loadArchives() {
     const el = document.getElementById('archivesContent');
     el.innerHTML = '<div class="loader">📁 Завантаження...</div>';
@@ -287,10 +289,36 @@ async function loadArchives() {
         const r = await fetch(`/api/archives/${userId}`);
         const d = await r.json();
         if (!d.archives || d.archives.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div>Архів порожній</div>'; return; }
-        el.innerHTML = d.archives.map(a => `<div class="archive-item"><div class="archive-header"><strong>📄 ${a.date}</strong><span class="archive-badge ${a.is_surplus ? 'surplus' : 'main'}">${a.type}</span></div><button class="download-btn" style="margin-top:8px" onclick="downloadArchive('${a.filename}')">📥 Завантажити</button></div>`).join('');
+        el.innerHTML = d.archives.map(a => `
+            <div class="archive-item">
+                <div class="archive-header"><strong>📄 ${a.date}</strong><span class="archive-badge ${a.is_surplus ? 'surplus' : 'main'}">${a.type}</span></div>
+                <div class="archive-actions">
+                    <button class="download-btn" onclick="downloadArchive('${a.filename}')">📥 Завантажити</button>
+                    <button class="delete-archive-btn" onclick="deleteArchive('${a.filename}')">🗑️ Видалити</button>
+                </div>
+            </div>
+        `).join('');
     } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка</div>'; }
 }
+
 function downloadArchive(f) { window.open(`/api/archive/download/${f}`, '_blank'); tg.HapticFeedback.notificationOccurred('success'); }
+
+async function deleteArchive(filename) {
+    if (!confirm(`Видалити файл "${filename}"?`)) return;
+    try {
+        const r = await fetch(`/api/archive/delete/${filename}?user_id=${userId}`, { method: 'DELETE' });
+        const d = await r.json();
+        if (d.success) {
+            tg.showAlert(`✅ ${d.message}`);
+            tg.HapticFeedback.notificationOccurred('success');
+            loadArchives();
+        } else {
+            tg.showAlert('❌ Помилка видалення');
+        }
+    } catch (e) {
+        tg.showAlert('❌ Помилка: ' + e.message);
+    }
+}
 
 if (userId) loadList();
 </script>

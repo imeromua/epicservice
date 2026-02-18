@@ -23,7 +23,7 @@ from database.orm import (
     orm_clear_temp_list
 )
 from utils.list_processor import process_and_save_list
-from utils.archive_manager import get_user_archives as get_archives_for_user, ACTIVE_DIR
+from utils.archive_manager import get_user_archives as get_archives_for_user, ACTIVE_DIR, parse_filename
 from sqlalchemy.exc import SQLAlchemyError
 from config import BOT_TOKEN
 
@@ -208,6 +208,45 @@ async def download_archive(filename: str):
         print(f"❌ ERROR in download_archive: {type(e).__name__}: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Download error")
+
+
+@app.delete("/api/archive/delete/{filename}")
+async def delete_archive(filename: str, user_id: int):
+    """
+    Видалити архівний файл.
+    Перевіряє що файл належить користувачу перед видаленням.
+    """
+    try:
+        # Перевірка безпеки: заборонити шляхи з '..' та '/'
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        
+        # Перевіряємо що файл належить користувачу
+        parsed = parse_filename(filename)
+        if not parsed or parsed["user_id"] != user_id:
+            print(f"⚠️ User {user_id} tried to delete file not owned by them: {filename}")
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        file_path = os.path.join(ACTIVE_DIR, filename)
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Видаляємо файл
+        os.remove(file_path)
+        print(f"🗑️ Deleted archive: {filename} by user {user_id}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Файл видалено"
+        }, status_code=200)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERROR in delete_archive: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Delete error")
 
 
 @app.post("/api/add")
