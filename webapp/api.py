@@ -149,14 +149,18 @@ async def add_to_list(req: AddToListRequest):
     Додати товар до списку користувача.
     """
     try:
+        print(f"➕ Add to list request: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
+        
         async with async_session() as session:
             async with session.begin():
+                print(f"📞 Calling orm_add_item_to_temp_list...")
                 result = await orm_add_item_to_temp_list(
                     user_id=req.user_id,
                     product_id=req.product_id,
                     quantity=req.quantity,
                     session=session
                 )
+                print(f"✅ orm_add_item_to_temp_list result: {result}")
                 
                 if result:
                     return JSONResponse(content={
@@ -164,12 +168,15 @@ async def add_to_list(req: AddToListRequest):
                         "message": f"Додано {req.quantity} шт."
                     }, status_code=200)
                 else:
+                    print(f"⚠️ orm_add_item_to_temp_list returned False/None")
                     return JSONResponse(content={
                         "success": False,
                         "message": "Не вдалося додати товар"
                     }, status_code=400)
                     
     except Exception as e:
+        print(f"❌ ERROR in add_to_list: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return JSONResponse(
             content={"error": "Помилка додавання", "details": str(e)},
             status_code=500
