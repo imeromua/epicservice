@@ -125,4 +125,6 @@ else:
     REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 # --- Конфігурація Сховища ---
-ARCHIVES_PATH = "archives"
+# Абсолютний шлях до папки archives відносно кореня проекту
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARCHIVES_PATH = os.path.join(BASE_DIR, "archives")
