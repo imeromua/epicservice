@@ -30,9 +30,8 @@ class SearchStates(StatesGroup):
 @router.message(F.text)
 async def search_handler(message: Message, bot: Bot, state: FSMContext):
     """
-    Обробник пошуку. Тепер видаляє клавіатуру з попереднього меню.
+    Обробник пошуку.
     """
-    # Не скидаємо стан повністю, щоб зберегти main_message_id
     current_state = await state.get_state()
     if current_state != SearchStates.waiting_for_manual_quantity:
          await state.set_state(None)
@@ -52,23 +51,20 @@ async def search_handler(message: Message, bot: Bot, state: FSMContext):
         logger.warning("Не вдалося видалити пошуковий запит користувача.")
 
     if len(search_query) < 3:
-        # Це тимчасове повідомлення, воно не повинно мати клавіатури
         await message.answer(LEXICON.SEARCH_TOO_SHORT, reply_markup=None)
         return
         
     try:
-        # --- ОНОВЛЕНА ЛОГІКА: Прибираємо стару клавіатуру ---
         await clean_previous_keyboard(state, bot, message.chat.id)
-        # --- КІНЕЦЬ ОНОВЛЕНОЇ ЛОГІКИ ---
 
         products = await orm_find_products(search_query)
         if not products:
             sent_message = await message.answer(LEXICON.SEARCH_NO_RESULTS, reply_markup=None)
-            # Зберігаємо ID, щоб потім його можна було прибрати
             await state.update_data(main_message_id=sent_message.message_id)
             return
             
         if len(products) == 1:
+            # При першому показі current_selection=1 (default)
             sent_message = await send_or_edit_product_card(bot, message.chat.id, message.from_user.id, products[0])
             if sent_message:
                 await state.update_data(main_message_id=sent_message.message_id)
@@ -99,13 +95,12 @@ async def show_product_from_button(callback: CallbackQuery, bot: Bot, state: FSM
         async with async_session() as session:
             product = await orm_get_product_by_id(session, product_id)
             if product:
-                # Редагуємо повідомлення зі списком результатів, перетворюючи його на картку
                 sent_message = await send_or_edit_product_card(
                     bot=bot, 
                     chat_id=callback.message.chat.id, 
                     user_id=callback.from_user.id, 
                     product=product,
-                    message_id=callback.message.message_id, # Редагуємо існуюче
+                    message_id=callback.message.message_id, 
                     search_query=last_query
                 )
                 if sent_message:
@@ -138,92 +133,73 @@ async def back_to_results_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("card_qty:"))
-async def handle_card_qty_change(callback: CallbackQuery, bot: Bot, state: FSMContext):
+@router.callback_query(F.data.startswith("selector:"))
+async def handle_selector_change(callback: CallbackQuery, bot: Bot, state: FSMContext):
     """
-    Обробка кнопок +/- на картці товару в режимі Direct Action.
-    Змінює кількість у базі даних МИТТЄВО.
+    Обробка кнопок +/- на картці товару (Selector Mode).
+    ТІЛЬКИ оновлює клавіатуру, не чіпає БД.
     """
-    # Format: card_qty:action:product_id:current_in_cart:max_qty:price
+    # Format: selector:action:product_id:current_val:max_val
     try:
         parts = callback.data.split(":")
         action = parts[1]
         product_id = int(parts[2])
-        current_in_cart = int(parts[3])
-        max_qty = int(parts[4])
+        current_val = int(parts[3])
+        max_val = int(parts[4])
         
         user_id = callback.from_user.id
         
-        # Перевірка відділу
-        async with async_session() as session:
-             product = await orm_get_product_by_id(session, product_id)
-             if not product:
-                 await callback.answer(LEXICON.PRODUCT_NOT_FOUND, show_alert=True)
-                 return
-             
-             allowed_department = await orm_get_temp_list_department(user_id)
-             if allowed_department is not None and product.відділ != allowed_department:
-                await callback.answer(
-                    LEXICON.DEPARTMENT_MISMATCH.format(department=allowed_department), 
-                    show_alert=True
-                )
-                return
-
-        qty_change = 0
+        new_val = current_val
         if action == "inc":
-            if current_in_cart < max_qty: # Тут max_qty - це скільки доступно на складі ВІЛЬНОГО
-                qty_change = 1
+            if current_val < max_val:
+                new_val += 1
             else:
-                await callback.answer(f"Максимально доступно: {max_qty}", show_alert=True)
+                await callback.answer(f"Максимально доступно: {max_val}", show_alert=True)
                 return
         elif action == "dec":
-            if current_in_cart > 0:
-                qty_change = -1
+            if current_val > 1:
+                new_val -= 1
             else:
-                await callback.answer("У кошику немає цього товару", show_alert=False)
+                await callback.answer("Мінімум 1 шт.", show_alert=False)
                 return
         
-        if qty_change != 0:
-            # Змінюємо в БД
-            await orm_add_item_to_temp_list(user_id, product_id, qty_change)
+        if new_val != current_val:
+            # Оновлюємо ТІЛЬКИ КЛАВІАТУРУ (перемальовуємо картку з новим selection)
+            async with async_session() as session:
+                product = await orm_get_product_by_id(session, product_id)
+                if product:
+                     data = await state.get_data()
+                     last_query = data.get('last_query')
+                     
+                     await send_or_edit_product_card(
+                        bot=bot,
+                        chat_id=callback.message.chat.id,
+                        user_id=user_id,
+                        product=product,
+                        message_id=callback.message.message_id,
+                        search_query=last_query,
+                        current_selection=new_val # Передаємо нове значення селектора
+                    )
             
-            if current_in_cart + qty_change <= 0:
-                 await orm_delete_temp_list_item(user_id, product_id)
-
-            # Оновлюємо картку ПОВНІСТЮ (текст + кнопки)
-            data = await state.get_data()
-            last_query = data.get('last_query')
-            
-            await send_or_edit_product_card(
-                bot=bot,
-                chat_id=callback.message.chat.id,
-                user_id=callback.from_user.id,
-                product=product,
-                message_id=callback.message.message_id,
-                search_query=last_query
-            )
-            
-            # Текст для спливаючого повідомлення
-            msg = f"➕ Додано 1 шт." if qty_change > 0 else f"➖ Видалено 1 шт."
-            await callback.answer(msg)
+            await callback.answer() # Silent update
         else:
             await callback.answer()
         
     except Exception as e:
-        logger.error(f"Error handling card qty change: {e}", exc_info=True)
+        logger.error(f"Error handling selector change: {e}", exc_info=True)
         await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
 
 
-@router.callback_query(F.data.startswith("card_add_all:"))
-async def handle_card_add_all(callback: CallbackQuery, bot: Bot, state: FSMContext):
+@router.callback_query(F.data.startswith("add_to_list:"))
+async def handle_add_to_list(callback: CallbackQuery, bot: Bot, state: FSMContext):
     """
-    Обробка кнопки 'Додати все'.
-    Встановлює кількість товару рівною max_qty (все доступне + те що в кошику).
+    Фінальне додавання товару в БД (кнопка 'Додати до списку' або 'Додати все').
     """
+    # Format: add_to_list:product_id:quantity
     try:
         parts = callback.data.split(":")
         product_id = int(parts[1])
-        max_qty = int(parts[2]) # Це загальна кількість, яку можна мати (доступно + вже в кошику)
+        quantity_to_add = int(parts[2])
         
         user_id = callback.from_user.id
         
@@ -233,7 +209,6 @@ async def handle_card_add_all(callback: CallbackQuery, bot: Bot, state: FSMConte
                  await callback.answer(LEXICON.PRODUCT_NOT_FOUND, show_alert=True)
                  return
              
-             # Перевірка відділу
              allowed_department = await orm_get_temp_list_department(user_id)
              if allowed_department is not None and product.відділ != allowed_department:
                 await callback.answer(
@@ -242,27 +217,31 @@ async def handle_card_add_all(callback: CallbackQuery, bot: Bot, state: FSMConte
                 )
                 return
 
-             # Встановлюємо кількість = max_qty
-             if max_qty > 0:
-                 await orm_update_temp_list_item_quantity(user_id, product_id, max_qty)
-             
-             # Оновлюємо картку
-             data = await state.get_data()
-             last_query = data.get('last_query')
-             
-             await send_or_edit_product_card(
-                bot=bot,
-                chat_id=callback.message.chat.id,
-                user_id=user_id,
-                product=product,
-                message_id=callback.message.message_id,
-                search_query=last_query
-            )
-             
-             await callback.answer(f"✅ Додано все доступне ({max_qty} шт.)", show_alert=True)
+             # Додаємо в БД
+             if quantity_to_add > 0:
+                 await orm_add_item_to_temp_list(user_id, product_id, quantity_to_add)
+                 
+                 # Оновлюємо картку
+                 # Після успішного додавання скидаємо селектор на 1 (або 0, якщо ліміт вичерпано, це зробить card_generator)
+                 data = await state.get_data()
+                 last_query = data.get('last_query')
+                 
+                 await send_or_edit_product_card(
+                    bot=bot,
+                    chat_id=callback.message.chat.id,
+                    user_id=user_id,
+                    product=product,
+                    message_id=callback.message.message_id,
+                    search_query=last_query,
+                    current_selection=1 # Reset to 1
+                )
+                 
+                 await callback.answer(f"✅ Додано {quantity_to_add} шт.", show_alert=True)
+             else:
+                 await callback.answer("Кількість 0?", show_alert=True)
 
     except Exception as e:
-        logger.error(f"Error handling card add all: {e}", exc_info=True)
+        logger.error(f"Error handling add to list: {e}", exc_info=True)
         await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
 
 
@@ -274,7 +253,7 @@ async def manual_input_callback(callback: CallbackQuery, state: FSMContext):
         await state.set_state(SearchStates.waiting_for_manual_quantity)
         await state.update_data(product_id=product_id, message_id=callback.message.message_id)
         
-        await callback.message.answer("⌨️ Введіть кількість товару цифрами:")
+        await callback.message.answer("⌨️ Введіть кількість для додавання:")
         await callback.answer()
     except (ValueError, IndexError) as e:
         logger.error("Помилка обробки callback 'qty_manual_input': %s", e, exc_info=True)
@@ -283,7 +262,7 @@ async def manual_input_callback(callback: CallbackQuery, state: FSMContext):
 
 @router.message(SearchStates.waiting_for_manual_quantity, F.text.isdigit())
 async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot):
-    """Обробляє кількість, введену вручну (Direct Action)."""
+    """Обробляє кількість, введену вручну (Selector Mode - просто оновлює клавіатуру)."""
     user_id = message.from_user.id
     state_data = await state.get_data()
     product_id = state_data.get("product_id")
@@ -297,8 +276,8 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
     
     try:
         quantity = int(message.text)
-        if quantity < 0:
-             await message.answer("❌ Кількість не може бути від'ємною.")
+        if quantity <= 0:
+             await message.answer("❌ Кількість має бути більше 0.")
              return
 
         async with async_session() as session:
@@ -307,20 +286,9 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
                  await message.answer(LEXICON.PRODUCT_NOT_FOUND)
                  await state.set_state(None)
                  return
-             
-             # Перевірка відділу
-             allowed_department = await orm_get_temp_list_department(user_id)
-             if allowed_department is not None and product.відділ != allowed_department:
-                await message.answer(LEXICON.DEPARTMENT_MISMATCH.format(department=allowed_department))
-                await state.set_state(None)
-                return
 
-             if quantity == 0:
-                 await orm_delete_temp_list_item(user_id, product_id)
-             else:
-                 await orm_update_temp_list_item_quantity(user_id, product_id, quantity)
-
-             # Оновлюємо картку
+             # Оновлюємо картку з НОВИМ current_selection = quantity
+             # Не додаємо в БД!
              data = await state.get_data()
              last_query = data.get('last_query')
              
@@ -330,10 +298,11 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
                 user_id=user_id,
                 product=product,
                 message_id=original_message_id,
-                search_query=last_query
+                search_query=last_query,
+                current_selection=quantity
             )
              
-             # await message.answer(f"✅ Встановлено кількість: {quantity} шт.", show_alert=True)
+             # await message.answer(f"✅ Обрано: {quantity} шт. Натисніть 'Додати'.", show_alert=True)
              
     except Exception as e:
         logger.error("Помилка обробки ручного вводу кількості: %s", e, exc_info=True)
