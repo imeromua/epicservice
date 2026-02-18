@@ -49,14 +49,23 @@ async def send_or_edit_product_card(
         try:
             stock_quantity = float(str(product.кількість).replace(',', '.'))
             permanently_reserved = product.відкладено or 0
+            
+            # available_for_anyone_qty - це скільки доступно ВЗАГАЛІ (за вирахуванням ВСІХ резервів)
             available_for_anyone_qty = stock_quantity - permanently_reserved - total_temp_reserved
             
             display_available_qty = format_quantity(available_for_anyone_qty)
             display_user_reserved_qty = format_quantity(in_user_temp_list_qty)
             
-            # Для клавіатури використовуємо ціле число, якщо це можливо, або 9999 якщо float
-            # (Логіка кнопок +/- зазвичай працює з цілими кроками, для дробових треба інший підхід)
-            int_available_for_button = max(0, int(available_for_anyone_qty))
+            # Максимальна кількість, яку може мати користувач = те, що він вже має + те, що вільно
+            # Але int_available_for_button в user_search.py використовується як поріг для "+"
+            # Там перевірка: if current_in_cart < max_qty
+            # Отже, max_qty має бути повною доступною кількістю для цього юзера.
+            
+            # Якщо available_for_anyone_qty < 0 (переліміт), то ми не можемо додати більше.
+            real_available = max(0, available_for_anyone_qty)
+            
+            # current_in_cart (що вже в кошику) + real_available (що ще можна взяти)
+            max_qty_for_user = int(in_user_temp_list_qty + real_available)
 
             price = product.ціна or 0.0
             
@@ -69,7 +78,7 @@ async def send_or_edit_product_card(
 
         except (ValueError, TypeError):
             display_available_qty = product.кількість
-            int_available_for_button = 0
+            max_qty_for_user = 0
             display_user_reserved_qty = in_user_temp_list_qty
             display_stock_sum = "---"
             display_reserved_sum = "---"
@@ -90,11 +99,16 @@ async def send_or_edit_product_card(
         )
         
         # Використовуємо нову клавіатуру
+        # ВИПРАВЛЕНО: передаємо display_user_reserved_qty як current_qty
+        # Також передаємо правильний max_qty
+        
+        current_qty_int = int(display_user_reserved_qty) if isinstance(display_user_reserved_qty, (int, float)) else 0
+
         keyboard = get_product_card_kb(
             product_id=product.id,
-            current_qty=1, # При відкритті картки завжди 1
+            current_qty=current_qty_int, 
             price=price,
-            max_qty=int_available_for_button,
+            max_qty=max_qty_for_user,
             search_query=search_query
         )
 
