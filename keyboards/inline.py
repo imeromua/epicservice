@@ -107,85 +107,82 @@ def get_search_results_kb(products: list[Product]) -> InlineKeyboardMarkup:
         keyboard.append([
             InlineKeyboardButton(text=button_text, callback_data=f"product:{product.id}")
         ])
+    # Додаємо кнопку "Головне меню" в кінець списку результатів
+    keyboard.append([
+         InlineKeyboardButton(text=LEXICON.BUTTON_BACK_TO_MAIN_MENU, callback_data="main:back")
+    ])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-def get_product_actions_kb(
+
+def get_product_card_kb(
     product_id: int,
-    available_quantity: int,
+    current_qty: int = 1,
+    price: float = 0.0,
+    max_qty: int = 9999,
     search_query: str | None = None
 ) -> InlineKeyboardMarkup:
-    keyboard = []
-    action_buttons = []
-    if available_quantity > 0:
-        add_all_text = LEXICON.BUTTON_ADD_ALL.format(quantity=available_quantity)
-        action_buttons.append(
-            InlineKeyboardButton(text=add_all_text, callback_data=f"add_all:{product_id}:{available_quantity}")
-        )
-    action_buttons.append(
-        InlineKeyboardButton(text=LEXICON.BUTTON_ADD_CUSTOM, callback_data=f"select_quantity:{product_id}")
-    )
-    keyboard.append(action_buttons)
+    """
+    Генерує інтерактивну клавіатуру картки товару.
+    Рядок 1: - 1 +
+    Рядок 2: Додати (Ціна)
+    Рядок 3: Назад | Головне меню
+    """
     
-    navigation_buttons = []
+    # Розраховуємо загальну суму
+    total_price = current_qty * price
+    price_text = f"({total_price:.2f} грн)" if price > 0 else ""
+    
+    keyboard = []
+    
+    # 1. Рядок керування кількістю
+    # Callback data: дія : тип : id товару : поточна кількість
+    qty_row = [
+        InlineKeyboardButton(
+            text="➖",
+            callback_data=f"card_qty:dec:{product_id}:{current_qty}"
+        ),
+        InlineKeyboardButton(
+            text=f" {current_qty} шт ",
+            callback_data="ignore" # Кнопка неактивна, просто відображає
+        ),
+        InlineKeyboardButton(
+            text="➕",
+            callback_data=f"card_qty:inc:{product_id}:{current_qty}"
+        )
+    ]
+    keyboard.append(qty_row)
+    
+    # 2. Кнопка додавання
+    add_button_text = f"🛒 Додати {price_text}"
+    keyboard.append([
+        InlineKeyboardButton(
+            text=add_button_text,
+            callback_data=f"card_add:{product_id}:{current_qty}"
+        )
+    ])
+    
+    # 3. Навігація
+    nav_row = []
     if search_query:
-        navigation_buttons.append(
+        # Якщо є пошуковий запит, додаємо кнопку "Назад до пошуку"
+        # Але щоб не захаращувати, можна зробити її окремим рядком, або разом з "Головне меню"
+        # Зробимо окремим рядком, якщо потрібно, або разом
+        nav_row.append(
             InlineKeyboardButton(
                 text=LEXICON.BUTTON_BACK_TO_SEARCH,
                 callback_data="back_to_results"
             )
         )
-    navigation_buttons.append(
-        InlineKeyboardButton(
-            text=LEXICON.INLINE_BUTTON_MY_LIST,
-            callback_data="main:my_list"
-        )
-    )
-    navigation_buttons.append(
+        
+    nav_row.append(
         InlineKeyboardButton(
             text=LEXICON.BUTTON_BACK_TO_MAIN_MENU,
             callback_data="main:back"
         )
     )
-    keyboard.append(navigation_buttons)
+    keyboard.append(nav_row)
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-
-def get_quantity_selector_kb(product_id: int, current_qty: int, max_qty: int) -> InlineKeyboardMarkup:
-    """
-    Створює інтерактивну клавіатуру для вибору кількості товару.
-    Центральна кнопка тепер є і індикатором, і кнопкою підтвердження.
-    """
-    current_qty = max(1, current_qty)
-
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text="➖",
-                callback_data=f"qty_update:{product_id}:minus:{current_qty}:{max_qty}"
-            ),
-            # --- ЗМІНА: Центральна кнопка тепер підтверджує додавання ---
-            InlineKeyboardButton(
-                text=f"✅ Додати {current_qty} шт.",
-                callback_data=f"add_confirm:{product_id}:{current_qty}"
-            ),
-            InlineKeyboardButton(
-                text="➕",
-                callback_data=f"qty_update:{product_id}:plus:{current_qty}:{max_qty}"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text="📝 Ввести число",
-                callback_data=f"qty_manual_input:{product_id}"
-            ),
-            InlineKeyboardButton(
-                text="⬅️ Назад",
-                callback_data=f"product:{product_id}"
-            )
-        ]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def get_confirmation_kb(confirm_callback: str, cancel_callback: str) -> InlineKeyboardMarkup:
@@ -239,6 +236,12 @@ def get_my_list_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text=LEXICON.CANCEL_LIST_BUTTON,
                     callback_data="cancel_list:confirm"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=LEXICON.BUTTON_BACK_TO_MAIN_MENU,
+                    callback_data="main:back"
                 )
             ]
         ]
