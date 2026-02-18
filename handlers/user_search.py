@@ -6,7 +6,7 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from sqlalchemy.exc import SQLAlchemyError
 
 from database.engine import async_session
@@ -279,18 +279,49 @@ async def handle_add_to_list(callback: CallbackQuery, bot: Bot, state: FSMContex
 
 
 @router.callback_query(F.data.startswith("qty_manual_input:"))
-async def manual_input_callback(callback: CallbackQuery, state: FSMContext):
+async def manual_input_callback(callback: CallbackQuery, state: FSMContext, bot: Bot):
     """Запитує у користувача кількість для ручного вводу."""
     try:
         product_id = int(callback.data.split(":")[1])
         await state.set_state(SearchStates.waiting_for_manual_quantity)
         await state.update_data(product_id=product_id, message_id=callback.message.message_id)
-        await callback.message.answer("⌨️ Введіть кількість для додавання:")
+        
+        # Додаємо кнопку "Скасувати"
+        cancel_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_manual_input")]
+            ]
+        )
+        
+        prompt_msg = await callback.message.answer(
+            "⌨️ Введіть кількість для додавання:",
+            reply_markup=cancel_kb
+        )
+        await state.update_data(prompt_message_id=prompt_msg.message_id)
+        
     except (ValueError, IndexError) as e:
         logger.error("Помилка обробки callback 'qty_manual_input': %s", e, exc_info=True)
         await callback.answer(LEXICON.UNEXPECTED_ERROR, show_alert=True)
     finally:
         await callback.answer()
+
+
+@router.callback_query(SearchStates.waiting_for_manual_quantity, F.data == "cancel_manual_input")
+async def cancel_manual_input(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    """Скасування ручного вводу кількості."""
+    await callback.answer("Скасовано")
+    
+    # Видаляємо повідомлення з промптом
+    state_data = await state.get_data()
+    prompt_msg_id = state_data.get("prompt_message_id")
+    if prompt_msg_id:
+        try:
+            await bot.delete_message(callback.message.chat.id, prompt_msg_id)
+        except TelegramBadRequest as e:
+            logger.debug("Не вдалося видалити повідомлення промпту: %s", e)
+    
+    # Скидаємо FSM стан
+    await state.set_state(None)
 
 
 @router.message(SearchStates.waiting_for_manual_quantity, F.text.isdigit())
@@ -300,11 +331,20 @@ async def process_manual_quantity(message: Message, state: FSMContext, bot: Bot)
     state_data = await state.get_data()
     product_id = state_data.get("product_id")
     original_message_id = state_data.get("message_id")
+    prompt_msg_id = state_data.get("prompt_message_id")
 
+    # Видаляємо повідомлення користувача з введеною кількістю
     try:
         await message.delete()
     except TelegramBadRequest:
         pass
+    
+    # Видаляємо повідомлення з промптом
+    if prompt_msg_id:
+        try:
+            await bot.delete_message(message.chat.id, prompt_msg_id)
+        except TelegramBadRequest as e:
+            logger.debug("Не вдалося видалити повідомлення промпту: %s", e)
 
     try:
         quantity = int(message.text)
