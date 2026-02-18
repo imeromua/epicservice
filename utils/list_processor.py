@@ -40,16 +40,13 @@ async def _save_list_to_excel(
 
         df = pd.DataFrame(items)
         
-        # --- НОВИЙ БЛОК: Додавання підсумкових рядків ---
         summary_df = pd.DataFrame([
-            {"Артикул": "", "Кількість": ""},  # Порожній рядок для відступу
+            {"Артикул": "", "Кількість": ""},
             {"Артикул": "К-ть артикулів:", "Кількість": len(df)},
             {"Артикул": "Зібрано на суму:", "Кількість": f"{total_sum:.2f} грн"}
         ])
         
-        # Об'єднуємо основні дані з підсумковими
         df_final = pd.concat([df, summary_df], ignore_index=True)
-        # --- КІНЕЦЬ НОВОГО БЛОКУ ---
 
         df_final.to_excel(file_path, index=False, header=['Артикул', 'Кількість'])
         
@@ -66,8 +63,10 @@ async def process_and_save_list(
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Централізована функція для обробки та збереження тимчасового списку.
+    Всі операції з БД відбуваються в переданій сесії.
     """
-    temp_list = await orm_get_temp_list(user_id)
+    # Передаємо session для роботи в транзакції
+    temp_list = await orm_get_temp_list(user_id, session=session)
     if not temp_list:
         return None, None
 
@@ -76,10 +75,8 @@ async def process_and_save_list(
     in_stock_items, surplus_items = [], []
     reservation_updates = []
     
-    # --- НОВИЙ БЛОК: Розрахунок сум ---
     total_in_stock_sum = 0.0
     total_surplus_sum = 0.0
-    # --- КІНЕЦЬ НОВОГО БЛОКУ ---
 
     for item in temp_list:
         product = await orm_get_product_by_id(session, item.product_id, for_update=True)
@@ -112,15 +109,14 @@ async def process_and_save_list(
     if reservation_updates:
         await orm_update_reserved_quantity(session, reservation_updates)
 
-    # Передаємо розраховані суми у функцію збереження
     main_list_path = await _save_list_to_excel(in_stock_items, user_id, department_id, total_in_stock_sum)
     surplus_list_path = await _save_list_to_excel(surplus_items, user_id, department_id, total_surplus_sum, "лишки_")
 
     if main_list_path and in_stock_items:
-        # Зберігаємо article_name для сумісності зі старими звітами
         db_items = [{"article_name": p.product.назва, "quantity": p.quantity} for p in temp_list]
         await orm_add_saved_list(session, user_id, os.path.basename(main_list_path), main_list_path, db_items)
 
-    await orm_clear_temp_list(user_id)
+    # Передаємо session для очищення в рамках транзакції
+    await orm_clear_temp_list(user_id, session=session)
 
     return main_list_path, surplus_list_path
