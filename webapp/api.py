@@ -12,7 +12,14 @@ import traceback
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from database.engine import async_session
-from database.orm import orm_find_products, orm_get_temp_list, orm_add_item_to_temp_list
+from database.orm import (
+    orm_find_products, 
+    orm_get_temp_list, 
+    orm_add_item_to_temp_list,
+    orm_update_temp_list_item_quantity,
+    orm_delete_temp_list_item,
+    orm_clear_temp_list
+)
 from sqlalchemy.exc import SQLAlchemyError
 
 app = FastAPI()
@@ -31,6 +38,17 @@ class AddToListRequest(BaseModel):
     user_id: int
     product_id: int
     quantity: int
+
+
+class UpdateQuantityRequest(BaseModel):
+    user_id: int
+    product_id: int
+    quantity: int
+
+
+class DeleteItemRequest(BaseModel):
+    user_id: int
+    product_id: int
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -169,6 +187,85 @@ async def add_to_list(req: AddToListRequest):
         traceback.print_exc()
         return JSONResponse(
             content={"error": "Помилка додавання", "details": str(e)},
+            status_code=500
+        )
+
+
+@app.post("/api/update")
+async def update_item_quantity(req: UpdateQuantityRequest):
+    """
+    Оновити кількість товару в списку.
+    """
+    try:
+        if req.quantity < 1:
+            return JSONResponse(
+                content={"success": False, "message": "Кількість має бути більше 0"},
+                status_code=400
+            )
+        
+        await orm_update_temp_list_item_quantity(
+            user_id=req.user_id,
+            product_id=req.product_id,
+            new_quantity=req.quantity
+        )
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"Кількість оновлено: {req.quantity} шт."
+        }, status_code=200)
+                    
+    except Exception as e:
+        print(f"❌ ERROR in update_item_quantity: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            content={"error": "Помилка оновлення", "details": str(e)},
+            status_code=500
+        )
+
+
+@app.post("/api/delete")
+async def delete_item(req: DeleteItemRequest):
+    """
+    Видалити товар зі списку.
+    """
+    try:
+        await orm_delete_temp_list_item(
+            user_id=req.user_id,
+            product_id=req.product_id
+        )
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Товар видалено"
+        }, status_code=200)
+                    
+    except Exception as e:
+        print(f"❌ ERROR in delete_item: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            content={"error": "Помилка видалення", "details": str(e)},
+            status_code=500
+        )
+
+
+@app.post("/api/clear/{user_id}")
+async def clear_list(user_id: int):
+    """
+    Очистити весь список користувача.
+    """
+    try:
+        await orm_clear_temp_list(user_id)
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Список очищено"
+        }, status_code=200)
+                    
+    except Exception as e:
+        print(f"❌ ERROR in clear_list: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            content={"error": "Помилка очищення", "details": str(e)},
             status_code=500
         )
 
