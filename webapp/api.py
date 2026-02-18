@@ -9,6 +9,8 @@ import os
 import traceback
 from datetime import datetime
 import pandas as pd
+from aiogram import Bot
+from aiogram.types import FSInputFile
 
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -23,6 +25,7 @@ from database.orm import (
     orm_clear_temp_list
 )
 from sqlalchemy.exc import SQLAlchemyError
+from config import settings
 
 app = FastAPI()
 
@@ -33,6 +36,9 @@ templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "t
 # Папка для тимчасових файлів
 TEMP_FILES_DIR = os.path.join(os.path.dirname(__file__), "temp_files")
 os.makedirs(TEMP_FILES_DIR, exist_ok=True)
+
+# Bot instance
+bot = Bot(token=settings.BOT_TOKEN)
 
 
 class SearchRequest(BaseModel):
@@ -276,10 +282,10 @@ async def clear_list(user_id: int):
         )
 
 
-@app.get("/api/save/{user_id}")
+@app.post("/api/save/{user_id}")
 async def save_list_to_excel(user_id: int):
     """
-    Згенерувати Excel файл зі списку та повернути його для завантаження.
+    Згенерувати Excel файл зі списку та відправити його користувачу в Telegram.
     """
     try:
         print(f"💾 Save list request for user_id={user_id}")
@@ -333,11 +339,30 @@ async def save_list_to_excel(user_id: int):
         
         print(f"✅ Excel file created: {file_path}")
         
-        return FileResponse(
-            path=file_path,
-            filename=file_name,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        # Відправка файлу через бота
+        try:
+            document = FSInputFile(file_path)
+            await bot.send_document(
+                chat_id=user_id,
+                document=document,
+                caption=f"💾 Ваш список\n\n📦 Товарів: {len(items)}\n💰 Сума: {total_sum:.2f} грн"
+            )
+            print(f"📤 File sent to user {user_id} via Telegram")
+            
+            # Видаляємо тимчасовий файл
+            os.remove(file_path)
+            
+            return JSONResponse(content={
+                "success": True,
+                "message": "Файл відправлено вам в чат!"
+            }, status_code=200)
+            
+        except Exception as bot_error:
+            print(f"❌ Error sending file via bot: {bot_error}")
+            return JSONResponse(
+                content={"success": False, "message": "Помилка відправки файлу"},
+                status_code=500
+            )
                     
     except Exception as e:
         print(f"❌ ERROR in save_list_to_excel: {type(e).__name__}: {e}")
