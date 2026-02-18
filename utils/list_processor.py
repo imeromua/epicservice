@@ -8,10 +8,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import ARCHIVES_PATH
-from database.orm import (orm_add_saved_list, orm_clear_temp_list,
-                          orm_get_product_by_id, orm_get_temp_list,
-                          orm_update_reserved_quantity)
+from database.orm import (orm_clear_temp_list, orm_get_product_by_id,
+                          orm_get_temp_list, orm_update_reserved_quantity)
+from utils.archive_manager import ACTIVE_DIR, rotate_user_files
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +23,19 @@ async def _save_list_to_excel(
     prefix: str = ""
 ) -> Optional[str]:
     """
-    Зберігає список товарів у файл Excel, додаючи підсумкові дані.
+    Зберігає список товарів у файл Excel з новим форматом назви.
+    Формат: {prefix}{department}_{user_id}_{dd-mm-yyyy}_{hh-mm}.xlsx
+    Зберігає в archives/active/
     """
     if not items:
         return None
     try:
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
         
-        base_name = department_id if department_id is not None else "list"
-        file_name = f"{prefix}{base_name}_{timestamp}.xlsx"
+        department = department_id if department_id is not None else "list"
+        file_name = f"{prefix}{department}_{user_id}_{timestamp}.xlsx"
         
-        archive_dir = os.path.join(ARCHIVES_PATH, f"user_{user_id}")
-        os.makedirs(archive_dir, exist_ok=True)
-        file_path = os.path.join(archive_dir, file_name)
+        file_path = os.path.join(ACTIVE_DIR, file_name)
 
         df = pd.DataFrame(items)
         
@@ -50,10 +49,10 @@ async def _save_list_to_excel(
 
         df_final.to_excel(file_path, index=False, header=['Артикул', 'Кількість'])
         
-        logger.info("Файл успішно збережено: %s", file_path)
+        logger.info(f"Файл успішно збережено: {file_path}")
         return file_path
     except Exception as e:
-        logger.error("Помилка збереження Excel файлу для користувача %s: %s", user_id, e, exc_info=True)
+        logger.error(f"Помилка збереження Excel файлу для користувача {user_id}: {e}", exc_info=True)
         return None
 
 
@@ -64,6 +63,7 @@ async def process_and_save_list(
     """
     Централізована функція для обробки та збереження тимчасового списку.
     Всі операції з БД відбуваються в переданій сесії.
+    Після збереження викликає rotate_user_files для автоочищення.
     """
     temp_list = await orm_get_temp_list(user_id, session=session)
     if not temp_list:
@@ -111,10 +111,8 @@ async def process_and_save_list(
     main_list_path = await _save_list_to_excel(in_stock_items, user_id, department_id, total_in_stock_sum)
     surplus_list_path = await _save_list_to_excel(surplus_items, user_id, department_id, total_surplus_sum, "лишки_")
 
-    # Зберігаємо архів у БД з product_id (надійніше ніж назва)
-    if main_list_path and in_stock_items:
-        db_items = [{"product_id": p.product_id, "quantity": p.quantity} for p in temp_list]
-        await orm_add_saved_list(session, user_id, os.path.basename(main_list_path), main_list_path, db_items)
+    # Ротація файлів юзера (залишаємо 10 новіших, решту в trash)
+    rotate_user_files(user_id, limit=10)
 
     await orm_clear_temp_list(user_id, session=session)
 
