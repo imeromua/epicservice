@@ -36,11 +36,11 @@ async def send_or_edit_product_card(
     user_id: int,
     product: Product,
     message_id: int = None,
-    search_query: str | None = None
+    search_query: str | None = None,
+    current_selection: int = 1 # Додано параметр для збереження вибору при оновленні (якщо треба)
 ) -> Message | None:
     """
     Формує та надсилає (або редагує) картку товару.
-    Тепер повертає об'єкт надісланого або відредагованого повідомлення.
     """
     try:
         in_user_temp_list_qty = await orm_get_temp_list_item_quantity(user_id, product.id)
@@ -50,22 +50,16 @@ async def send_or_edit_product_card(
             stock_quantity = float(str(product.кількість).replace(',', '.'))
             permanently_reserved = product.відкладено or 0
             
-            # available_for_anyone_qty - це скільки доступно ВЗАГАЛІ (за вирахуванням ВСІХ резервів)
+            # available_for_anyone_qty - це скільки доступно ВЗАГАЛІ
+            # (скільки можна ще додати до кошика)
             available_for_anyone_qty = stock_quantity - permanently_reserved - total_temp_reserved
             
             display_available_qty = format_quantity(available_for_anyone_qty)
             display_user_reserved_qty = format_quantity(in_user_temp_list_qty)
             
-            # Максимальна кількість, яку може мати користувач = те, що він вже має + те, що вільно
-            # Але int_available_for_button в user_search.py використовується як поріг для "+"
-            # Там перевірка: if current_in_cart < max_qty
-            # Отже, max_qty має бути повною доступною кількістю для цього юзера.
-            
-            # Якщо available_for_anyone_qty < 0 (переліміт), то ми не можемо додати більше.
-            real_available = max(0, available_for_anyone_qty)
-            
-            # current_in_cart (що вже в кошику) + real_available (що ще можна взяти)
-            max_qty_for_user = int(in_user_temp_list_qty + real_available)
+            # Max доступно для додавання (Selector Mode)
+            # Якщо available < 0 (переліміт), то 0
+            max_addable_qty = max(0, int(available_for_anyone_qty))
 
             price = product.ціна or 0.0
             
@@ -78,7 +72,7 @@ async def send_or_edit_product_card(
 
         except (ValueError, TypeError):
             display_available_qty = product.кількість
-            max_qty_for_user = 0
+            max_addable_qty = 0
             display_user_reserved_qty = in_user_temp_list_qty
             display_stock_sum = "---"
             display_reserved_sum = "---"
@@ -98,17 +92,23 @@ async def send_or_edit_product_card(
             reserved_sum=escape_markdown(display_reserved_sum),
         )
         
-        # Використовуємо нову клавіатуру
-        # ВИПРАВЛЕНО: передаємо display_user_reserved_qty як current_qty
-        # Також передаємо правильний max_qty
-        
-        current_qty_int = int(display_user_reserved_qty) if isinstance(display_user_reserved_qty, (int, float)) else 0
+        # Перевіряємо, щоб selection не перевищував доступне (якщо це можливо)
+        # Але користувач може хотіти додати 1, навіть якщо доступно 0 (щоб потрапити в чергу? ні, у нас ліміт).
+        # Коригуємо selection
+        if max_addable_qty > 0:
+             final_selection = min(current_selection, max_addable_qty)
+             if final_selection == 0: final_selection = 1 # Щоб хоча б 1 показувало, якщо є доступне
+        else:
+             final_selection = 0 # Якщо нічого немає, то 0
+             
+        # Якщо доступно 0, то кнопка додавання буде неактивна або покаже 0?
+        # Краще 0.
 
         keyboard = get_product_card_kb(
             product_id=product.id,
-            current_qty=current_qty_int, 
+            current_qty=final_selection, # Це selected amount
             price=price,
-            max_qty=max_qty_for_user,
+            max_qty=max_addable_qty, # Це скільки ВІЛЬНО
             search_query=search_query
         )
 
