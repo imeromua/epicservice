@@ -1,21 +1,24 @@
 # epicservice/handlers/user/list_management.py
 
 import logging
+import os
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import (CallbackQuery, InlineKeyboardButton,
+from aiogram.types import (CallbackQuery, FSInputFile, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import ADMIN_IDS
+from database.engine import async_session
 from database.orm import orm_clear_temp_list, orm_get_temp_list
 from handlers.common import clean_previous_keyboard
 from keyboards.inline import (get_admin_main_kb, get_confirmation_kb,
                               get_my_list_kb, get_user_main_kb)
 from lexicon.lexicon import LEXICON
+from utils.list_processor import process_and_save_list
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -24,6 +27,7 @@ router = Router()
 class ListManagementStates(StatesGroup):
     confirm_new_list = State()
     confirm_cancel_list = State()
+    confirm_save_list = State()
 
 
 async def _display_user_list(bot: Bot, chat_id: int, user_id: int, state: FSMContext):
@@ -135,6 +139,96 @@ async def my_list_handler(callback: CallbackQuery, bot: Bot, state: FSMContext):
         await callback.message.edit_reply_markup(reply_markup=None)
     except TelegramBadRequest as e:
         logger.debug("my_list_handler: не вдалося прибрати клавіатуру: %s", e)
+    await _display_user_list(bot, callback.message.chat.id, callback.from_user.id, state)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "save_list:confirm")
+async def save_list_handler(callback: CallbackQuery, state: FSMContext):
+    """
+    Просить підтвердження збереження списку.
+    """
+    await callback.message.edit_text(
+        LEXICON.SAVE_LIST_CONFIRM,
+        reply_markup=get_confirmation_kb("save_list:yes", "save_list:no")
+    )
+    await state.set_state(ListManagementStates.confirm_save_list)
+    await callback.answer()
+
+
+@router.callback_query(ListManagementStates.confirm_save_list, F.data == "save_list:yes")
+async def save_list_confirmed(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    """
+    Зберігає список в БД та відправляє Excel файл.
+    """
+    user_id = callback.from_user.id
+    await state.set_state(None)
+    
+    try:
+        # Прибираємо клавіатуру з підтвердження
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except TelegramBadRequest as e:
+            logger.debug("save_list_confirmed: не вдалося прибрати клавіатуру: %s", e)
+        
+        # Відправляємо повідомлення "Обробка..."
+        processing_msg = await callback.message.answer("⌛️ Обробка списку...")
+        
+        # Обробляємо та зберігаємо список в єдиній транзакції
+        async with async_session() as session:
+            async with session.begin():
+                main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
+        
+        # Видаляємо повідомлення "Обробка..."
+        try:
+            await bot.delete_message(callback.message.chat.id, processing_msg.message_id)
+        except TelegramBadRequest:
+            pass
+        
+        if main_list_path:
+            # Відправляємо основний файл
+            if os.path.exists(main_list_path):
+                await callback.message.answer_document(
+                    FSInputFile(main_list_path),
+                    caption="✅ Список успішно збережено!"
+                )
+            
+            # Відправляємо файл лишків (якщо є)
+            if surplus_list_path and os.path.exists(surplus_list_path):
+                await callback.message.answer_document(
+                    FSInputFile(surplus_list_path),
+                    caption="⚠️ Лишки (товари, яких не вистачило на складі)"
+                )
+            
+            logger.info("Список user_id=%s успішно збережено: %s", user_id, main_list_path)
+        else:
+            await callback.message.answer("❌ Помилка збереження списку.")
+            logger.error("Помилка збереження списку user_id=%s: main_list_path порожній", user_id)
+        
+        # Повертаємось до головного меню
+        user = callback.from_user
+        kb = get_admin_main_kb() if user.id in ADMIN_IDS else get_user_main_kb()
+        text = LEXICON.CMD_START_ADMIN if user.id in ADMIN_IDS else LEXICON.CMD_START_USER
+        sent_message = await callback.message.answer(text, reply_markup=kb)
+        await state.update_data(main_message_id=sent_message.message_id)
+        
+    except Exception as e:
+        logger.error("Помилка при збереженні списку user_id=%s: %s", user_id, e, exc_info=True)
+        await callback.message.answer(LEXICON.UNEXPECTED_ERROR)
+    finally:
+        await callback.answer()
+
+
+@router.callback_query(ListManagementStates.confirm_save_list, F.data == "save_list:no")
+async def save_list_declined(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    """
+    Скасування збереження списку.
+    """
+    await state.set_state(None)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest as e:
+        logger.debug("save_list_declined: не вдалося прибрати клавіатуру: %s", e)
     await _display_user_list(bot, callback.message.chat.id, callback.from_user.id, state)
     await callback.answer()
 
