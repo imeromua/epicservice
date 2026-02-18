@@ -1,9 +1,10 @@
 # epicservice/database/orm/temp_lists.py
 
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from sqlalchemy import delete, func, select, distinct, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database.engine import async_session, sync_session
@@ -13,16 +14,22 @@ from database.models import Product, TempList, SavedList
 logger = logging.getLogger(__name__)
 
 
-# --- Асинхронні функції для роботи з тимчасовими списками ---
+# --- Асинхронні функції для роботи з тимчасовими списками ---\n
 
-async def orm_clear_temp_list(user_id: int):
+async def orm_clear_temp_list(user_id: int, session: Optional[AsyncSession] = None):
     """
     Повністю очищує тимчасовий список для конкретного користувача.
+    Підтримує зовнішню сесію для транзакцій.
     """
-    async with async_session() as session:
+    if session:
         query = delete(TempList).where(TempList.user_id == user_id)
         await session.execute(query)
-        await session.commit()
+        # Не робимо commit, якщо сесія зовнішня
+    else:
+        async with async_session() as session:
+            query = delete(TempList).where(TempList.user_id == user_id)
+            await session.execute(query)
+            await session.commit()
 
 
 async def orm_add_item_to_temp_list(user_id: int, product_id: int, quantity: int):
@@ -76,18 +83,24 @@ async def orm_delete_temp_list_item(user_id: int, product_id: int):
 
 # --- Решта функцій ---
 
-async def orm_get_temp_list(user_id: int) -> list[TempList]:
+async def orm_get_temp_list(user_id: int, session: Optional[AsyncSession] = None) -> list[TempList]:
     """
     Отримує поточний тимчасовий список користувача з усіма даними про товари.
+    Підтримує зовнішню сесію.
     """
-    async with async_session() as session:
-        query = (
-            select(TempList)
-            .where(TempList.user_id == user_id)
-            .options(selectinload(TempList.product))
-        )
+    query = (
+        select(TempList)
+        .where(TempList.user_id == user_id)
+        .options(selectinload(TempList.product))
+    )
+    
+    if session:
         result = await session.execute(query)
         return result.scalars().all()
+    else:
+        async with async_session() as session:
+            result = await session.execute(query)
+            return result.scalars().all()
 
 
 async def orm_get_temp_list_department(user_id: int) -> int | None:
