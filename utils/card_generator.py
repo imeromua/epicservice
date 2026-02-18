@@ -105,15 +105,9 @@ async def send_or_edit_product_card(
             reserved_sum=escape_markdown(display_reserved_sum),
         )
         
-        # Якщо current_selection == 0, показуємо 1 як дефолтний вибір для селектора
-        # (але НЕ віднімаємо з доступного — це зроблено вище)
-        selector_value = current_selection if current_selection > 0 else 1
-        
-        # Якщо доступно менше selector_value, обмежуємо
-        if max_addable_qty > 0:
-            selector_value = min(selector_value, max_addable_qty)
-        else:
-            selector_value = 0
+        # selector_value - яка кількість показується в селекторі +/-
+        # Дозволяємо 0, обмежуємо max_addable_qty
+        selector_value = min(current_selection, max_addable_qty)
 
         keyboard = get_product_card_kb(
             product_id=product.id,
