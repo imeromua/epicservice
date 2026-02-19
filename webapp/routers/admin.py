@@ -687,7 +687,9 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
                             filepath = os.path.join(archives_dir, filename)
                             df = pd.read_excel(filepath)
                             if 'Сума' in df.columns:
-                                total_amount += df['Сума'].sum()
+                                # Фільтруємо NaN та підраховуємо
+                                suma_column = df['Сума'].dropna()
+                                total_amount += suma_column.sum()
                         except Exception as e:
                             logger.warning(f"Не вдалося прочитати {filename}: {e}")
             
