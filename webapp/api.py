@@ -10,6 +10,9 @@ import traceback
 from aiogram import Bot
 from aiogram.types import FSInputFile
 import openpyxl
+import zipfile
+from io import BytesIO
+from datetime import datetime, timedelta
 
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -213,6 +216,144 @@ async def get_user_archives(user_id: int):
         return JSONResponse(content={"error": "Помилка отримання архівів", "details": str(e)}, status_code=500)
 
 
+@app.get("/api/statistics/{user_id}")
+async def get_user_statistics(user_id: int):
+    """Отримати статистику користувача: кількість списків, загальна сума, популярні відділи."""
+    try:
+        archives = get_archives_for_user(user_id)
+        
+        if not archives:
+            return JSONResponse(content={
+                "total_lists": 0,
+                "total_amount": 0.0,
+                "total_items": 0,
+                "popular_department": None,
+                "this_month_lists": 0,
+                "this_month_amount": 0.0
+            }, status_code=200)
+        
+        total_lists = len(archives)
+        total_amount = 0.0
+        total_items = 0
+        departments = {}
+        
+        # Дата місяць тому
+        month_ago = datetime.now() - timedelta(days=30)
+        this_month_lists = 0
+        this_month_amount = 0.0
+        
+        for filename, timestamp in archives:
+            file_path = os.path.join(ACTIVE_DIR, filename)
+            if not os.path.exists(file_path):
+                continue
+            
+            try:
+                # Парсимо Excel для підрахунку
+                wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                ws = wb.active
+                
+                file_amount = 0.0
+                file_items = 0
+                
+                # Рахуємо товари та суму (пропускаємо заголовок)
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if not row or not row[0]:
+                        continue
+                    # Пропускаємо підсумки
+                    if str(row[0]).strip() in ["", "К-ть артикулів:", "Зібрано на суму:"]:
+                        continue
+                    
+                    file_items += 1
+                    # Сума = кількість * ціна (зазвичай стовпці 2 і 3)
+                    try:
+                        qty = float(row[2]) if len(row) > 2 and row[2] else 0
+                        price = float(row[3]) if len(row) > 3 and row[3] else 0
+                        file_amount += qty * price
+                    except (ValueError, TypeError, IndexError):
+                        pass
+                
+                wb.close()
+                
+                total_amount += file_amount
+                total_items += file_items
+                
+                # Статистика за місяць
+                if timestamp >= month_ago:
+                    this_month_lists += 1
+                    this_month_amount += file_amount
+                
+                # Відділ з імені файлу
+                parsed = parse_filename(filename)
+                if parsed and "department" in parsed:
+                    dept = parsed["department"]
+                    departments[dept] = departments.get(dept, 0) + 1
+                    
+            except Exception as e:
+                print(f"⚠️ Error parsing {filename}: {e}")
+                continue
+        
+        # Найпопулярніший відділ
+        popular_department = max(departments, key=departments.get) if departments else None
+        
+        print(f"📊 Stats for user {user_id}: {total_lists} lists, {total_amount:.2f} грн, dept: {popular_department}")
+        
+        return JSONResponse(content={
+            "total_lists": total_lists,
+            "total_amount": round(total_amount, 2),
+            "total_items": total_items,
+            "popular_department": popular_department,
+            "this_month_lists": this_month_lists,
+            "this_month_amount": round(this_month_amount, 2)
+        }, status_code=200)
+        
+    except Exception as e:
+        print(f"❌ ERROR in get_user_statistics: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(content={"error": "Помилка отримання статистики"}, status_code=500)
+
+
+@app.get("/api/archives/download-all/{user_id}")
+async def download_all_archives(user_id: int):
+    """Завантажити всі архіви користувача як ZIP."""
+    try:
+        archives = get_archives_for_user(user_id)
+        
+        if not archives:
+            raise HTTPException(status_code=404, detail="No archives found")
+        
+        # Створюємо ZIP в пам'яті
+        zip_buffer = BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for filename, timestamp in archives:
+                file_path = os.path.join(ACTIVE_DIR, filename)
+                if os.path.exists(file_path):
+                    # Додаємо файл до ZIP
+                    zip_file.write(file_path, filename)
+        
+        zip_buffer.seek(0)
+        
+        # Ім'я ZIP файлу
+        zip_filename = f"epicservice_archives_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        
+        print(f"📦 Created ZIP with {len(archives)} files for user {user_id}")
+        
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename={zip_filename}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERROR in download_all_archives: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Download error")
+
+
 @app.get("/api/archive/stats/{filename}")
 async def get_archive_stats(filename: str, user_id: int):
     """
@@ -251,8 +392,6 @@ async def get_archive_stats(filename: str, user_id: int):
         wb.close()
         
         # Отримуємо відділ з імені файлу
-        # Формат: {prefix}{department}_{user_id}_{timestamp}.xlsx
-        # або лишки_{department}_{user_id}_{timestamp}.xlsx
         department = parsed.get("department", "Невідомо")
         
         print(f"📊 Stats for {filename}: {items_count} items, department={department}, author={user_id}")
