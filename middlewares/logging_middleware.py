@@ -1,58 +1,89 @@
-# epicservice/middlewares/logging_middleware.py
+"""Logging middleware for FastAPI with correlation ID."""
 
-import logging
-from typing import Any, Awaitable, Callable, Dict
+import time
+import uuid
+from typing import Callable
 
-from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
-# Отримуємо основний логер, щоб додати до нього наш фільтр
-logger = logging.getLogger(__name__)
-
-
-class UserContextFilter(logging.Filter):
-    """
-    Фільтр для логів, що додає контекстну інформацію про користувача та оновлення.
-    """
-    def filter(self, record):
-        # Встановлюємо значення за замовчуванням
-        record.user_id = getattr(record, 'user_id', 'N/A')
-        record.update_id = getattr(record, 'update_id', 'N/A')
-        return True
-
-# Додаємо фільтр до логера один раз при завантаженні модуля
-if not any(isinstance(f, UserContextFilter) for f in logger.filters):
-    logger.addFilter(UserContextFilter())
+from utils.logger import api_logger, set_correlation_id, clear_correlation_id
 
 
-class LoggingMiddleware(BaseMiddleware):
-    """
-    Middleware для збагачення логів contextual-інформацією.
+class LoggingMiddleware(BaseHTTPMiddleware):
+    """Middleware that logs all requests with correlation ID."""
 
-    Цей middleware витягує ID користувача та ID оновлення з кожного
-    вхідного event'у (повідомлення, callback-запиту) та додає їх
-    до записів у лог-файлі через `logging.LoggerAdapter`.
-    """
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: Dict[str, Any],
-    ) -> Any:
-        # Визначаємо користувача з event'у
-        user = data.get("event_from_user")
-        user_id = user.id if user else "N/A"
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """
+        Log request and response with timing and correlation ID.
         
-        # Визначаємо ID оновлення
-        update_id = event.update_id if hasattr(event, 'update_id') else "N/A"
-
-        # Створюємо адаптер для логера, що додає нашу кастомну інформацію
-        adapter = logging.LoggerAdapter(
-            logger, {"user_id": user_id, "update_id": update_id}
+        Correlation ID priority:
+        1. X-Correlation-ID header (from client)
+        2. Generate new UUID
+        """
+        # Get or generate correlation ID
+        correlation_id = request.headers.get(
+            "X-Correlation-ID", str(uuid.uuid4())
         )
-        
-        # Передаємо адаптер у всі наступні обробники через data
-        data["logger"] = adapter
+        set_correlation_id(correlation_id)
 
-        # Викликаємо наступний middleware або обробник у ланцюжку
-        return await handler(event, data)
+        # Log request
+        start_time = time.time()
+        api_logger.info(
+            f"Request started: {request.method} {request.url.path}",
+            method=request.method,
+            path=request.url.path,
+            query_params=dict(request.query_params),
+            client_ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+
+        # Process request
+        try:
+            response = await call_next(request)
+            duration = time.time() - start_time
+
+            # Log response
+            api_logger.info(
+                f"Request completed: {request.method} {request.url.path}",
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=round(duration * 1000, 2),
+            )
+
+            # Add correlation ID to response headers
+            response.headers["X-Correlation-ID"] = correlation_id
+
+            return response
+
+        except Exception as exc:
+            duration = time.time() - start_time
+
+            # Log error
+            api_logger.exception(
+                f"Request failed: {request.method} {request.url.path}",
+                method=request.method,
+                path=request.url.path,
+                duration_ms=round(duration * 1000, 2),
+                error=str(exc),
+            )
+
+            raise
+
+        finally:
+            # Clear correlation ID from context
+            clear_correlation_id()
+
+
+def setup_logging(app):
+    """
+    Setup logging middleware for FastAPI app.
+    
+    Usage:
+        from middlewares.logging_middleware import setup_logging
+        
+        app = FastAPI()
+        setup_logging(app)
+    """
+    app.add_middleware(LoggingMiddleware)
