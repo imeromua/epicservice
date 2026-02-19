@@ -812,14 +812,17 @@ async function deleteArchive(filename) { if (!confirm(`Видалити файл
 
 async function loadAdminData() {
     if (!isAdmin) return;
+    console.log('👑 Loading admin data...');
     await loadAdminStats();
     await loadAdminActiveUsers();
 }
 
 async function loadAdminStats() {
     try {
+        console.log('📊 Fetching admin statistics...');
         const response = await fetch(`/api/admin/statistics?user_id=${userId}`);
         const data = await response.json();
+        console.log('📊 Stats data:', data);
         
         const container = document.getElementById('adminStatsGrid');
         container.innerHTML = `
@@ -845,18 +848,21 @@ async function loadAdminStats() {
             </div>
         `;
     } catch (error) {
-        console.error('Error loading admin stats:', error);
+        console.error('❌ Error loading admin stats:', error);
+        document.getElementById('adminStatsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
     }
 }
 
 async function loadAdminActiveUsers() {
     try {
+        console.log('👥 Fetching active users...');
         const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
         const data = await response.json();
+        console.log('👥 Active users data:', data);
         
         const container = document.getElementById('adminActiveUsers');
         
-        if (!data.users || data.users.length === 0) {
+        if (!data.success || !data.users || data.users.length === 0) {
             container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає активних списків</div>';
             return;
         }
@@ -866,7 +872,7 @@ async function loadAdminActiveUsers() {
                 <div class="user-info">
                     <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
                     <div class="user-details">
-                        🏢 ${user.department} • 📦 ${user.items_count} • 💰 ${user.total_sum.toLocaleString('uk-UA')} ₴
+                        🏢 ${user.department || '-'} • 📦 ${user.items_count} • 💰 ${(user.total_sum || 0).toLocaleString('uk-UA')} ₴
                     </div>
                 </div>
                 <button class="btn btn-success" style="flex: 0 0 auto; padding: 8px 16px; font-size: 12px;" onclick="forceSave(${user.user_id})">
@@ -875,7 +881,8 @@ async function loadAdminActiveUsers() {
             </div>
         `).join('');
     } catch (error) {
-        console.error('Error loading active users:', error);
+        console.error('❌ Error loading active users:', error);
+        document.getElementById('adminActiveUsers').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
     }
 }
 
@@ -957,14 +964,13 @@ async function uploadFile() {
     
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('user_id', userId);
     formData.append('notify_users', document.getElementById('notifyUsers').checked);
     
     document.getElementById('uploadBtn').disabled = true;
     document.getElementById('uploadBtn').textContent = '⏳ Завантаження...';
     
     try {
-        const response = await fetch('/api/admin/import', {
+        const response = await fetch(`/api/admin/import?user_id=${userId}`, {
             method: 'POST',
             body: formData
         });
@@ -975,7 +981,7 @@ async function uploadFile() {
             document.getElementById('importAlert').innerHTML = `
                 <div class="alert alert-success">
                     <span style="font-size: 20px;">✅</span>
-                    <div>${data.message}<br><small>Імпортовано: ${data.imported || 0} товарів</small></div>
+                    <div>Імпорт успішний<br><small>Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}</small></div>
                 </div>
             `;
             cancelUpload();
@@ -984,7 +990,7 @@ async function uploadFile() {
             document.getElementById('importAlert').innerHTML = `
                 <div class="alert alert-error">
                     <span style="font-size: 20px;">❌</span>
-                    <div>${data.message || 'Помилка імпорту'}</div>
+                    <div>${data.error || data.message || 'Помилка імпорту'}</div>
                 </div>
             `;
         }
@@ -1023,7 +1029,7 @@ async function subtractCollected() {
     if (!confirm('⚠️ УВАГА! Ця операція відніме зібрані товари з залишків.\\n\\nПродовжити?')) return;
     
     try {
-        const response = await fetch('/api/admin/subtract', {
+        const response = await fetch(`/api/admin/subtract?user_id=${userId}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ user_id: userId })
@@ -1068,7 +1074,7 @@ async function sendBroadcast() {
             document.getElementById('broadcastAlert').innerHTML = `
                 <div class="alert alert-success">
                     <span style="font-size: 20px;">✅</span>
-                    <div>${data.message}<br><small>Розіслано: ${data.sent || 0} користувачам</small></div>
+                    <div>${data.message || 'Розсилка завершена'}<br><small>Розіслано: ${data.sent || 0} користувачам</small></div>
                 </div>
             `;
             document.getElementById('broadcastMessage').value = '';
@@ -1092,6 +1098,9 @@ async function sendBroadcast() {
 
 if (userId) loadList();
 updateSearchBoxVisibility();
+
+// Debug info
+console.log('App initialized:', { userId, isAdmin, ADMIN_IDS });
 </script>
 </body>
 </html>
