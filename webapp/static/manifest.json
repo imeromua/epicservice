@@ -77,10 +77,10 @@
   "categories": ["business", "productivity"],
   "shortcuts": [
     {
-      "name": "Пошук запчастин",
-      "short_name": "Пошук",
-      "description": "Швидкий пошук запчастин",
-      "url": "/?action=search",
+      "name": "Відкрити в Telegram",
+      "short_name": "Telegram",
+      "description": "Відкрити повну версію в Telegram",
+      "url": "https://t.me/your_bot_name/app",
       "icons": [
         {
           "src": "/static/icons/icon-192x192.png",
@@ -89,10 +89,10 @@
       ]
     },
     {
-      "name": "Нове замовлення",
-      "short_name": "Замовлення",
-      "description": "Створити нове замовлення",
-      "url": "/?action=order",
+      "name": "Пошук запчастин",
+      "short_name": "Пошук",
+      "description": "Швидкий пошук запчастин",
+      "url": "/?action=search",
       "icons": [
         {
           "src": "/static/icons/icon-192x192.png",
