@@ -59,6 +59,18 @@ async def favicon():
     return Response(status_code=204)
 
 
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    """Віддає Service Worker для PWA з кореня"""
+    sw_path = os.path.join(os.path.dirname(__file__), "sw.js")
+    response = FileResponse(sw_path, media_type="application/javascript")
+    # Забороняємо кешування Service Worker
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Головна сторінка Mini App"""
