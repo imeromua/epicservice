@@ -1,0 +1,24 @@
+[Unit]
+Description=EpicService Telegram Bot
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/home/epicservice
+Environment="PATH=/home/epicservice/venv/bin"
+ExecStart=/home/epicservice/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+# Логування
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=epicservice-bot
+
+# Безпека
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
