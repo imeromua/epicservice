@@ -1,24 +1,50 @@
 [Unit]
-Description=EpicService Telegram Bot
+Description=EpicService - Telegram Bot & Web API
 After=network.target postgresql.service redis.service
+Requires=postgresql.service redis.service
 
 [Service]
-Type=simple
-User=www-data
-WorkingDirectory=/home/epicservice
-Environment="PATH=/home/epicservice/venv/bin"
-ExecStart=/home/epicservice/venv/bin/python bot.py
+Type=notify
+User=epicservice
+Group=epicservice
+WorkingDirectory=/opt/epicservice
+
+# Environment
+EnvironmentFile=/opt/epicservice/.env
+Environment="PATH=/opt/epicservice/venv/bin"
+
+# Start command
+ExecStart=/opt/epicservice/venv/bin/gunicorn \
+    --config /opt/epicservice/deploy/gunicorn.conf.py \
+    webapp.api:app
+
+# Reload command
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Graceful shutdown
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Restart policy
 Restart=always
 RestartSec=10
 
-# Логування
+# Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=epicservice-bot
+SyslogIdentifier=epicservice
 
-# Безпека
+# Security
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/epicservice /var/run/epicservice
+
+# Resource limits
+LimitNOFILE=65535
+LimitNPROC=4096
 
 [Install]
 WantedBy=multi-user.target
