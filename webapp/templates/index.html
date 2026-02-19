@@ -137,6 +137,15 @@ function updateDepartmentInfo(department, count) {
     } else {
         info.classList.remove('active');
     }
+    
+    // Оновлюємо стан locked для всіх товарів в кеші
+    if (cachedProducts.length > 0) {
+        cachedProducts.forEach(p => {
+            p.is_different_department = (department !== null && p.department !== department);
+            p.current_list_department = department;
+        });
+        updateSearchResults();
+    }
 }
 
 function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
@@ -226,10 +235,17 @@ async function confirmAdd() {
                 cachedProducts[productIndex].user_reserved += currentQuantity;
                 cachedProducts[productIndex].user_reserved_sum += currentQuantity * selectedProduct.price;
                 cachedProducts[productIndex].available -= currentQuantity;
-                updateSearchResults();
             }
             
-            loadList(); 
+            // Оновлюємо список і department info
+            const listResponse = await fetch(`/api/list/${userId}`);
+            const listData = await listResponse.json();
+            
+            const deptResponse = await fetch(`/api/list/department/${userId}`);
+            const deptData = await deptResponse.json();
+            
+            updateDepartmentInfo(deptData.department, listData.count || 0);
+            updateListBadge(listData.count || 0);
         } else { 
             tg.showAlert('❌ ' + d.message); 
         } 
