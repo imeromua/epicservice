@@ -382,6 +382,30 @@
             gap: 12px;
             flex-wrap: wrap;
         }
+        
+        .dept-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .dept-item {
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .dept-name {
+            font-weight: 600;
+        }
+        
+        .dept-count {
+            color: var(--primary);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -456,7 +480,7 @@
                     <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>
                         📤 Імпортувати
                     </button>
-                    <button class="btn btn-secondary" onclick="cancelUpload()">
+                    <button class="btn btn-secondary" onclick="cancelUpload(true)">
                         ❌ Скасувати
                     </button>
                 </div>
@@ -479,10 +503,15 @@
                     <button class="btn btn-primary" onclick="exportStock()">
                         📊 Експорт залишків
                     </button>
-                    <button class="btn btn-success" onclick="exportCollected()">
+                    <button class="btn btn-success" onclick="showSummary()">
                         📋 Зведений звіт
                     </button>
                 </div>
+            </div>
+            
+            <div id="summaryCard" class="card" style="display: none;">
+                <div class="card-title">📋 Зведений звіт</div>
+                <div id="summaryContent"></div>
             </div>
             
             <div class="card">
@@ -590,15 +619,12 @@
                     return;
                 }
                 
-                container.innerHTML = data.users.map(user => `
+                container.innerHTML = data.users.map(userId => `
                     <div class="user-item">
                         <div class="user-info">
-                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
-                            <div class="user-details">ID: ${user.user_id} • Перший візит: ${new Date(user.first_seen).toLocaleDateString('uk-UA')}</div>
+                            <div class="user-name">👤 User ${userId}</div>
+                            <div class="user-details">ID: ${userId}</div>
                         </div>
-                        <button class="btn btn-primary" onclick="forceSave(${user.user_id})">
-                            💾 Зберегти список
-                        </button>
                     </div>
                 `).join('');
             } catch (error) {
@@ -625,7 +651,7 @@
                         <div class="user-info">
                             <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
                             <div class="user-details">
-                                🏢 Відділ: ${user.department} • 
+                                🏢 Відділ: ${user.department || 'N/A'} • 
                                 📦 Товарів: ${user.items_count} • 
                                 💰 Сума: ${user.total_sum.toLocaleString('uk-UA')} ₴
                             </div>
@@ -703,12 +729,14 @@
             }
         }
         
-        function cancelUpload() {
+        function cancelUpload(clearAlert = false) {
             selectedFile = null;
             document.getElementById('fileInput').value = '';
             document.getElementById('fileInfo').style.display = 'none';
             document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('importAlert').innerHTML = '';
+            if (clearAlert) {
+                document.getElementById('importAlert').innerHTML = '';
+            }
         }
         
         async function uploadFile() {
@@ -717,16 +745,15 @@
                 return;
             }
             
+            const notifyChecked = document.getElementById('notifyUsers').checked;
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('user_id', ADMIN_ID);
-            formData.append('notify_users', document.getElementById('notifyUsers').checked);
             
             document.getElementById('uploadProgress').style.display = 'block';
             document.getElementById('uploadBtn').disabled = true;
             
             try {
-                const response = await fetch('/api/admin/import', {
+                const response = await fetch(`/api/admin/import?user_id=${ADMIN_ID}&notify_users=${notifyChecked}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -738,9 +765,9 @@
                         <div class="alert alert-success">
                             <span style="font-size: 24px;">✅</span>
                             <div>
-                                <div style="font-weight: 600;">${data.message}</div>
+                                <div style="font-weight: 600;">Імпорт успішний</div>
                                 <div style="font-size: 13px; margin-top: 4px;">
-                                    Імпортовано: ${data.imported || 0} товарів
+                                    Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}, Деактивовано: ${data.deactivated || 0}
                                 </div>
                             </div>
                         </div>
@@ -751,7 +778,7 @@
                     document.getElementById('importAlert').innerHTML = `
                         <div class="alert alert-error">
                             <span style="font-size: 24px;">❌</span>
-                            <div>${data.message || 'Помилка імпорту'}</div>
+                            <div>${data.error || 'Помилка імпорту'}</div>
                         </div>
                     `;
                 }
@@ -777,11 +804,42 @@
             }
         }
         
-        async function exportCollected() {
+        async function showSummary() {
+            const summaryCard = document.getElementById('summaryCard');
+            const summaryContent = document.getElementById('summaryContent');
+            
+            summaryContent.innerHTML = '<div class="loader"><div class="loader-spinner">⟳</div><div>Завантаження...</div></div>';
+            summaryCard.style.display = 'block';
+            
             try {
-                window.open(`/api/admin/export/collected?user_id=${ADMIN_ID}`, '_blank');
+                const response = await fetch(`/api/admin/summary?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const deptList = data.departments.map(dept => `
+                        <li class="dept-item">
+                            <span class="dept-name">Відділ ${dept.department_id}</span>
+                            <span class="dept-count">${dept.count} арт.</span>
+                        </li>
+                    `).join('');
+                    
+                    summaryContent.innerHTML = `
+                        <div style="margin-bottom: 20px;">
+                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">
+                                📦 Кількість артикулів: <span style="color: var(--primary);">${data.total_count} шт.</span>
+                            </div>
+                            <div style="font-size: 18px; font-weight: 600;">
+                                💰 Загальна сума збору: <span style="color: var(--success);">${data.total_sum.toLocaleString('uk-UA')} грн</span>
+                            </div>
+                        </div>
+                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">📦 Актуальна кількість артикулів по відділах:</div>
+                        <ul class="dept-list">${deptList}</ul>
+                    `;
+                } else {
+                    summaryContent.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${data.message || 'Помилка завантаження'}</div>`;
+                }
             } catch (error) {
-                alert('❌ Помилка експорту: ' + error.message);
+                summaryContent.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${error.message}</div>`;
             }
         }
         
@@ -789,10 +847,9 @@
             if (!confirm('⚠️ УВАГА! Ця операція віднімає зібрані товари з залишків.\n\nПродовжити?')) return;
             
             try {
-                const response = await fetch('/api/admin/subtract', {
+                const response = await fetch(`/api/admin/subtract?user_id=${ADMIN_ID}`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: ADMIN_ID })
+                    headers: {'Content-Type': 'application/json'}
                 });
                 
                 const data = await response.json();
