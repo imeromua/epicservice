@@ -1027,6 +1027,41 @@ async function exportStock() {
 
 
 
+
+async function showAdminArchives() {
+    try {
+        const response = await fetch(`/api/admin/archives?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.files && data.files.length > 0) {
+            let html = '<div style="max-height: 400px; overflow-y: auto;">';
+            html += '<button class="btn btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="downloadAllAdminArchives()">📥 Завантажити всі (ZIP)</button>';
+            data.files.forEach(file => {
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">`;
+                html += `<div><div style="font-weight: 600;">📄 ${file.filename}</div><div style="font-size: 12px; color: var(--hint-color);">${(file.size / 1024).toFixed(1)} KB | ${file.modified}</div></div>`;
+                html += `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; min-width: auto;" onclick="downloadAdminArchive('${file.filename}')">📥</button></div>`;
+            });
+            html += '</div>';
+            
+            tg.showPopup({title: '🗄 Архіви користувачів', message: html, buttons: [{type: 'close'}]});
+        } else {
+            tg.showAlert('📁 Немає архівів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+function downloadAdminArchive(filename) {
+    window.open(`/api/admin/archives/download/${filename}?user_id=${userId}`, '_blank');
+    tg.HapticFeedback.notificationOccurred('success');
+}
+
+function downloadAllAdminArchives() {
+    window.open(`/api/admin/archives/download-all?user_id=${userId}`, '_blank');
+    tg.HapticFeedback.notificationOccurred('success');
+}
+
 async function sendBroadcast() {
     const message = document.getElementById('broadcastMessage').value.trim();
     
