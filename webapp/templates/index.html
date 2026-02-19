@@ -7,79 +7,224 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F4E6;</text></svg>">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --hint-color: var(--tg-theme-hint-color, #999999);
+            --link-color: var(--tg-theme-link-color, #0088cc);
+            --button-color: var(--tg-theme-button-color, #0088cc);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #000000); padding-bottom: 80px; }
-        .sticky-container { position: sticky; top: 0; z-index: 100; background: var(--tg-theme-bg-color, #ffffff); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg-color); 
+            color: var(--text-color); 
+            padding-bottom: 80px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .sticky-container { 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            background: var(--bg-color); 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
+        }
         .header { padding: 16px 16px 8px 16px; }
-        h1 { color: var(--tg-theme-button-color, #0088cc); font-size: 24px; margin-bottom: 8px; }
-        .department-info { background: rgba(0,136,204,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; display: none; }
-        .department-info.active { display: block; }
+        h1 { color: var(--button-color); font-size: 24px; margin-bottom: 8px; transition: color 0.3s ease; }
+        .department-info { 
+            background: var(--button-color); 
+            opacity: 0.15;
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            font-size: 13px; 
+            display: none;
+            transition: opacity 0.3s ease;
+        }
+        .department-info.active { display: block; opacity: 1; background: rgba(0,136,204,0.1); }
         .search-box { position: relative; margin-bottom: 12px; padding: 0 16px; }
-        .search-input { width: 100%; padding: 12px 16px; border: 2px solid var(--tg-theme-button-color, #0088cc); border-radius: 12px; font-size: 16px; background: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #000000); }
-        .search-input:focus { outline: none; border-color: var(--tg-theme-link-color, #0088cc); }
-        .tabs { display: flex; gap: 4px; padding: 0 16px 8px 16px; border-bottom: 1px solid var(--tg-theme-hint-color, #999999); overflow-x: auto; }
-        .tab { position: relative; padding: 12px 16px; background: none; border: none; color: var(--tg-theme-hint-color, #999999); cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; transition: all 0.3s; white-space: nowrap; }
-        .tab.active { color: var(--tg-theme-button-color, #0088cc); border-bottom-color: var(--tg-theme-button-color, #0088cc); }
+        .search-input { 
+            width: 100%; 
+            padding: 12px 16px; 
+            border: 2px solid var(--button-color); 
+            border-radius: 12px; 
+            font-size: 16px; 
+            background: var(--bg-color); 
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+        .search-input:focus { outline: none; border-color: var(--link-color); }
+        .tabs { display: flex; gap: 4px; padding: 0 16px 8px 16px; border-bottom: 1px solid var(--hint-color); overflow-x: auto; }
+        .tab { 
+            position: relative; 
+            padding: 12px 16px; 
+            background: none; 
+            border: none; 
+            color: var(--hint-color); 
+            cursor: pointer; 
+            font-size: 14px; 
+            border-bottom: 2px solid transparent; 
+            transition: all 0.3s; 
+            white-space: nowrap; 
+        }
+        .tab.active { color: var(--button-color); border-bottom-color: var(--button-color); }
         .tab-badge { position: absolute; top: 6px; right: 8px; background: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
         .main-content { padding: 16px; }
         .content { display: none; }
         .content.active { display: block; }
-        .product-card, .list-item, .archive-item { background: var(--tg-theme-secondary-bg-color, #f0f0f0); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: transform 0.2s; position: relative; }
+        .product-card, .list-item, .archive-item { 
+            background: var(--secondary-bg-color); 
+            border-radius: 12px; 
+            padding: 16px; 
+            margin-bottom: 12px; 
+            cursor: pointer; 
+            transition: transform 0.2s, background-color 0.3s ease; 
+            position: relative; 
+        }
         .product-card:active, .list-item:active { transform: scale(0.98); }
-        .product-card.locked { opacity: 0.5; cursor: not-allowed; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); }
+        .product-card.locked { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--secondary-bg-color) 100%);
+            filter: grayscale(50%);
+        }
         .product-card.locked:active { transform: none; }
         .lock-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; opacity: 0.3; pointer-events: none; display: none; }
         .product-card.locked .lock-overlay { display: block; }
         .product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .product-article { font-weight: bold; color: var(--tg-theme-button-color, #0088cc); font-size: 16px; }
-        .product-card.locked .product-article { color: #999; }
+        .product-article { font-weight: bold; color: var(--button-color); font-size: 16px; transition: color 0.3s ease; }
+        .product-card.locked .product-article { color: var(--hint-color); }
         .product-status { background: #34c759; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
         .product-status.locked { background: #ff3b30; }
-        .product-name { font-size: 14px; margin-bottom: 12px; color: var(--tg-theme-text-color, #000000); }
-        .product-card.locked .product-name { color: #999; }
-        .product-details { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--tg-theme-hint-color, #999999); }
+        .product-name { font-size: 14px; margin-bottom: 12px; color: var(--text-color); transition: color 0.3s ease; }
+        .product-card.locked .product-name { color: var(--hint-color); }
+        .product-details { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--hint-color); }
         .product-detail-row { display: flex; justify-content: space-between; }
         .product-detail-label { font-weight: 500; }
-        .product-detail-value { color: var(--tg-theme-text-color, #000000); }
-        .product-card.locked .product-detail-value { color: #bbb; }
-        .product-detail-value.highlight { color: var(--tg-theme-button-color, #0088cc); font-weight: bold; }
+        .product-detail-value { color: var(--text-color); transition: color 0.3s ease; }
+        .product-card.locked .product-detail-value { color: var(--hint-color); opacity: 0.6; }
+        .product-detail-value.highlight { color: var(--button-color); font-weight: bold; }
         .product-detail-value.warning { color: #ff9500; font-weight: bold; }
         .product-detail-value.success { color: #34c759; font-weight: bold; }
         .list-header, .archive-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
         .action-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
-        .save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .download-btn { flex: 1; padding: 12px; background: var(--tg-theme-button-color, #0088cc); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .delete-archive-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .empty-state { text-align: center; padding: 40px 20px; color: var(--tg-theme-hint-color, #999999); }
+        .save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .save-btn:active { transform: scale(0.95); }
+        .clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .clear-btn:active { transform: scale(0.95); }
+        .download-btn { flex: 1; padding: 12px; background: var(--button-color); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s, background-color 0.3s ease; }
+        .download-btn:active { transform: scale(0.95); }
+        .delete-archive-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .delete-archive-btn:active { transform: scale(0.95); }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--hint-color); transition: color 0.3s ease; }
         .empty-icon { font-size: 48px; margin-bottom: 16px; }
-        .loader { text-align: center; padding: 20px; color: var(--tg-theme-hint-color, #999999); }
-        .total-box { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-bg-color, #ffffff); border-top: 1px solid var(--tg-theme-hint-color, #999999); padding: 16px; display: flex; justify-content: space-between; align-items: center; z-index: 50; }
+        .loader { text-align: center; padding: 20px; color: var(--hint-color); transition: color 0.3s ease; }
+        .total-box { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            background: var(--bg-color); 
+            border-top: 1px solid var(--hint-color); 
+            padding: 16px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            z-index: 50;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
         .total-text { font-size: 18px; font-weight: bold; }
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--tg-theme-bg-color, #ffffff); border-radius: 16px; padding: 24px; max-width: 90%; max-height: 80%; overflow-y: auto; }
+        .modal-content { 
+            background: var(--bg-color); 
+            border-radius: 16px; 
+            padding: 24px; 
+            max-width: 90%; 
+            max-height: 80%; 
+            overflow-y: auto;
+            transition: background-color 0.3s ease;
+        }
         .quantity-selector { display: flex; align-items: center; gap: 16px; margin: 20px 0; justify-content: center; }
-        .qty-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--tg-theme-button-color, #0088cc); background: var(--tg-theme-button-color, #0088cc); color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .qty-btn { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            border: 2px solid var(--button-color); 
+            background: var(--button-color); 
+            color: white; 
+            font-size: 20px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: transform 0.2s, background-color 0.3s ease;
+        }
+        .qty-btn:active { transform: scale(0.9); }
         .qty-display { font-size: 24px; font-weight: bold; min-width: 60px; text-align: center; }
         .quick-actions { display: flex; gap: 8px; margin-bottom: 12px; }
-        .quick-btn { flex: 1; padding: 12px; background: var(--tg-theme-secondary-bg-color, #f0f0f0); color: var(--tg-theme-text-color, #000000); border: 2px solid var(--tg-theme-button-color, #0088cc); border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s; }
-        .quick-btn:active { transform: scale(0.95); background: var(--tg-theme-button-color, #0088cc); color: white; }
-        .add-btn { width: 100%; padding: 16px; background: var(--tg-theme-button-color, #0088cc); color: var(--tg-theme-button-text-color, #ffffff); border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 12px; }
+        .quick-btn { 
+            flex: 1; 
+            padding: 12px; 
+            background: var(--secondary-bg-color); 
+            color: var(--text-color); 
+            border: 2px solid var(--button-color); 
+            border-radius: 8px; 
+            font-size: 14px; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+        }
+        .quick-btn:active { transform: scale(0.95); background: var(--button-color); color: white; }
+        .add-btn { 
+            width: 100%; 
+            padding: 16px; 
+            background: var(--button-color); 
+            color: var(--button-text-color); 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 12px;
+            transition: transform 0.2s, background-color 0.3s ease;
+        }
+        .add-btn:active { transform: scale(0.95); }
         .delete-btn { background: #ff3b30; }
-        .cancel-btn { background: #999 !important; }
-        .custom-input { width: 100%; padding: 12px; border: 2px solid var(--tg-theme-button-color, #0088cc); border-radius: 8px; font-size: 18px; text-align: center; margin: 16px 0; background: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #000000); }
+        .cancel-btn { background: var(--hint-color) !important; }
+        .custom-input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid var(--button-color); 
+            border-radius: 8px; 
+            font-size: 18px; 
+            text-align: center; 
+            margin: 16px 0; 
+            background: var(--bg-color); 
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
         .archive-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-left: 8px; }
         .archive-badge.main { background: #34c759; color: white; }
         .archive-badge.surplus { background: #ff9500; color: white; }
-        .archive-stats { font-size: 12px; color: var(--tg-theme-hint-color, #999999); margin-top: 8px; padding: 8px; background: rgba(0,136,204,0.05); border-radius: 8px; }
+        .archive-stats { 
+            font-size: 12px; 
+            color: var(--hint-color); 
+            margin-top: 8px; 
+            padding: 8px; 
+            background: rgba(0,136,204,0.05); 
+            border-radius: 8px;
+            transition: color 0.3s ease;
+        }
         .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .stat-row:last-child { margin-bottom: 0; }
         .stat-label { font-weight: 500; }
-        .stat-value { color: var(--tg-theme-button-color, #0088cc); font-weight: bold; }
+        .stat-value { color: var(--button-color); font-weight: bold; transition: color 0.3s ease; }
         .success-icon { font-size: 64px; text-align: center; margin-bottom: 12px; }
         .success-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #34c759; }
-        .success-subtitle { text-align: center; font-size: 14px; color: var(--tg-theme-hint-color, #999999); margin-bottom: 24px; }
+        .success-subtitle { text-align: center; font-size: 14px; color: var(--hint-color); margin-bottom: 24px; transition: color 0.3s ease; }
         .archive-actions { display: flex; gap: 8px; margin-top: 8px; }
     </style>
 </head>
@@ -118,13 +263,17 @@
     <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
     <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
     <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
-    <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--tg-theme-hint-color,#999)"><span id="totalItems">0</span> товарів</div></div>
+    <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
 <script>
-const tg = window.Telegram.WebApp; tg.expand();
+const tg = window.Telegram.WebApp; 
+tg.expand();
+tg.ready();
+
 const userId = tg.initDataUnsafe?.user?.id || 0;
 let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
 let cachedProducts = [];
 let currentDepartment = null;
+
 document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}` : 'Тестовий режим';
 
 function updateDepartmentInfo(department, count) {
@@ -138,7 +287,6 @@ function updateDepartmentInfo(department, count) {
         info.classList.remove('active');
     }
     
-    // Оновлюємо стан locked для всіх товарів в кеші
     if (cachedProducts.length > 0) {
         cachedProducts.forEach(p => {
             p.is_different_department = (department !== null && p.department !== department);
@@ -237,7 +385,6 @@ async function confirmAdd() {
                 cachedProducts[productIndex].available -= currentQuantity;
             }
             
-            // Оновлюємо список і department info
             const listResponse = await fetch(`/api/list/${userId}`);
             const listData = await listResponse.json();
             
@@ -261,7 +408,7 @@ async function confirmUpdate() { try { const r = await fetch('/api/update', { me
 async function confirmDelete() { if (!confirm('Видалити товар зі списку?')) return; try { const r = await fetch('/api/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
 async function saveList() { try { const r = await fetch(`/api/save/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.HapticFeedback.notificationOccurred('success'); if (d.cleared) { loadList(); updateDepartmentInfo(null, 0); } document.getElementById('successModal').classList.add('active'); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
 async function clearList() { if (!confirm('Очистити весь список?')) return; try { const r = await fetch(`/api/clear/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); updateDepartmentInfo(null, 0); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
-async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⏳ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); updateDepartmentInfo(null, 0); return; } const deptR = await fetch(`/api/list/department/${userId}`); const deptD = await deptR.json(); updateDepartmentInfo(deptD.department, d.count); let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--tg-theme-hint-color,#999)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); updateDepartmentInfo(null, 0); } }
+async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⏳ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); updateDepartmentInfo(null, 0); return; } const deptR = await fetch(`/api/list/department/${userId}`); const deptD = await deptR.json(); updateDepartmentInfo(deptD.department, d.count); let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--hint-color)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); updateDepartmentInfo(null, 0); } }
 
 async function loadArchiveStats(filename) { try { const r = await fetch(`/api/archive/stats/${filename}?user_id=${userId}`); const d = await r.json(); if (d.success) { return `<div class="stat-row"><span class="stat-label">📦 Товарів:</span><span class="stat-value">${d.items_count}</span></div><div class="stat-row"><span class="stat-label">🏢 Відділ:</span><span class="stat-value">${d.department}</span></div><div class="stat-row"><span class="stat-label">👤 Автор:</span><span class="stat-value">ID ${d.author_id}</span></div>`; } return ''; } catch (e) { return ''; } }
 
