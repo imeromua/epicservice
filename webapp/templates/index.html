@@ -479,11 +479,9 @@
             </div>
             
             <div class="admin-section-title">📤 Експорт та операції</div>
-            <div class="admin-section-title">📤 Звіти та Архіви</div>
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
-            </div>
             </div>
             
             <div class="admin-section-title">📢 Розсилка повідомлень</div>
@@ -497,6 +495,7 @@
             </div>
         </div>
     </div>
+        </div>
 
     <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
     <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
