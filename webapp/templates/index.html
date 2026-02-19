@@ -109,6 +109,7 @@
 const tg = window.Telegram.WebApp; tg.expand();
 const userId = tg.initDataUnsafe?.user?.id || 0;
 let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
+let cachedProducts = []; // Кеш результатів пошуку
 document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}` : 'Тестовий режим';
 
 function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
@@ -116,15 +117,94 @@ function updateSearchBoxVisibility() { const searchBox = document.getElementById
 function switchTab(tab) { currentTab = tab; document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab']}; const [idx, id] = tabs[tab]; document.querySelectorAll('.tab')[idx].classList.add('active'); document.getElementById(id).classList.add('active'); updateSearchBoxVisibility(); if (tab === 'list') loadList(); if (tab === 'archives') loadArchives(); }
 function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
 function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
-document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; } searchTimeout = setTimeout(() => search(query), 500); });
-async function search(query) { const results = document.getElementById('searchResults'); results.innerHTML = '<div class="loader">🔍 Пошук...</div>'; try { const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) }); const data = await response.json(); if (!data.products || data.products.length === 0) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; return; } results.innerHTML = data.products.map(p => `<div class="product-card" onclick='openAddModal(${JSON.stringify(p)})'><div class="product-header"><span class="product-article">🆔 ${p.article}</span><span class="product-status">✅ Знайдено</span></div><div class="product-name">📝 ${p.name}</div><div class="product-details"><div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div><div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div><div class="product-detail-row"><span class="product-detail-label">⏳ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div><div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div><div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}</div></div>`).join(''); } catch (error) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; } }
+document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; cachedProducts = []; return; } searchTimeout = setTimeout(() => search(query), 500); });
+
+function renderProduct(p) {
+    return `<div class="product-card" data-product-id="${p.id}" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+        <div class="product-header">
+            <span class="product-article">🆔 ${p.article}</span>
+            <span class="product-status">✅ Знайдено</span>
+        </div>
+        <div class="product-name">📝 ${p.name}</div>
+        <div class="product-details">
+            <div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">⏳ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>
+            ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
+        </div>
+    </div>`;
+}
+
+function updateSearchResults() {
+    const results = document.getElementById('searchResults');
+    // Фільтруємо товари з available > 0
+    const visibleProducts = cachedProducts.filter(p => p.available > 0);
+    
+    if (visibleProducts.length === 0) {
+        results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено або все зарезервовано</div>';
+        return;
+    }
+    
+    results.innerHTML = visibleProducts.map(p => renderProduct(p)).join('');
+}
+
+async function search(query) { 
+    const results = document.getElementById('searchResults'); 
+    results.innerHTML = '<div class="loader">🔍 Пошук...</div>'; 
+    try { 
+        const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) }); 
+        const data = await response.json(); 
+        if (!data.products || data.products.length === 0) { 
+            results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; 
+            cachedProducts = [];
+            return; 
+        }
+        // Фільтруємо товари з available > 0
+        cachedProducts = data.products.filter(p => p.available > 0);
+        updateSearchResults();
+    } catch (error) { 
+        results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; 
+        cachedProducts = [];
+    } 
+}
+
 function openAddModal(product) { selectedProduct = product; currentQuantity = 1; document.getElementById('modalTitle').textContent = product.article; document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`; document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`; document.getElementById('qtyDisplay').textContent = 1; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; document.getElementById('customQtyInput').value = ''; document.getElementById('addModal').classList.add('active'); }
 function closeModal() { document.getElementById('addModal').classList.remove('active'); }
 function changeQty(d) { currentQuantity = Math.max(1, Math.min(selectedProduct.available, currentQuantity + d)); document.getElementById('qtyDisplay').textContent = currentQuantity; }
 function addAllAvailable() { currentQuantity = selectedProduct.available; document.getElementById('qtyDisplay').textContent = currentQuantity; tg.HapticFeedback.notificationOccurred('success'); }
 function showCustomInput() { document.getElementById('customInputBox').style.display = 'block'; document.getElementById('normalSelector').style.display = 'none'; document.getElementById('customQtyInput').focus(); }
 function applyCustomQty() { const v = parseInt(document.getElementById('customQtyInput').value); if (isNaN(v) || v < 1) { tg.showAlert('❌ Введіть коректне число'); return; } if (v > selectedProduct.available) { tg.showAlert(`⚠️ Максимум: ${selectedProduct.available} шт.`); return; } currentQuantity = v; document.getElementById('qtyDisplay').textContent = v; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; tg.HapticFeedback.notificationOccurred('success'); }
-async function confirmAdd() { try { const r = await fetch('/api/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: selectedProduct.id, quantity: currentQuantity}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+
+async function confirmAdd() { 
+    try { 
+        const r = await fetch('/api/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: selectedProduct.id, quantity: currentQuantity}) }); 
+        const d = await r.json(); 
+        if (d.success) { 
+            tg.showAlert(`✅ ${d.message}`); 
+            closeModal(); 
+            
+            // Оновлюємо кешовані дані
+            const productIndex = cachedProducts.findIndex(p => p.id === selectedProduct.id);
+            if (productIndex !== -1) {
+                cachedProducts[productIndex].user_reserved += currentQuantity;
+                cachedProducts[productIndex].user_reserved_sum += currentQuantity * selectedProduct.price;
+                cachedProducts[productIndex].available -= currentQuantity;
+                
+                // Перемальовуємо результати
+                updateSearchResults();
+            }
+            
+            loadList(); 
+        } else { 
+            tg.showAlert('❌ ' + d.message); 
+        } 
+    } catch (e) { 
+        tg.showAlert('❌ ' + e.message); 
+    } 
+}
+
 function openEditModal(item) { editingItem = item; editQuantity = item.quantity; document.getElementById('editModalTitle').textContent = item.article; document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`; document.getElementById('editQtyDisplay').textContent = editQuantity; document.getElementById('editModal').classList.add('active'); }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
 function changeEditQty(d) { editQuantity = Math.max(1, editQuantity + d); document.getElementById('editQtyDisplay').textContent = editQuantity; }
