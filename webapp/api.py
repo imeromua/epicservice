@@ -62,7 +62,14 @@ async def favicon():
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Головна сторінка Mini App"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Читаємо список ID адмінів з .env
+    admin_ids_str = os.getenv("WEBAPP_ADMIN_IDS", "")
+    admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "admin_ids": admin_ids
+    })
 
 
 @app.get("/admin", response_class=HTMLResponse)
