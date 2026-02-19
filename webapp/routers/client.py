@@ -28,7 +28,7 @@ from database.orm import (
     orm_get_temp_list_department,
     orm_update_temp_list_item_quantity,
 )
-from utils.archive_manager import ACTIVE_DIR, get_user_archives, parse_filename
+from utils.archive_manager import ACTIVE_DIR, get_user_archives as fetch_user_archives, parse_filename
 from utils.list_processor import process_and_save_list
 
 router = APIRouter()
@@ -258,7 +258,7 @@ async def get_user_archives(user_id: int):
     """Отримати список архівних файлів користувача."""
     try:
         print(f"📁 Archives request for user_id={user_id}")
-        archives = get_user_archives(user_id)
+        archives = fetch_user_archives(user_id)
         if not archives:
             return JSONResponse(content={"archives": []}, status_code=200)
         result = []
@@ -283,7 +283,7 @@ async def get_user_archives(user_id: int):
 async def get_user_statistics(user_id: int):
     """Отримати статистику користувача: кількість списків, загальна сума, популярні відділи."""
     try:
-        archives = get_user_archives(user_id)
+        archives = fetch_user_archives(user_id)
         
         if not archives:
             return JSONResponse(content={
@@ -381,7 +381,7 @@ async def get_user_statistics(user_id: int):
 async def download_all_archives(user_id: int):
     """Завантажити всі архіви користувача як ZIP."""
     try:
-        archives = get_user_archives(user_id)
+        archives = fetch_user_archives(user_id)
         
         if not archives:
             raise HTTPException(status_code=404, detail="No archives found")
