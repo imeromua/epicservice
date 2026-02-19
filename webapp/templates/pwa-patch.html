@@ -3,7 +3,10 @@
   Для автоматичного впровадження можна використати скрипт update-html.py
 -->
 
-<!-- ========== Додати в <head> секцію ========== -->
+<!-- ========== Додати в <head> секцію (ПЕРЕД telegram-web-app.js) ========== -->
+
+<!-- PWA Detection and Telegram Integration (MUST BE FIRST!) -->
+<script src="/static/pwa-redirect.js"></script>
 
 <!-- PWA Meta Tags -->
 <meta name="theme-color" content="#3b82f6">
