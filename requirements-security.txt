@@ -1,0 +1,10 @@
+# Security dependencies
+
+# Rate limiting
+slowapi==0.1.9
+
+# Redis for production rate limiting (optional)
+redis==5.0.1
+
+# Additional security headers
+secure==0.3.0
