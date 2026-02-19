@@ -1,0 +1,48 @@
+name: Auto Format
+
+on:
+  workflow_dispatch:
+
+jobs:
+  format:
+    name: Format Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: 3.0.0-beta
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install formatters
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort ruff
+      
+      - name: Run Black
+        run: black --line-length=100 .
+      
+      - name: Run isort
+        run: isort --profile black --line-length 100 .
+      
+      - name: Run Ruff (auto-fix)
+        run: ruff check --fix . || true
+      
+      - name: Commit changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -A
+          git diff --staged --quiet || git commit -m "style: auto-format code with black, isort, and ruff"
+      
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: 3.0.0-beta
