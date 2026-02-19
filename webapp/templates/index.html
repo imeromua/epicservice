@@ -500,6 +500,7 @@
     <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
     <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
     <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
+    <div id="adminArchivesModal" class="modal"><div class="modal-content" id="adminArchivesModalContent"></div></div>
     <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
 <script>
 const tg = window.Telegram.WebApp; 
@@ -1034,22 +1035,29 @@ async function showAdminArchives() {
         const data = await response.json();
         
         if (data.success && data.files && data.files.length > 0) {
-            let html = '<div style="max-height: 400px; overflow-y: auto;">';
-            html += '<button class="btn btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="downloadAllAdminArchives()">📥 Завантажити всі (ZIP)</button>';
+            let html = '<h2 style="margin-bottom: 16px;">🗄 Архіви користувачів</h2>';
+            html += '<button class="btn btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="downloadAllAdminArchives(); closeAdminArchivesModal();">📥 Завантажити всі (ZIP)</button>';
+            html += '<div style="max-height: 400px; overflow-y: auto;">';
             data.files.forEach(file => {
                 html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">`;
                 html += `<div><div style="font-weight: 600;">📄 ${file.filename}</div><div style="font-size: 12px; color: var(--hint-color);">${(file.size / 1024).toFixed(1)} KB | ${file.modified}</div></div>`;
                 html += `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; min-width: auto;" onclick="downloadAdminArchive('${file.filename}')">📥</button></div>`;
             });
             html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeAdminArchivesModal()">Закрити</button>';
             
-            tg.showPopup({title: '🗄 Архіви користувачів', message: html, buttons: [{type: 'close'}]});
+            document.getElementById('adminArchivesModalContent').innerHTML = html;
+            document.getElementById('adminArchivesModal').classList.add('active');
         } else {
             tg.showAlert('📁 Немає архівів');
         }
     } catch (error) {
         tg.showAlert('❌ Помилка: ' + error.message);
     }
+}
+
+function closeAdminArchivesModal() {
+    document.getElementById('adminArchivesModal').classList.remove('active');
 }
 
 function downloadAdminArchive(filename) {
