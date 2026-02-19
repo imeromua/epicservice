@@ -33,7 +33,7 @@ from database.orm import (
 from database.orm.products import SmartColumnMapper
 from keyboards.inline import get_admin_main_kb, get_user_main_kb
 from lexicon.lexicon import LEXICON
-from utils.force_save_helper import force_save_user_list
+from utils.force_save_helper import force_save_user_list_web
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -553,7 +553,8 @@ async def force_save_user_list_endpoint(
     verify_admin(user_id)
     
     try:
-        success = await force_save_user_list(target_user_id, bot)
+        # Використовуємо веб-версію без FSMContext
+        success = await force_save_user_list_web(target_user_id, bot)
         
         if success:
             return JSONResponse(content={
