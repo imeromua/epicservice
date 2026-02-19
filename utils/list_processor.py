@@ -26,6 +26,7 @@ async def _save_list_to_excel(
     Зберігає список товарів у файл Excel з новим форматом назви.
     Формат: {prefix}{department}_{user_id}_{dd-mm-yyyy}_{hh-mm}.xlsx
     Зберігає в archives/active/
+    Колонки: Артикул, Кількість, Ціна, Сума
     """
     if not items:
         return None
@@ -39,17 +40,18 @@ async def _save_list_to_excel(
 
         df = pd.DataFrame(items)
         
+        # Підсумки з порожніми клітинками для вирівнювання
         summary_df = pd.DataFrame([
-            {"Артикул": "", "Кількість": ""},
-            {"Артикул": "К-ть артикулів:", "Кількість": len(df)},
-            {"Артикул": "Зібрано на суму:", "Кількість": f"{total_sum:.2f} грн"}
+            {"Артикул": "", "Кількість": "", "Ціна": "", "Сума": ""},
+            {"Артикул": "К-ть артикулів:", "Кількість": len(df), "Ціна": "", "Сума": ""},
+            {"Артикул": "Зібрано на суму:", "Кількість": "", "Ціна": "", "Сума": f"{total_sum:.2f} грн"}
         ])
         
         df_final = pd.concat([df, summary_df], ignore_index=True)
 
-        df_final.to_excel(file_path, index=False, header=['Артикул', 'Кількість'])
+        df_final.to_excel(file_path, index=False, header=['Артикул', 'Кількість', 'Ціна', 'Сума'])
         
-        logger.info(f"Файл успішно збережено: {file_path}")
+        logger.info(f"Файл успішно збережено: {file_path} з {len(df)} товарами на суму {total_sum:.2f} грн")
         return file_path
     except Exception as e:
         logger.error(f"Помилка збереження Excel файлу для користувача {user_id}: {e}", exc_info=True)
@@ -90,19 +92,37 @@ async def process_and_save_list(
         available = stock_qty - (product.відкладено or 0)
         reservation_updates.append({"product_id": product.id, "quantity": item.quantity})
         
-        price = product.ціна or 0.0
+        price = float(product.ціна or 0.0)
 
         if item.quantity <= available:
-            in_stock_items.append({"Артикул": product.артикул, "Кількість": item.quantity})
-            total_in_stock_sum += item.quantity * price
+            item_sum = item.quantity * price
+            in_stock_items.append({
+                "Артикул": product.артикул,
+                "Кількість": item.quantity,
+                "Ціна": price,
+                "Сума": item_sum
+            })
+            total_in_stock_sum += item_sum
         else:
             if available > 0:
-                in_stock_items.append({"Артикул": product.артикул, "Кількість": available})
-                total_in_stock_sum += available * price
+                available_sum = available * price
+                in_stock_items.append({
+                    "Артикул": product.артикул,
+                    "Кількість": available,
+                    "Ціна": price,
+                    "Сума": available_sum
+                })
+                total_in_stock_sum += available_sum
             
             surplus_quantity = item.quantity - available
-            surplus_items.append({"Артикул": product.артикул, "Кількість": surplus_quantity})
-            total_surplus_sum += surplus_quantity * price
+            surplus_sum = surplus_quantity * price
+            surplus_items.append({
+                "Артикул": product.артикул,
+                "Кількість": surplus_quantity,
+                "Ціна": price,
+                "Сума": surplus_sum
+            })
+            total_surplus_sum += surplus_sum
 
 
     if reservation_updates:
