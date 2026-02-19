@@ -143,24 +143,12 @@
             background: linear-gradient(135deg, var(--success) 0%, #30b350 100%);
         }
         
-        .stat-card.success:hover {
-            box-shadow: 0 8px 20px rgba(52,199,89,0.3);
-        }
-        
         .stat-card.warning {
             background: linear-gradient(135deg, var(--warning) 0%, #e68a00 100%);
         }
         
-        .stat-card.warning:hover {
-            box-shadow: 0 8px 20px rgba(255,149,0,0.3);
-        }
-        
         .stat-card.danger {
             background: linear-gradient(135deg, var(--danger) 0%, #e63027 100%);
-        }
-        
-        .stat-card.danger:hover {
-            box-shadow: 0 8px 20px rgba(255,59,48,0.3);
         }
         
         .stat-icon {
@@ -223,6 +211,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            text-decoration: none;
         }
         
         .btn:hover {
@@ -230,34 +219,11 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         
-        .btn:active {
-            transform: translateY(0);
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-        
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .btn-warning {
-            background: var(--warning);
-            color: white;
-        }
-        
-        .btn-secondary {
-            background: var(--text-secondary);
-            color: white;
-        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-secondary { background: var(--text-secondary); color: white; }
         
         .file-upload-area {
             border: 2px dashed var(--border);
@@ -269,24 +235,14 @@
             transition: all 0.3s;
         }
         
-        .file-upload-area:hover {
+        .file-upload-area:hover, .file-upload-area.dragover {
             border-color: var(--primary);
             background: rgba(0,136,204,0.05);
         }
         
-        .file-upload-area.dragover {
-            border-color: var(--primary);
-            background: rgba(0,136,204,0.1);
-        }
+        .upload-icon { font-size: 48px; margin-bottom: 16px; }
         
-        .upload-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
+        .form-group { margin-bottom: 20px; }
         
         .form-label {
             display: block;
@@ -295,7 +251,7 @@
             color: var(--text);
         }
         
-        .form-input, .form-select, .form-textarea {
+        .form-input, .form-textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid var(--border);
@@ -304,55 +260,18 @@
             transition: border-color 0.3s;
         }
         
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
+        .form-input:focus, .form-textarea:focus {
             outline: none;
             border-color: var(--primary);
         }
         
-        .form-textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
+        .form-textarea { resize: vertical; min-height: 100px; }
         
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; }
+        .checkbox-group input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
         
-        .checkbox-group input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-        
-        .loader {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-secondary);
-        }
-        
-        .loader-spinner {
-            font-size: 48px;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-secondary);
-        }
-        
-        .empty-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+        .empty-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
         
         .alert {
             padding: 16px;
@@ -363,859 +282,329 @@
             gap: 12px;
         }
         
-        .alert-success {
-            background: rgba(52,199,89,0.1);
-            color: var(--success);
-            border: 1px solid var(--success);
-        }
-        
-        .alert-error {
-            background: rgba(255,59,48,0.1);
-            color: var(--danger);
-            border: 1px solid var(--danger);
-        }
-        
-        .alert-info {
-            background: rgba(0,136,204,0.1);
-            color: var(--primary);
-            border: 1px solid var(--primary);
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: var(--border);
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 20px 0;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: var(--primary);
-            transition: width 0.3s;
-        }
-        
+        .alert-success { background: rgba(52,199,89,0.1); color: #28a745; border: 1px solid rgba(52,199,89,0.2); }
+        .alert-error { background: rgba(255,59,48,0.1); color: #dc3545; border: 1px solid rgba(255,59,48,0.2); }
+
         .action-buttons {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
-        }
-        
-        .dept-list {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .dept-item {
-            padding: 12px;
-            background: var(--bg);
-            border-radius: 8px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .dept-name {
-            font-weight: 600;
-        }
-        
-        .dept-count {
-            color: var(--primary);
-            font-weight: 600;
-        }
-        
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            animation: fadeIn 0.3s;
-        }
-        
-        .modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal-content {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 800px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            animation: slideUp 0.3s;
-        }
-        
-        @keyframes slideUp {
-            from { transform: translateY(30px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid var(--border);
-        }
-        
-        .modal-title {
-            font-size: 24px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 28px;
-            cursor: pointer;
-            color: var(--text-secondary);
-            padding: 0;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: background 0.2s;
-        }
-        
-        .modal-close:hover {
-            background: var(--bg);
-        }
-        
-        .modal-body {
-            margin-top: 16px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛠️ Панель Адміністратора</h1>
-            <div class="header-subtitle">EpicService Management Dashboard</div>
+            <h1>🛠 EpicService Admin Panel</h1>
+            <div class="header-subtitle">Система управління складом та користувачами</div>
         </div>
-        
+
         <div class="tabs">
             <button class="tab active" onclick="switchTab('dashboard')">📊 Дашборд</button>
+            <button class="tab" onclick="switchTab('import')">📥 Завантаження</button>
             <button class="tab" onclick="switchTab('users')">👥 Користувачі</button>
-            <button class="tab" onclick="switchTab('import')">📥 Імпорт</button>
-            <button class="tab" onclick="switchTab('export')">📤 Експорт</button>
             <button class="tab" onclick="switchTab('broadcast')">📢 Розсилка</button>
         </div>
-        
-        <!-- Dashboard Tab -->
-        <div id="dashboardTab" class="tab-content active">
-            <div id="statsContainer" class="stats-grid">
-                <div class="loader">
-                    <div class="loader-spinner">⟳</div>
-                    <div>Завантаження статистики...</div>
+
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card" onclick="showActiveUsers()">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-value" id="activeUsersCount">-</div>
+                    <div class="stat-label">Активних користувачів</div>
+                </div>
+                <div class="stat-card success" onclick="showProductsInfo()">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-value" id="productsCount">-</div>
+                    <div class="stat-label">Товарів у базі</div>
+                </div>
+                <div class="stat-card warning" onclick="showReservedInfo()">
+                    <div class="stat-icon">🛒</div>
+                    <div class="stat-value" id="reservedSum">-</div>
+                    <div class="stat-label">Сума резервів (грн)</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Звіти та Експорт</div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="showSummaryReport(); return false;">
+                        📊 Зведений звіт
+                    </button>
+                    <a href="#" id="exportStockBtn" class="btn btn-success">📥 Експорт залишків</a>
+                    <a href="#" id="exportArchiveBtn" class="btn btn-secondary">🗄 Архів списків</a>
                 </div>
             </div>
         </div>
-        
-        <!-- Users Tab -->
-        <div id="usersTab" class="tab-content">
+
+        <div id="import" class="tab-content">
             <div class="card">
-                <div class="card-title">👥 Всі користувачі</div>
-                <div id="allUsersList" class="user-list">
-                    <div class="loader">Завантаження...</div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-title">🔥 Активні списки</div>
-                <div id="activeUsersList" class="user-list">
-                    <div class="loader">Завантаження...</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Import Tab -->
-        <div id="importTab" class="tab-content">
-            <div class="card">
-                <div class="card-title">📥 Імпорт товарів з Excel</div>
-                
-                <div id="importAlert"></div>
-                
+                <div class="card-title">Оновлення залишків</div>
+                <div id="uploadAlert"></div>
                 <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <div class="upload-icon">📁</div>
-                    <div style="font-size: 18px; margin-bottom: 8px;">Перетягніть файл сюди або клікніть для вибору</div>
-                    <div style="color: var(--text-secondary); font-size: 14px;">Підтримуються файли: .xlsx, .xls</div>
-                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
-                </div>
-                
-                <div id="fileInfo" style="display: none; margin-bottom: 20px;">
-                    <div style="font-weight: 600; margin-bottom: 8px;">Вибраний файл:</div>
+                    <div class="upload-icon">📄</div>
+                    <h3 style="margin-bottom: 8px;">Завантажити Excel файл</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 16px;">Натисніть або перетягніть файл сюди</p>
                     <div id="fileName" style="color: var(--primary);"></div>
                 </div>
+                <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;">
                 
                 <div class="form-group">
                     <div class="checkbox-group">
                         <input type="checkbox" id="notifyUsers">
-                        <label for="notifyUsers" class="form-label" style="margin: 0;">📢 Розіслати повідомлення користувачам про оновлення</label>
+                        <label for="notifyUsers" class="form-label" style="margin: 0;">📢 Сповістити користувачів про оновлення</label>
                     </div>
                 </div>
                 
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>
-                        📤 Імпортувати
-                    </button>
-                    <button class="btn btn-secondary" onclick="cancelUpload(true)">
-                        ❌ Скасувати
-                    </button>
-                </div>
-                
-                <div id="uploadProgress" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
-                    </div>
-                    <div id="progressText" style="text-align: center; color: var(--text-secondary);">Завантаження...</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Export Tab -->
-        <div id="exportTab" class="tab-content">
-            <div class="card">
-                <div class="card-title">📤 Експорт звітів</div>
-                
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="exportStock()">
-                        📊 Експорт залишків
-                    </button>
-                    <button class="btn btn-primary" onclick="showSummaryReport()">
-                        📊 Зведений звіт
-                    </button>
-                </div>
-            </div>
-            
-            <div id="summaryCard" class="card" style="display: none;">
-                <div class="card-title">📋 Зведений звіт</div>
-                <div id="summaryContent"></div>
-            </div>
-            
-            <div class="card">
-                <div class="card-title">➖ Віднімання зібраного</div>
-                <p style="color: var(--text-secondary); margin-bottom: 16px;">
-                    Віднімає зібрані товари з залишків в базі даних
-                </p>
-                <button class="btn btn-warning" onclick="subtractCollected()">
-                    ⚠️ Віднімати зібране
+                <button class="btn btn-primary" onclick="uploadFile()" style="width: 100%; justify-content: center; font-size: 16px; padding: 14px;">
+                    🚀 Оновити базу
                 </button>
             </div>
         </div>
-        
-        <!-- Broadcast Tab -->
-        <div id="broadcastTab" class="tab-content">
+
+        <div id="users" class="tab-content">
             <div class="card">
-                <div class="card-title">📢 Розсилка повідомлень</div>
-                
+                <div class="card-title">Список користувачів</div>
+                <div id="usersListContainer">
+                    <div class="loader"><div class="loader-spinner">⏳</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="broadcast" class="tab-content">
+            <div class="card">
+                <div class="card-title">Масова розсилка</div>
                 <div id="broadcastAlert"></div>
-                
                 <div class="form-group">
-                    <label class="form-label">💬 Текст повідомлення:</label>
-                    <textarea class="form-textarea" id="broadcastMessage" placeholder="Введіть текст повідомлення для всіх користувачів..."></textarea>
+                    <label class="form-label">Текст повідомлення</label>
+                    <textarea id="broadcastMessage" class="form-textarea" placeholder="Введіть текст повідомлення для всіх користувачів..."></textarea>
                 </div>
-                
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="sendBroadcast()">
-                        📤 Розіслати
-                    </button>
-                </div>
+                <button class="btn btn-warning" onclick="sendBroadcast()">
+                    📢 Відправити всім
+                </button>
             </div>
         </div>
     </div>
-    
-    <!-- Modal window -->
-    <div id="modal" class="modal" onclick="closeModal(event)">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div class="modal-title" id="modalTitle">📊 Деталі</div>
-                <button class="modal-close" onclick="closeModal()">×</button>
+
+    <div id="reportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: var(--card-bg); width: 90%; max-width: 500px; border-radius: 12px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                <h3 id="modalTitle" style="margin: 0; color: var(--text);">Звіт</h3>
+                <button onclick="document.getElementById('reportModal').style.display='none'" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary);">✖</button>
             </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Content will be inserted here -->
-            </div>
+            <div id="modalBody" style="max-height: 60vh; overflow-y: auto;">
+                </div>
         </div>
     </div>
-    
+
     <script>
-        const ADMIN_ID = 123456;
+        // Ініціалізація URL та параметрів
+        const urlParams = new URLSearchParams(window.location.search);
+        const ADMIN_ID = urlParams.get('user_id') || 0;
         
-        function switchTab(tab) {
+        // Оновлення посилань на експорт (щоб передавався user_id)
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('exportStockBtn').href = `/api/admin/export/stock?user_id=${ADMIN_ID}`;
+            document.getElementById('exportArchiveBtn').href = `/api/admin/export/archives?user_id=${ADMIN_ID}`;
+            loadStatistics();
+        });
+
+        function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             
-            const tabMap = {
-                'dashboard': ['dashboardTab', 0],
-                'users': ['usersTab', 1],
-                'import': ['importTab', 2],
-                'export': ['exportTab', 3],
-                'broadcast': ['broadcastTab', 4]
-            };
+            event.currentTarget.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
             
-            const [contentId, tabIndex] = tabMap[tab];
-            document.getElementById(contentId).classList.add('active');
-            document.querySelectorAll('.tab')[tabIndex].classList.add('active');
-            
-            if (tab === 'dashboard') loadStatistics();
-            if (tab === 'users') { loadAllUsers(); loadActiveUsers(); }
+            if (tabId === 'users') {
+                loadUsers();
+            }
         }
-        
-        // Modal functions
-        function openModal(title, content) {
-            document.getElementById('modalTitle').innerHTML = title;
+
+        // --- ЛОГІКА МОДАЛЬНОГО ВІКНА ---
+        function showModal(title, content) {
+            document.getElementById('modalTitle').innerText = title;
             document.getElementById('modalBody').innerHTML = content;
-            document.getElementById('modal').classList.add('active');
+            document.getElementById('reportModal').style.display = 'flex';
         }
-        
-        function closeModal(event) {
-            if (!event || event.target.id === 'modal') {
-                document.getElementById('modal').classList.remove('active');
-            }
-        }
-        
-        // Stat card click handlers
-        async function showAllUsers() {
-            openModal('👥 Всі користувачі', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
+
+        // --- НОВА ФУНКЦІЯ ЗВЕДЕНОГО ЗВІТУ ---
+        async function showSummaryReport() {
+            showModal('Зведений звіт по складу', '<div style="text-align:center; padding: 30px; color: var(--text-secondary);">⏳ Збираємо дані...</div>');
+            
             try {
-                const response = await fetch(`/api/admin/users?user_id=${ADMIN_ID}`);
-                const data = await response.json();
+                const response = await fetch(`/api/admin/report/summary?user_id=${ADMIN_ID}`);
+                const result = await response.json();
                 
-                if (!data.users || data.users.length === 0) {
-                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає користувачів</div>';
-                    return;
-                }
-                
-                const usersList = data.users.map(userId => `
-                    <div class="user-item">
-                        <div class="user-info">
-                            <div class="user-name">👤 User ${userId}</div>
-                            <div class="user-details">ID: ${userId}</div>
-                        </div>
-                    </div>
-                `).join('');
-                
-                document.getElementById('modalBody').innerHTML = `<div class="user-list">${usersList}</div>`;
-            } catch (error) {
-                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
-            }
-        }
-        
-        async function showActiveUsers() {
-            openModal('🔥 Активні списки', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
-            try {
-                const response = await fetch(`/api/admin/users/active?user_id=${ADMIN_ID}`);
-                const data = await response.json();
-                
-                if (!data.users || data.users.length === 0) {
-                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Немає активних списків</div>';
-                    return;
-                }
-                
-                const usersList = data.users.map(user => `
-                    <div class="user-item">
-                        <div class="user-info">
-                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
-                            <div class="user-details">
-                                🏢 Відділ: ${user.department || 'N/A'} • 
-                                📦 Товарів: ${user.items_count} • 
-                                💰 Сума: ${user.total_sum.toLocaleString('uk-UA')} ₴
-                            </div>
-                        </div>
-                        <button class="btn btn-success" onclick="forceSave(${user.user_id})">
-                            💾 Зберегти
-                        </button>
-                    </div>
-                `).join('');
-                
-                document.getElementById('modalBody').innerHTML = `<div class="user-list">${usersList}</div>`;
-            } catch (error) {
-                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
-            }
-        }
-        
-        async function showProductsStats() {
-            openModal('📦 Статистика товарів', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
-            try {
-                const response = await fetch(`/api/admin/summary?user_id=${ADMIN_ID}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    const deptList = data.departments.map(dept => `
-                        <li class="dept-item">
-                            <span class="dept-name">Відділ ${dept.department_id}</span>
-                            <span class="dept-count">${dept.count} арт.</span>
-                        </li>
-                    `).join('');
+                if (result.success || result.data) {
+                    const data = result.data || result; // Підтримка різних форматів відповіді
                     
-                    document.getElementById('modalBody').innerHTML = `
-                        <div style="margin-bottom: 20px;">
-                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">
-                                📦 Кількість артикулів: <span style="color: var(--primary);">${data.total_count} шт.</span>
-                            </div>
-                            <div style="font-size: 18px; font-weight: 600;">
-                                💰 Загальна сума збору: <span style="color: var(--success);">${data.total_sum.toLocaleString('uk-UA')} грн</span>
-                            </div>
+                    const formatMoney = (sum) => new Intl.NumberFormat('uk-UA', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                    }).format(sum).replace(/,/g, '.'); 
+                    
+                    let html = `
+                        <div style="font-size: 16px; margin-bottom: 20px; background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                            <p style="margin-bottom: 8px;"><strong>Кількість артикулів:</strong> <span style="color: var(--primary); font-weight: bold;">${data.total_articles || 0}</span> шт.</p>
+                            <p><strong>Загальна сума збору:</strong> <span style="color: var(--success); font-weight: bold;">${formatMoney(data.total_sum || 0)}</span> грн</p>
                         </div>
-                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">📦 По відділах:</div>
-                        <ul class="dept-list">${deptList}</ul>
+                        <div style="font-size: 15px;">
+                            <p style="margin-bottom: 12px;">📦 <strong>Актуальна кількість артикулів по відділах:</strong></p>
+                            <div style="display: grid; gap: 8px; padding-left: 10px;">
                     `;
+                    
+                    if (data.departments) {
+                        for (const [dep, count] of Object.entries(data.departments)) {
+                            html += `
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: var(--primary); font-size: 12px;">●</span> 
+                                    <span>Відділ ${dep}: <strong>${count}</strong> арт.</span>
+                                </div>`;
+                        }
+                    } else {
+                        html += `<div>Немає даних по відділах</div>`;
+                    }
+                    
+                    html += `</div></div>`;
+                    document.getElementById('modalBody').innerHTML = html;
                 } else {
-                    document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${data.message || 'Помилка завантаження'}</div>`;
+                    document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${result.error || 'Помилка завантаження'}</div>`;
                 }
             } catch (error) {
-                document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${error.message}</div>`;
+                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка з\'єднання із сервером</div>';
             }
         }
-        
-        async function showReservedBreakdown() {
-            openModal('💰 Розбивка резервів', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
-            try {
-                const response = await fetch(`/api/admin/users/active?user_id=${ADMIN_ID}`);
-                const data = await response.json();
-                
-                if (!data.users || data.users.length === 0) {
-                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div>Немає резервів</div>';
-                    return;
-                }
-                
-                const totalReserved = data.users.reduce((sum, user) => sum + user.total_sum, 0);
-                
-                const usersList = data.users
-                    .sort((a, b) => b.total_sum - a.total_sum)
-                    .map(user => `
-                    <div class="user-item">
-                        <div class="user-info">
-                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
-                            <div class="user-details">
-                                📦 Товарів: ${user.items_count} • 
-                                🏢 Відділ: ${user.department || 'N/A'}
-                            </div>
-                        </div>
-                        <div style="font-size: 18px; font-weight: 600; color: var(--danger);">
-                            ${user.total_sum.toLocaleString('uk-UA')} ₴
-                        </div>
-                    </div>
-                `).join('');
-                
-                document.getElementById('modalBody').innerHTML = `
-                    <div style="margin-bottom: 20px; padding: 16px; background: var(--bg); border-radius: 8px;">
-                        <div style="font-size: 18px; font-weight: 600;">
-                            💰 Загальна сума резервів: <span style="color: var(--danger);">${totalReserved.toLocaleString('uk-UA')} ₴</span>
-                        </div>
-                    </div>
-                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">По користувачах:</div>
-                    <div class="user-list">${usersList}</div>
-                `;
-            } catch (error) {
-                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
-            }
-        }
-        
+
+        // --- ЛОГІКА ДАШБОРДУ ТА СТАТИСТИКИ ---
         async function loadStatistics() {
             try {
                 const response = await fetch(`/api/admin/statistics?user_id=${ADMIN_ID}`);
                 const data = await response.json();
                 
-                const container = document.getElementById('statsContainer');
-                container.innerHTML = `
-                    <div class="stat-card" onclick="showAllUsers()">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-value">${data.total_users || 0}</div>
-                        <div class="stat-label">Всього користувачів</div>
-                    </div>
-                    <div class="stat-card success" onclick="showActiveUsers()">
-                        <div class="stat-icon">🔥</div>
-                        <div class="stat-value">${data.active_users || 0}</div>
-                        <div class="stat-label">Активні списки</div>
-                    </div>
-                    <div class="stat-card warning" onclick="showProductsStats()">
-                        <div class="stat-icon">📦</div>
-                        <div class="stat-value">${data.total_products || 0}</div>
-                        <div class="stat-label">Товарів в базі</div>
-                    </div>
-                    <div class="stat-card danger" onclick="showReservedBreakdown()">
-                        <div class="stat-icon">💰</div>
-                        <div class="stat-value">${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
-                        <div class="stat-label">Зарезервовано</div>
+                document.getElementById('activeUsersCount').innerText = data.active_users || 0;
+                document.getElementById('productsCount').innerText = data.total_products || 0;
+                document.getElementById('reservedSum').innerText = (data.total_reserved_sum || 0).toFixed(2);
+            } catch (error) {
+                console.error("Помилка завантаження статистики:", error);
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(`/api/admin/statistics?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                // Тут можна було б завантажити реальний список через окремий ендпоїнт
+                document.getElementById('usersListContainer').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">👥</div>
+                        Всього користувачів: ${data.total_users || 0}
                     </div>
                 `;
             } catch (error) {
-                console.error('Error loading statistics:', error);
-                document.getElementById('statsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження статистики</div>';
+                document.getElementById('usersListContainer').innerHTML = `
+                    <div class="alert alert-error">Помилка завантаження користувачів</div>
+                `;
             }
         }
-        
-        async function loadAllUsers() {
-            try {
-                const response = await fetch(`/api/admin/users?user_id=${ADMIN_ID}`);
-                const data = await response.json();
-                
-                const container = document.getElementById('allUsersList');
-                
-                if (!data.users || data.users.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає користувачів</div>';
-                    return;
-                }
-                
-                container.innerHTML = data.users.map(userId => `
-                    <div class="user-item">
-                        <div class="user-info">
-                            <div class="user-name">👤 User ${userId}</div>
-                            <div class="user-details">ID: ${userId}</div>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading users:', error);
-                document.getElementById('allUsersList').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
-            }
-        }
-        
-        async function loadActiveUsers() {
-            try {
-                const response = await fetch(`/api/admin/users/active?user_id=${ADMIN_ID}`);
-                const data = await response.json();
-                
-                const container = document.getElementById('activeUsersList');
-                
-                if (!data.users || data.users.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Немає активних списків</div>';
-                    return;
-                }
-                
-                container.innerHTML = data.users.map(user => `
-                    <div class="user-item">
-                        <div class="user-info">
-                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
-                            <div class="user-details">
-                                🏢 Відділ: ${user.department || 'N/A'} • 
-                                📦 Товарів: ${user.items_count} • 
-                                💰 Сума: ${user.total_sum.toLocaleString('uk-UA')} ₴
-                            </div>
-                        </div>
-                        <button class="btn btn-success" onclick="forceSave(${user.user_id})">
-                            💾 Примусово зберегти
-                        </button>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading active users:', error);
-                document.getElementById('activeUsersList').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
-            }
-        }
-        
-        async function forceSave(targetUserId) {
-            if (!confirm(`Примусово зберегти список користувача ${targetUserId}?`)) return;
-            
-            try {
-                const response = await fetch(`/api/admin/force-save/${targetUserId}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: ADMIN_ID })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    loadActiveUsers();
-                    closeModal();
-                } else {
-                    alert('❌ ' + (data.message || 'Помилка збереження'));
-                }
-            } catch (error) {
-                alert('❌ Помилка: ' + error.message);
-            }
-        }
-        
-        let selectedFile = null;
-        
+
+        // --- ЛОГІКА ЗАВАНТАЖЕННЯ ФАЙЛІВ ---
         const dropZone = document.getElementById('dropZone');
-        
+        const fileInput = document.getElementById('fileInput');
+
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('dragover');
         });
-        
+
         dropZone.addEventListener('dragleave', () => {
             dropZone.classList.remove('dragover');
         });
-        
+
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                selectedFile = files[0];
-                updateFileInfo();
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                document.getElementById('fileName').innerText = e.dataTransfer.files[0].name;
             }
         });
-        
-        function handleFileSelect(event) {
-            selectedFile = event.target.files[0];
-            updateFileInfo();
-        }
-        
-        function updateFileInfo() {
-            if (selectedFile) {
-                document.getElementById('fileName').textContent = `📄 ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`;
-                document.getElementById('fileInfo').style.display = 'block';
-                document.getElementById('uploadBtn').disabled = false;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                document.getElementById('fileName').innerText = e.target.files[0].name;
             }
-        }
-        
-        function cancelUpload(clearAlert = false) {
-            selectedFile = null;
-            document.getElementById('fileInput').value = '';
-            document.getElementById('fileInfo').style.display = 'none';
-            document.getElementById('uploadBtn').disabled = true;
-            if (clearAlert) {
-                document.getElementById('importAlert').innerHTML = '';
-            }
-        }
-        
+        });
+
         async function uploadFile() {
-            if (!selectedFile) {
-                alert('❌ Оберіть файл для завантаження');
+            const file = fileInput.files[0];
+            if (!file) {
+                document.getElementById('uploadAlert').innerHTML = `
+                    <div class="alert alert-error">Будь ласка, виберіть файл</div>`;
                 return;
             }
-            
-            const notifyChecked = document.getElementById('notifyUsers').checked;
+
             const formData = new FormData();
-            formData.append('file', selectedFile);
-            
-            document.getElementById('uploadProgress').style.display = 'block';
-            document.getElementById('uploadBtn').disabled = true;
-            
+            formData.append('file', file);
+            formData.append('notify_users', document.getElementById('notifyUsers').checked);
+
+            document.getElementById('uploadAlert').innerHTML = `
+                <div class="alert alert-success">⏳ Завантаження та обробка...</div>`;
+
             try {
-                const response = await fetch(`/api/admin/import?user_id=${ADMIN_ID}&notify_users=${notifyChecked}`, {
+                const response = await fetch(`/api/admin/import/smart?user_id=${ADMIN_ID}`, {
                     method: 'POST',
                     body: formData
                 });
-                
                 const data = await response.json();
-                
-                if (data.success) {
-                    document.getElementById('importAlert').innerHTML = `
-                        <div class="alert alert-success">
-                            <span style="font-size: 24px;">✅</span>
-                            <div>
-                                <div style="font-weight: 600;">Імпорт успішний</div>
-                                <div style="font-size: 13px; margin-top: 4px;">
-                                    Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}, Деактивовано: ${data.deactivated || 0}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    cancelUpload();
-                    loadStatistics();
+
+                if (response.ok) {
+                    document.getElementById('uploadAlert').innerHTML = `
+                        <div class="alert alert-success">✅ ${data.message || 'Файл успішно завантажено'}</div>`;
+                    loadStatistics(); // Оновлюємо статистику
                 } else {
-                    document.getElementById('importAlert').innerHTML = `
-                        <div class="alert alert-error">
-                            <span style="font-size: 24px;">❌</span>
-                            <div>${data.error || 'Помилка імпорту'}</div>
-                        </div>
-                    `;
+                    document.getElementById('uploadAlert').innerHTML = `
+                        <div class="alert alert-error">❌ ${data.detail || data.error || 'Помилка завантаження'}</div>`;
                 }
             } catch (error) {
-                document.getElementById('importAlert').innerHTML = `
-                    <div class="alert alert-error">
-                        <span style="font-size: 24px;">❌</span>
-                        <div>Помилка: ${error.message}</div>
-                    </div>
-                `;
-            } finally {
-                document.getElementById('uploadProgress').style.display = 'none';
-                document.getElementById('uploadBtn').disabled = false;
+                document.getElementById('uploadAlert').innerHTML = `
+                    <div class="alert alert-error">❌ Помилка з'єднання із сервером</div>`;
             }
         }
-        
-        async function exportStock() {
-            try {
-                window.open(`/api/admin/export/stock?user_id=${ADMIN_ID}`, '_blank');
-            } catch (error) {
-                alert('❌ Помилка експорту: ' + error.message);
-            }
-        }
-        
-        async function showSummary() {
-            const summaryCard = document.getElementById('summaryCard');
-            const summaryContent = document.getElementById('summaryContent');
-            
-            summaryContent.innerHTML = '<div class="loader"><div class="loader-spinner">⟳</div><div>Завантаження...</div></div>';
-            summaryCard.style.display = 'block';
-            
-            try {
-                const response = await fetch(`/api/admin/summary?user_id=${ADMIN_ID}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    const deptList = data.departments.map(dept => `
-                        <li class="dept-item">
-                            <span class="dept-name">Відділ ${dept.department_id}</span>
-                            <span class="dept-count">${dept.count} арт.</span>
-                        </li>
-                    `).join('');
-                    
-                    summaryContent.innerHTML = `
-                        <div style="margin-bottom: 20px;">
-                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">
-                                📦 Кількість артикулів: <span style="color: var(--primary);">${data.total_count} шт.</span>
-                            </div>
-                            <div style="font-size: 18px; font-weight: 600;">
-                                💰 Загальна сума збору: <span style="color: var(--success);">${data.total_sum.toLocaleString('uk-UA')} грн</span>
-                            </div>
-                        </div>
-                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">📦 Актуальна кількість артикулів по відділах:</div>
-                        <ul class="dept-list">${deptList}</ul>
-                    `;
-                } else {
-                    summaryContent.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${data.message || 'Помилка завантаження'}</div>`;
-                }
-            } catch (error) {
-                summaryContent.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${error.message}</div>`;
-            }
-        }
-        
-        async function subtractCollected() {
-            if (!confirm('⚠️ УВАГА! Ця операція віднімає зібрані товари з залишків.\n\nПродовжити?')) return;
-            
-            try {
-                const response = await fetch(`/api/admin/subtract?user_id=${ADMIN_ID}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    loadStatistics();
-                } else {
-                    alert('❌ ' + (data.message || 'Помилка операції'));
-                }
-            } catch (error) {
-                alert('❌ Помилка: ' + error.message);
-            }
-        }
-        
-        async function showSummaryReport() {
-    // Відкриваємо модалку та показуємо лоадер, поки чекаємо відповідь від сервера
-    showModal('Зведений звіт по складу', '<div style="text-align:center; padding: 30px; color: var(--text-secondary);">⏳ Збираємо дані...</div>');
-    
-    try {
-        const response = await fetch(`/api/admin/report/summary?user_id=${ADMIN_ID}`);
-        const result = await response.json();
-        
-        if (result.success) {
-            const data = result.data;
-            
-            // Форматуємо суму у вигляді "741 736.24"
-            const formatMoney = (sum) => new Intl.NumberFormat('uk-UA', { 
-                minimumFractionDigits: 2, 
-                maximumFractionDigits: 2 
-            }).format(sum).replace(/,/g, '.'); // Примусово ставимо крапку замість коми, як у зразку
-            
-            let html = `
-                <div style="font-size: 16px; margin-bottom: 20px; background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                    <p style="margin-bottom: 8px;"><strong>Кількість артикулів:</strong> <span style="color: var(--primary); font-weight: bold;">${data.total_articles}</span> шт.</p>
-                    <p><strong>Загальна сума збору:</strong> <span style="color: var(--success); font-weight: bold;">${formatMoney(data.total_sum)}</span> грн</p>
-                </div>
-                <div style="font-size: 15px;">
-                    <p style="margin-bottom: 12px;">📦 <strong>Актуальна кількість артикулів по відділах:</strong></p>
-                    <div style="display: grid; gap: 8px; padding-left: 10px;">
-            `;
-            
-            for (const [dep, count] of Object.entries(data.departments)) {
-                html += `
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="color: var(--primary); font-size: 12px;">●</span> 
-                        <span>Відділ ${dep}: <strong>${count}</strong> арт.</span>
-                    </div>`;
-            }
-            
-            html += `</div></div>`;
-            document.getElementById('modalBody').innerHTML = html;
-        } else {
-            document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${result.error || 'Помилка завантаження'}</div>`;
-        }
-    } catch (error) {
-        document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка з\'єднання із сервером</div>';
-    }
-        }
+
+        // --- ЛОГІКА РОЗСИЛКИ ---
         async function sendBroadcast() {
-            const message = document.getElementById('broadcastMessage').value.trim();
-            
+            const message = document.getElementById('broadcastMessage').value;
             if (!message) {
-                alert('❌ Введіть текст повідомлення');
+                document.getElementById('broadcastAlert').innerHTML = `
+                    <div class="alert alert-error">Введіть текст повідомлення</div>`;
                 return;
             }
-            
-            if (!confirm(`Розіслати повідомлення всім користувачам?\n\nТекст: "${message}"`)) return;
-            
+
             try {
-                const response = await fetch('/api/admin/broadcast', {
+                const response = await fetch(`/api/admin/broadcast?user_id=${ADMIN_ID}`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        user_id: ADMIN_ID,
-                        message: message
-                    })
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
                 });
-                
                 const data = await response.json();
-                
-                if (data.success) {
+
+                if (response.ok) {
                     document.getElementById('broadcastAlert').innerHTML = `
-                        <div class="alert alert-success">
-                            <span style="font-size: 24px;">✅</span>
-                            <div>
-                                <div style="font-weight: 600;">${data.message}</div>
-                                <div style="font-size: 13px; margin-top: 4px;">
-                                    Розіслано: ${data.sent || 0} користувачам
-                                </div>
-                            </div>
-                        </div>
-                    `;
+                        <div class="alert alert-success">✅ Розсилку успішно виконано!</div>`;
                     document.getElementById('broadcastMessage').value = '';
                 } else {
                     document.getElementById('broadcastAlert').innerHTML = `
-                        <div class="alert alert-error">
-                            <span style="font-size: 24px;">❌</span>
-                            <div>${data.message || 'Помилка розсилки'}</div>
-                        </div>
-                    `;
+                        <div class="alert alert-error">❌ Помилка розсилки</div>`;
                 }
             } catch (error) {
                 document.getElementById('broadcastAlert').innerHTML = `
-                    <div class="alert alert-error">
-                        <span style="font-size: 24px;">❌</span>
-                        <div>Помилка: ${error.message}</div>
-                    </div>
-                `;
+                    <div class="alert alert-error">❌ Помилка: ${error.message}</div>`;
             }
         }
-        
-        loadStatistics();
     </script>
 </body>
 </html>
