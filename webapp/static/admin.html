@@ -216,15 +216,30 @@
             opacity: 0.6;
         }
 
-        .dept-item {
+        .archive-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
+            align-items: center;
+            padding: 12px;
             border-bottom: 1px solid rgba(0,0,0,0.05);
         }
 
-        .dept-item:last-child {
+        .archive-item:last-child {
             border-bottom: none;
+        }
+
+        .archive-info {
+            flex: 1;
+        }
+
+        .archive-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .archive-meta {
+            font-size: 12px;
+            opacity: 0.6;
         }
     </style>
 </head>
@@ -253,8 +268,8 @@
     </div>
 
     <div class="section">
-        <div class="section-title">📊 Звіти</div>
-        <button class="btn btn-primary" onclick="showSummaryReport()">📄 Зведений звіт</button>
+        <div class="section-title">📊 Звіти та Архіви</div>
+        <button class="btn btn-primary" onclick="showArchives()">🗄 Архіви користувачів</button>
         <button class="btn btn-secondary" onclick="downloadStockReport()">📥 Звіт про залишки (Excel)</button>
     </div>
 
@@ -276,11 +291,12 @@
         <div class="user-list" id="activeUsersList"></div>
     </div>
 
-    <div class="modal hidden" id="summaryModal">
+    <div class="modal hidden" id="archivesModal">
         <div class="modal-content">
-            <span class="modal-close" onclick="closeSummaryModal()">&times;</span>
-            <div class="modal-title">📄 Зведений звіт</div>
-            <div id="summaryContent"></div>
+            <span class="modal-close" onclick="closeArchivesModal()">&times;</span>
+            <div class="modal-title">🗄 Архіви користувачів</div>
+            <button class="btn btn-primary" onclick="downloadAllArchives()" style="margin-bottom: 16px;">📥 Скачати всі (ZIP)</button>
+            <div id="archivesContent"></div>
         </div>
     </div>
 
@@ -363,43 +379,45 @@
             }
         }
 
-        // Показати зведений звіт
-        async function showSummaryReport() {
+        // Показати архіви
+        async function showArchives() {
             try {
-                const response = await fetch(`/api/admin/summary?user_id=${userId}`);
+                const response = await fetch(`/api/admin/archives?user_id=${userId}`);
                 const data = await response.json();
                 
-                if (data.success) {
-                    let html = `
-                        <div style="margin-bottom: 20px;">
-                            <strong>Кількість артикулів:</strong> ${data.total_count} шт.<br>
-                            <strong>Загальна сума збору:</strong> ${data.total_sum.toLocaleString('uk-UA', {minimumFractionDigits: 2})} грн
-                        </div>
-                        <div style="margin-bottom: 12px;"><strong>📦 Актуальна кількість артикулів по відділах:</strong></div>
-                    `;
-                    
-                    data.departments.forEach(dept => {
-                        html += `
-                            <div class="dept-item">
-                                <span>Відділ ${dept.department_id}:</span>
-                                <span><strong>${dept.count}</strong> арт. | ${dept.total_sum.toLocaleString('uk-UA', {minimumFractionDigits: 2})} грн</span>
+                if (data.success && data.files.length > 0) {
+                    const html = data.files.map(file => `
+                        <div class="archive-item">
+                            <div class="archive-info">
+                                <div class="archive-name">${file.filename}</div>
+                                <div class="archive-meta">${(file.size / 1024).toFixed(1)} KB | ${file.modified}</div>
                             </div>
-                        `;
-                    });
+                            <button class="btn-small" onclick="downloadArchive('${file.filename}')">📥</button>
+                        </div>
+                    `).join('');
                     
-                    document.getElementById('summaryContent').innerHTML = html;
-                    document.getElementById('summaryModal').classList.remove('hidden');
+                    document.getElementById('archivesContent').innerHTML = html;
                 } else {
-                    tg.showAlert('❌ Немає даних для звіту');
+                    document.getElementById('archivesContent').innerHTML = '<div class="loading">Немає архівів</div>';
                 }
+                
+                document.getElementById('archivesModal').classList.remove('hidden');
             } catch (error) {
-                console.error('Error loading summary:', error);
-                tg.showAlert('❌ Помилка завантаження');
+                console.error('Error loading archives:', error);
+                tg.showAlert('❌ Помилка завантаження архівів');
             }
         }
 
-        function closeSummaryModal() {
-            document.getElementById('summaryModal').classList.add('hidden');
+        function closeArchivesModal() {
+            document.getElementById('archivesModal').classList.add('hidden');
+        }
+
+        function downloadArchive(filename) {
+            window.location.href = `/api/admin/archives/download/${filename}?user_id=${userId}`;
+        }
+
+        function downloadAllArchives() {
+            window.location.href = `/api/admin/archives/download-all?user_id=${userId}`;
         }
 
         // Скачати Excel звіт
@@ -474,7 +492,7 @@
         });
 
         document.getElementById('totalProducts').addEventListener('click', () => {
-            showSummaryReport();
+            tg.showAlert('📦 Загальна кількість товарів у базі');
         });
 
         document.getElementById('reservedSum').addEventListener('click', () => {

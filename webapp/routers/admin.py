@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import zipfile
 from datetime import datetime
 from typing import List, Optional
 
@@ -144,30 +145,6 @@ def _create_stock_report_sync() -> Optional[str]:
         return None
 
 
-def _parse_and_validate_subtract_file(df: pd.DataFrame) -> Optional[pd.DataFrame]:
-    """Парсить та валідує файл для віднімання залишків."""
-    try:
-        df_columns_lower = {str(c).lower() for c in df.columns}
-        if {"назва", "кількість"}.issubset(df_columns_lower):
-            df.rename(columns={col: str(col).lower() for col in df.columns}, inplace=True)
-            df_prepared = df[['назва', 'кількість']].copy()
-            df_prepared['артикул'] = df_prepared['назва'].astype(str).str.extract(r'(\d{8,})')
-            df_prepared = df_prepared.dropna(subset=['артикул'])
-            if pd.to_numeric(df_prepared['кількість'], errors='coerce').notna().all():
-                return df_prepared[['артикул', 'кількість']]
-
-        if len(df.columns) == 2:
-            header_as_data = pd.DataFrame([df.columns.values], columns=['артикул', 'кількість'])
-            df.columns = ['артикул', 'кількість']
-            df_simple = pd.concat([header_as_data, df], ignore_index=True)
-            if pd.to_numeric(df_simple['артикул'], errors='coerce').notna().all() and \
-               pd.to_numeric(df_simple['кількість'], errors='coerce').notna().all():
-                return df_simple[['артикул', 'кількість']]
-    except Exception as e:
-        logger.error("Помилка парсингу файлу для віднімання: %s", e)
-    return None
-
-
 async def broadcast_import_update(result: dict):
     """Розсилає повідомлення всім користувачам про оновлення бази товарів."""
     loop = asyncio.get_running_loop()
@@ -260,7 +237,6 @@ async def get_active_users(user_id: int = Query(...)):
                     "total_sum": 0.0
                 }
             user_data[item.user_id]["items_count"] += 1
-            # Використовуємо item.product.ціна замість item.price
             user_data[item.user_id]["total_sum"] += (item.quantity * (item.product.ціна or 0.0))
             if not user_data[item.user_id]["department"]:
                 user_data[item.user_id]["department"] = item.product.відділ
@@ -272,6 +248,124 @@ async def get_active_users(user_id: int = Query(...)):
     except Exception as e:
         logger.error("Помилка отримання активних користувачів: %s", e, exc_info=True)
         return JSONResponse(content={"error": "Помилка отримання активних користувачів"}, status_code=500)
+
+
+@router.get("/archives")
+async def list_archives(user_id: int = Query(...)):
+    """
+    Отримати список всіх архівів користувачів.
+    Читає файли з /home/anubis/epicservice/archives/active.
+    """
+    verify_admin(user_id)
+    try:
+        archives_dir = os.path.join(ARCHIVES_PATH, "active")
+        
+        if not os.path.exists(archives_dir):
+            return JSONResponse(content={
+                "success": True,
+                "files": [],
+                "message": "Папка архівів не існує"
+            })
+        
+        files = []
+        for filename in os.listdir(archives_dir):
+            filepath = os.path.join(archives_dir, filename)
+            if os.path.isfile(filepath) and filename.endswith('.xlsx'):
+                stat = os.stat(filepath)
+                files.append({
+                    "filename": filename,
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                })
+        
+        # Сортуємо за датою модифікації (новіші першими)
+        files.sort(key=lambda x: x['modified'], reverse=True)
+        
+        return JSONResponse(content={
+            "success": True,
+            "files": files,
+            "count": len(files)
+        })
+    
+    except Exception as e:
+        logger.error("Помилка отримання списку архівів: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"error": "Помилка отримання списку архівів"},
+            status_code=500
+        )
+
+
+@router.get("/archives/download/{filename}")
+async def download_archive(filename: str, user_id: int = Query(...)):
+    """
+    Скачати конкретний файл архіву.
+    """
+    verify_admin(user_id)
+    try:
+        # Безпека: перевіряємо що filename не містить шляхи
+        if '/' in filename or '\\' in filename or '..' in filename:
+            raise HTTPException(status_code=400, detail="Недозволене ім'я файлу")
+        
+        filepath = os.path.join(ARCHIVES_PATH, "active", filename)
+        
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Файл не знайдено")
+        
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Помилка завантаження архіву %s: %s", filename, e, exc_info=True)
+        return JSONResponse(
+            content={"error": "Помилка завантаження файлу"},
+            status_code=500
+        )
+
+
+@router.get("/archives/download-all")
+async def download_all_archives(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
+    """
+    Скачати всі архіви одним ZIP файлом.
+    """
+    verify_admin(user_id)
+    try:
+        archives_dir = os.path.join(ARCHIVES_PATH, "active")
+        
+        if not os.path.exists(archives_dir):
+            raise HTTPException(status_code=404, detail="Папка архівів не існує")
+        
+        # Створюємо тимчасовий ZIP файл
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        zip_path = os.path.join(tempfile.gettempdir(), f"archives_{timestamp}.zip")
+        
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for filename in os.listdir(archives_dir):
+                if filename.endswith('.xlsx'):
+                    filepath = os.path.join(archives_dir, filename)
+                    zipf.write(filepath, arcname=filename)
+        
+        if background_tasks:
+            background_tasks.add_task(cleanup_file, zip_path)
+        
+        return FileResponse(
+            path=zip_path,
+            filename=f"archives_{timestamp}.zip",
+            media_type="application/zip"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Помилка створення ZIP архіву: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"error": "Помилка створення архіву"},
+            status_code=500
+        )
 
 
 @router.post("/import")
@@ -384,7 +478,7 @@ async def export_stock_report(user_id: int = Query(...), background_tasks: Backg
 @router.get("/summary")
 async def get_summary_stats(user_id: int = Query(...)):
     """
-    НОВИЙ: Отримати зведену статистику по відділах у форматі JSON.
+    Отримати зведену статистику по відділах у форматі JSON.
     Показує кількість артикулів та загальну суму збору.
     """
     verify_admin(user_id)
@@ -433,166 +527,6 @@ async def get_summary_stats(user_id: int = Query(...)):
         logger.error("Помилка отримання зведеної статистики: %s", e, exc_info=True)
         return JSONResponse(
             content={"error": "Помилка отримання статистики"},
-            status_code=500
-        )
-
-@router.get("/report/summary")
-async def get_warehouse_summary(user_id: int = Query(...)):
-    """Повертає зведену статистику по складу для відображення в адмін-панелі."""
-    verify_admin(user_id)
-    try:
-        loop = asyncio.get_running_loop()
-        
-        def _calc_summary():
-            products = orm_get_all_products_sync()
-            temp_list_items = orm_get_all_temp_list_items_sync()
-
-            # Збираємо всі зарезервовані товари з тимчасових списків користувачів
-            temp_reservations = {}
-            for item in temp_list_items:
-                temp_reservations[item.product_id] = temp_reservations.get(item.product_id, 0) + item.quantity
-
-            total_articles = 0
-            total_sum = 0.0
-            departments = {}
-
-            for product in products:
-                # Безпечна конвертація кількості
-                try:
-                    stock_qty = float(str(product.кількість).replace(',', '.'))
-                except (ValueError, TypeError):
-                    stock_qty = 0
-
-                reserved = (product.відкладено or 0) + temp_reservations.get(product.id, 0)
-                available = stock_qty - reserved
-                
-                # Враховуємо лише ті артикули, які фізично є в наявності (доступні > 0)
-                if available > 0:
-                    total_articles += 1
-                    available_sum = available * (product.ціна or 0.0)
-                    total_sum += available_sum
-                    
-                    dep = str(product.відділ)
-                    departments[dep] = departments.get(dep, 0) + 1
-            
-            # Сортуємо відділи за зростанням для красивого виводу
-            sorted_deps = dict(sorted(departments.items(), key=lambda x: int(x[0]) if x[0].isdigit() else x[0]))
-            
-            return {
-                "total_articles": total_articles,
-                "total_sum": total_sum,
-                "departments": sorted_deps
-            }
-            
-        summary = await loop.run_in_executor(None, _calc_summary)
-        return JSONResponse(content={"success": True, "data": summary})
-    
-    except Exception as e:
-        logger.error("Помилка формування зведеного звіту: %s", e, exc_info=True)
-        return JSONResponse(
-            content={"success": False, "error": "Помилка формування зведеного звіту"},
-            status_code=500
-        )
-
-@router.get("/export/collected")
-async def export_department_stats(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
-    """
-    ЗАСТАРІЛО: Експорт статистики по відділах у вигляді Excel файлу.
-    Рекомендується використовувати /summary для отримання JSON.
-    """
-    verify_admin(user_id)
-    try:
-        loop = asyncio.get_running_loop()
-        all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
-
-        if not all_products:
-            return JSONResponse(
-                content={"message": "Немає даних для експорту"},
-                status_code=404
-            )
-
-        # Групуємо по відділах
-        dept_stats = {}
-        for product in all_products:
-            dept = product.відділ
-            if dept not in dept_stats:
-                dept_stats[dept] = {"count": 0, "total_sum": 0.0}
-            dept_stats[dept]["count"] += 1
-            dept_stats[dept]["total_sum"] += (product.сума_залишку or 0.0)
-
-        # Формуємо DataFrame
-        report_data = [
-            {
-                "Відділ": dept_id,
-                "Кількість артикулів": stats["count"],
-                "Загальна сума збору (грн)": round(stats["total_sum"], 2)
-            }
-            for dept_id, stats in sorted(dept_stats.items())
-        ]
-        
-        df = pd.DataFrame(report_data)
-        os.makedirs(ARCHIVES_PATH, exist_ok=True)
-        report_path = os.path.join(
-            ARCHIVES_PATH, f"department_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        )
-        df.to_excel(report_path, index=False)
-
-        if background_tasks:
-            background_tasks.add_task(cleanup_file, report_path)
-
-        return FileResponse(
-            path=report_path,
-            filename=os.path.basename(report_path),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-    except Exception as e:
-        logger.error("Помилка експорту статистики: %s", e, exc_info=True)
-        return JSONResponse(
-            content={"error": "Помилка створення звіту"},
-            status_code=500
-        )
-
-
-@router.post("/subtract")
-async def subtract_collected(
-    user_id: int = Query(...)
-):
-    """
-    Віднімання зібраних товарів з залишків на основі архівів.
-    """
-    verify_admin(user_id)
-    try:
-        # Отримуємо всі зібрані товари з архівів
-        loop = asyncio.get_running_loop()
-        collected_items = await loop.run_in_executor(None, orm_get_all_collected_items_sync)
-        
-        if not collected_items:
-            return JSONResponse(
-                content={"success": False, "message": "Немає зібраних товарів для віднімання"},
-                status_code=404
-            )
-        
-        # Створюємо DataFrame для віднімання
-        df = pd.DataFrame([
-            {"артикул": item["article"], "кількість": item["quantity"]}
-            for item in collected_items
-        ])
-        
-        result = await orm_subtract_collected(df)
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": "Залишки успішно оновлено",
-            "processed": result['processed'],
-            "not_found": result['not_found'],
-            "errors": result['errors']
-        })
-
-    except Exception as e:
-        logger.error("Помилка віднімання зібраного: %s", e, exc_info=True)
-        return JSONResponse(
-            content={"error": "Помилка операції"},
             status_code=500
         )
 
@@ -696,7 +630,7 @@ async def get_system_statistics(user_id: int = Query(...)):
         active_users_data = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
-        # Підраховуємо загальну зарезервовану суму (використовуємо item.product.ціна)
+        # Підраховуємо загальну зарезервовану суму
         total_reserved_sum = sum(item.quantity * (item.product.ціна or 0.0) for item in temp_list_items)
         
         return JSONResponse(content={
