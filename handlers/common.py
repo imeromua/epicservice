@@ -6,7 +6,8 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import ReplyKeyboardRemove
 
 from config import ADMIN_IDS, WEBAPP_URL
 from database.orm import orm_upsert_user
@@ -38,42 +39,12 @@ async def clean_previous_keyboard(state: FSMContext, bot: Bot, chat_id: int):
                          previous_message_id, e)
 
 
-def get_user_keyboard() -> ReplyKeyboardMarkup:
-    """
-    Клавіатура для звичайних користувачів: тільки кнопка Mini App.
-    """
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🌐 Відкрити Mini App", web_app=WebAppInfo(url=WEBAPP_URL))]
-        ],
-        resize_keyboard=True,
-        persistent=True
-    )
-    return keyboard
-
-
-def get_admin_keyboard() -> ReplyKeyboardMarkup:
-    """
-    Клавіатура для адмінів: Mini App + кнопка Адмінка.
-    """
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🌐 Відкрити Mini App", web_app=WebAppInfo(url=WEBAPP_URL))],
-            [KeyboardButton(text="⚙️ Адмінка")]
-        ],
-        resize_keyboard=True,
-        persistent=True
-    )
-    return keyboard
-
-
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     """
     Обробник команди /start.
-    Реєструє користувача та показує персистентну клавіатуру:
-    - Для користувачів: кнопка Mini App
-    - Для адмінів: Mini App + Адмінка
+    Реєструє користувача та автоматично відкриває Mini App.
+    Усі клавіатури прибрані - управління тільки через webapp.
     """
     user = message.from_user
     try:
@@ -88,37 +59,64 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
         # Очищаємо FSM state
         await state.clear()
 
-        # Визначаємо текст та клавіатуру залежно від ролі
+        # Визначаємо текст та inline-клавіатуру залежно від ролі
         if user.id in ADMIN_IDS:
-            text = LEXICON.CMD_START_ADMIN
-            kb = get_admin_keyboard()
+            text = (
+                f"{LEXICON.CMD_START_ADMIN}\n\n"
+                "👉 Натисніть кнопку нижче, щоб відкрити додаток."
+            )
+            # Адмінська кнопка: Mini App + Адмінка
+            inline_kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🌐 Відкрити Mini App", web_app=WebAppInfo(url=WEBAPP_URL))],
+                    [InlineKeyboardButton(text="⚙️ Адмінка", callback_data="admin_panel")]
+                ]
+            )
         else:
-            text = LEXICON.CMD_START_USER
-            kb = get_user_keyboard()
+            text = (
+                f"{LEXICON.CMD_START_USER}\n\n"
+                "👉 Натисніть кнопку нижче, щоб відкрити додаток."
+            )
+            # Кнопка для користувача: тільки Mini App
+            inline_kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🌐 Відкрити Mini App", web_app=WebAppInfo(url=WEBAPP_URL))]
+                ]
+            )
 
-        # Надсилаємо привітання з персистентною клавіатурою
-        await message.answer(text, reply_markup=kb)
+        # Прибираємо всі reply-клавіатури та надсилаємо інлайн
+        await message.answer(
+            text,
+            reply_markup=ReplyKeyboardRemove()  # Видаляємо reply-клавіатуру
+        )
+        
+        # Надсилаємо inline-клавіатуру
+        await message.answer(
+            "🚀 *Ласкаво просимо до EpicService!*",
+            reply_markup=inline_kb
+        )
 
     except Exception as e:
         logger.error("Неочікувана помилка в cmd_start для %s: %s", user.id, e, exc_info=True)
         await message.answer(LEXICON.UNEXPECTED_ERROR)
 
 
-@router.message(F.text == "⚙️ Адмінка")
-async def admin_button_handler(message: Message):
+@router.callback_query(F.data == "admin_panel")
+async def admin_panel_callback(callback):
     """
-    Обробник натискання кнопки "Адмінка".
+    Обробник callback кнопки "Адмінка".
     Показує inline-меню з адміністративними функціями.
     """
-    user_id = message.from_user.id
+    user_id = callback.from_user.id
     
     # Перевірка чи юзер є адміном
     if user_id not in ADMIN_IDS:
-        await message.answer("❌ У вас немає доступу до адміністративних функцій.")
+        await callback.answer("❌ У вас немає доступу до адміністративних функцій.", show_alert=True)
         return
     
     # Показуємо inline-меню (існуюча адмінська клавіатура)
-    await message.answer(
+    await callback.message.answer(
         "⚙️ *Панель адміністратора*\n\nОберіть дію:",
         reply_markup=get_admin_main_kb()
     )
+    await callback.answer()
