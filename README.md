@@ -438,8 +438,8 @@ curl http://localhost:8000/health
 ## 📞 Підтримка
 
 Для питань та підтримки:
-- 📧 Email: support@epicservice.com
-- 💬 Telegram: @epic_support_bot
+- 📧 Email: imerom25@gmail.com
+- 💬 Telegram: @my_life_ukr
 
 ---
 
