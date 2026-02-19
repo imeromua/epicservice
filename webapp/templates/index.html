@@ -32,6 +32,19 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transition: background-color 0.3s ease;
         }
+        .pull-indicator {
+            text-align: center;
+            padding: 10px;
+            font-size: 24px;
+            opacity: 0;
+            transform: translateY(-100%);
+            transition: all 0.3s ease;
+            background: var(--bg-color);
+        }
+        .pull-indicator.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
         .header { padding: 16px 16px 8px 16px; }
         h1 { color: var(--button-color); font-size: 24px; margin-bottom: 8px; transition: color 0.3s ease; }
         .department-info { 
@@ -229,6 +242,7 @@
     </style>
 </head>
 <body>
+    <div class="pull-indicator" id="pullIndicator">↓ Потягніть для оновлення</div>
     <div class="sticky-container">
         <div class="header">
             <h1>📦 EpicService</h1>
@@ -273,6 +287,65 @@ const userId = tg.initDataUnsafe?.user?.id || 0;
 let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
 let cachedProducts = [];
 let currentDepartment = null;
+let pullStartY = 0, pulling = false;
+
+// Pull-to-refresh
+document.addEventListener('touchstart', e => {
+    if (window.scrollY === 0) {
+        pullStartY = e.touches[0].clientY;
+        pulling = true;
+    }
+}, {passive: true});
+
+document.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const pullDistance = e.touches[0].clientY - pullStartY;
+    const indicator = document.getElementById('pullIndicator');
+    
+    if (pullDistance > 0 && pullDistance < 80) {
+        indicator.style.opacity = pullDistance / 80;
+        indicator.style.transform = `translateY(${pullDistance - 50}px)`;
+    } else if (pullDistance >= 80) {
+        indicator.classList.add('active');
+        indicator.textContent = '↻ Відпустіть для оновлення';
+    }
+}, {passive: true});
+
+document.addEventListener('touchend', e => {
+    if (!pulling) return;
+    const pullDistance = e.changedTouches[0].clientY - pullStartY;
+    const indicator = document.getElementById('pullIndicator');
+    
+    if (pullDistance >= 80) {
+        indicator.textContent = '⟳ Оновлення...';
+        tg.HapticFeedback.impactOccurred('medium');
+        refreshCurrentTab();
+    }
+    
+    setTimeout(() => {
+        indicator.classList.remove('active');
+        indicator.style.opacity = 0;
+        indicator.style.transform = 'translateY(-100%)';
+        indicator.textContent = '↓ Потягніть для оновлення';
+    }, 500);
+    
+    pulling = false;
+}, {passive: true});
+
+function refreshCurrentTab() {
+    switch(currentTab) {
+        case 'search':
+            const query = document.getElementById('searchInput').value.trim();
+            if (query.length >= 2) search(query);
+            break;
+        case 'list':
+            loadList();
+            break;
+        case 'archives':
+            loadArchives();
+            break;
+    }
+}
 
 document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}` : 'Тестовий режим';
 
