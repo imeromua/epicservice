@@ -5,6 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EpicService</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F4E6;</text></svg>">
+    
+    <!-- PWA Detection and Telegram Integration (MUST BE FIRST!) -->
+    <script src="/static/pwa-redirect.js"></script>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EpicService">
+    <meta name="description" content="Система обліку та замовлення запчастин">
+
+    <!-- Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+
+    <!-- Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-192x192.png">
+
+    <!-- PWA Styles -->
+    <link rel="stylesheet" href="/static/pwa-styles.css">
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -495,7 +518,6 @@
             </div>
         </div>
     </div>
-        </div>
 
     <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
     <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
@@ -503,6 +525,47 @@
     <div id="statsModal" class="modal"><div class="modal-content" id="statsModalContent"></div></div>
     <div id="adminArchivesModal" class="modal"><div class="modal-content" id="adminArchivesModalContent"></div></div>
     <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
+
+<!-- PWA Install Banner -->
+<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
+  <div class="pwa-install-content">
+    <span>📱 Встановіть Epic Service на свій телефон!</span>
+    <button id="pwa-install-btn" class="btn btn-primary">Встановити</button>
+    <button onclick="document.getElementById('pwa-install-banner').style.display='none'" class="btn btn-secondary">Пізніше</button>
+  </div>
+</div>
+
+<!-- Offline Indicator -->
+<div id="offline-indicator" class="offline-indicator">
+  ⚠️ Немає з'єднання з інтернетом
+</div>
+
+<!-- PWA Scripts -->
+<script src="/static/pwa-install.js"></script>
+
+<!-- Offline/Online Detection -->
+<script>
+  const offlineIndicator = document.getElementById('offline-indicator');
+  
+  window.addEventListener('online', () => {
+    if (offlineIndicator) {
+      offlineIndicator.classList.remove('show');
+      console.log('[✅] З\'єднання відновлено');
+    }
+  });
+  
+  window.addEventListener('offline', () => {
+    if (offlineIndicator) {
+      offlineIndicator.classList.add('show');
+      console.log('[⚠️] Втрачено з\'єднання');
+    }
+  });
+  
+  if (!navigator.onLine && offlineIndicator) {
+    offlineIndicator.classList.add('show');
+  }
+</script>
+
 <script>
 const tg = window.Telegram.WebApp; 
 tg.expand();
@@ -1261,6 +1324,10 @@ updateSearchBoxVisibility();
 
 // Debug info
 console.log('App initialized:', { userId, isAdmin, ADMIN_IDS });
+console.log('🚀 PWA Ready!');
+console.log('📱 Display mode:', 
+  window.matchMedia('(display-mode: standalone)').matches ? 'Standalone (PWA)' : 'Browser'
+);
 </script>
 </body>
 </html>
