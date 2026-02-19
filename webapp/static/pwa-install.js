@@ -136,11 +136,11 @@ window.addEventListener('appinstalled', (e) => {
   showNotification('🎉 Epic Service успішно встановлено!');
 });
 
-// Реєстрація Service Worker
+// Реєстрація Service Worker (ШЛЯХ ЗМІНЕНО НА /sw.js)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/static/sw.js', {
+      const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/'
       });
       console.log('[PWA] ✅ Service Worker registered:', registration.scope);
