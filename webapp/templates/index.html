@@ -475,7 +475,7 @@
             </div>
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>📤 Імпортувати</button>
-                <button class="btn btn-danger" onclick="cancelUpload()">✖️ Скасувати</button>
+                <button class="btn btn-danger" onclick="cancelUpload(true)">✖️ Скасувати</button>
             </div>
             
             <div class="admin-section-title">📤 Експорт та операції</div>
@@ -953,12 +953,14 @@ function updateFileInfo() {
     }
 }
 
-function cancelUpload() {
+function cancelUpload(clearAlert = false) {
     selectedFile = null;
     document.getElementById('fileInput').value = '';
     document.getElementById('fileInfo').style.display = 'none';
     document.getElementById('uploadBtn').disabled = true;
-    document.getElementById('importAlert').innerHTML = '';
+    if (clearAlert) {
+        document.getElementById('importAlert').innerHTML = '';
+    }
 }
 
 async function uploadFile() {
@@ -969,28 +971,30 @@ async function uploadFile() {
     
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('notify_users', document.getElementById('notifyUsers').checked);
-    formData.append('user_id', userId);
+    const notifyChecked = document.getElementById('notifyUsers').checked;
     
     document.getElementById('uploadBtn').disabled = true;
     document.getElementById('uploadBtn').textContent = '⏳ Завантаження...';
     
     try {
-        const response = await fetch(`/api/admin/import?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/import?user_id=${userId}&notify_users=${notifyChecked}`, {
             method: 'POST',
             body: formData
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         
-        if (data.success) {
+        if (data.success || data.added !== undefined) {
             document.getElementById('importAlert').innerHTML = `
                 <div class="alert alert-success">
                     <span style="font-size: 20px;">✅</span>
-                    <div>Імпорт успішний<br><small>Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}</small></div>
+                    <div>Імпорт успішний<br><small>Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}, Деактивовано: ${data.deactivated || 0}</small></div>
                 </div>
             `;
-            cancelUpload();
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
             loadAdminStats();
         } else {
             document.getElementById('importAlert').innerHTML = `
