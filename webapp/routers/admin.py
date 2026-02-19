@@ -16,6 +16,7 @@ import pandas as pd
 from aiogram import Bot
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.background import BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -65,6 +66,16 @@ class BroadcastRequest(BaseModel):
 
 
 # === Допоміжні функції ===
+
+def cleanup_file(file_path: str):
+    """Видаляє файл після відправки."""
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Файл {file_path} успішно видалено")
+    except Exception as e:
+        logger.error(f"Помилка видалення файлу {file_path}: {e}")
+
 
 def _validate_excel_columns(df: pd.DataFrame) -> tuple[bool, str]:
     """Використовує SmartColumnMapper для перевірки наявності необхідних колонок."""
@@ -336,7 +347,7 @@ async def import_products(
 
 
 @router.get("/export/stock")
-async def export_stock_report(user_id: int = Query(...)):
+async def export_stock_report(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
     """
     Експорт звіту про залишки на складі.
     Враховує резерви з temp_list.
@@ -352,11 +363,13 @@ async def export_stock_report(user_id: int = Query(...)):
                 status_code=500
             )
 
+        if background_tasks:
+            background_tasks.add_task(cleanup_file, report_path)
+
         return FileResponse(
             path=report_path,
             filename=os.path.basename(report_path),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            background=lambda: os.remove(report_path) if os.path.exists(report_path) else None
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     except Exception as e:
@@ -424,7 +437,7 @@ async def get_summary_stats(user_id: int = Query(...)):
 
 
 @router.get("/export/collected")
-async def export_department_stats(user_id: int = Query(...)):
+async def export_department_stats(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
     """
     ЗАСТАРІЛО: Експорт статистики по відділах у вигляді Excel файлу.
     Рекомендується використовувати /summary для отримання JSON.
@@ -466,11 +479,13 @@ async def export_department_stats(user_id: int = Query(...)):
         )
         df.to_excel(report_path, index=False)
 
+        if background_tasks:
+            background_tasks.add_task(cleanup_file, report_path)
+
         return FileResponse(
             path=report_path,
             filename=os.path.basename(report_path),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            background=lambda: os.remove(report_path) if os.path.exists(report_path) else None
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     except Exception as e:
