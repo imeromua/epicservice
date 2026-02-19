@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpicService Admin Panel</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F6E0;</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #0088cc;
+            --success: #34c759;
+            --danger: #ff3b30;
+            --warning: #ff9500;
+            --bg: #f5f5f5;
+            --card-bg: #ffffff;
+            --text: #000000;
+            --text-secondary: #666666;
+            --border: #e0e0e0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, #006699 100%);
+            color: white;
+            padding: 30px 20px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,136,204,0.3);
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header-subtitle {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        
+        .tab:hover {
+            color: var(--primary);
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary) 0%, #006699 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,136,204,0.2);
+        }
+        
+        .stat-card.success {
+            background: linear-gradient(135deg, var(--success) 0%, #30b350 100());
+        }
+        
+        .stat-card.warning {
+            background: linear-gradient(135deg, var(--warning) 0%, #e68a00 100());
+        }
+        
+        .stat-card.danger {
+            background: linear-gradient(135deg, var(--danger) 0%, #e63027 100());
+        }
+        
+        .stat-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .user-list {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .user-item {
+            background: var(--bg);
+            padding: 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        
+        .user-item:hover {
+            transform: translateX(4px);
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .user-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: var(--text-secondary);
+            color: white;
+        }
+        
+        .file-upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(0,136,204,0.05);
+        }
+        
+        .file-upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(0,136,204,0.1);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .loader {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        
+        .loader-spinner {
+            font-size: 48px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .alert-success {
+            background: rgba(52,199,89,0.1);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        
+        .alert-error {
+            background: rgba(255,59,48,0.1);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+        
+        .alert-info {
+            background: rgba(0,136,204,0.1);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛠️ Панель Адміністратора</h1>
+            <div class="header-subtitle">EpicService Management Dashboard</div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">📊 Дашборд</button>
+            <button class="tab" onclick="switchTab('users')">👥 Користувачі</button>
+            <button class="tab" onclick="switchTab('import')">📥 Імпорт</button>
+            <button class="tab" onclick="switchTab('export')">📤 Експорт</button>
+            <button class="tab" onclick="switchTab('broadcast')">📢 Розсилка</button>
+        </div>
+        
+        <!-- Dashboard Tab -->
+        <div id="dashboardTab" class="tab-content active">
+            <div id="statsContainer" class="stats-grid">
+                <div class="loader">
+                    <div class="loader-spinner">⟳</div>
+                    <div>Завантаження статистики...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Users Tab -->
+        <div id="usersTab" class="tab-content">
+            <div class="card">
+                <div class="card-title">👥 Всі користувачі</div>
+                <div id="allUsersList" class="user-list">
+                    <div class="loader">Завантаження...</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">🔥 Активні списки</div>
+                <div id="activeUsersList" class="user-list">
+                    <div class="loader">Завантаження...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Import Tab -->
+        <div id="importTab" class="tab-content">
+            <div class="card">
+                <div class="card-title">📥 Імпорт товарів з Excel</div>
+                
+                <div id="importAlert"></div>
+                
+                <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <div style="font-size: 18px; margin-bottom: 8px;">Перетягніть файл сюди або клікніть для вибору</div>
+                    <div style="color: var(--text-secondary); font-size: 14px;">Підтримуються файли: .xlsx, .xls</div>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
+                </div>
+                
+                <div id="fileInfo" style="display: none; margin-bottom: 20px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Вибраний файл:</div>
+                    <div id="fileName" style="color: var(--primary);"></div>
+                </div>
+                
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="notifyUsers">
+                        <label for="notifyUsers" class="form-label" style="margin: 0;">📢 Розіслати повідомлення користувачам про оновлення</label>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>
+                        📤 Імпортувати
+                    </button>
+                    <button class="btn btn-secondary" onclick="cancelUpload()">
+                        ❌ Скасувати
+                    </button>
+                </div>
+                
+                <div id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                    </div>
+                    <div id="progressText" style="text-align: center; color: var(--text-secondary);">Завантаження...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Tab -->
+        <div id="exportTab" class="tab-content">
+            <div class="card">
+                <div class="card-title">📤 Експорт звітів</div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="exportStock()">
+                        📊 Експорт залишків
+                    </button>
+                    <button class="btn btn-success" onclick="exportCollected()">
+                        📋 Зведений звіт
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">➖ Віднімання зібраного</div>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    Віднімає зібрані товари з залишків в базі даних
+                </p>
+                <button class="btn btn-warning" onclick="subtractCollected()">
+                    ⚠️ Віднімати зібране
+                </button>
+            </div>
+        </div>
+        
+        <!-- Broadcast Tab -->
+        <div id="broadcastTab" class="tab-content">
+            <div class="card">
+                <div class="card-title">📢 Розсилка повідомлень</div>
+                
+                <div id="broadcastAlert"></div>
+                
+                <div class="form-group">
+                    <label class="form-label">💬 Текст повідомлення:</label>
+                    <textarea class="form-textarea" id="broadcastMessage" placeholder="Введіть текст повідомлення для всіх користувачів..."></textarea>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="sendBroadcast()">
+                        📤 Розіслати
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const ADMIN_ID = 123456; // TODO: Отримувати з авторизації
+        
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            const tabMap = {
+                'dashboard': ['dashboardTab', 0],
+                'users': ['usersTab', 1],
+                'import': ['importTab', 2],
+                'export': ['exportTab', 3],
+                'broadcast': ['broadcastTab', 4]
+            };
+            
+            const [contentId, tabIndex] = tabMap[tab];
+            document.getElementById(contentId).classList.add('active');
+            document.querySelectorAll('.tab')[tabIndex].classList.add('active');
+            
+            // Load data when switching tabs
+            if (tab === 'dashboard') loadStatistics();
+            if (tab === 'users') { loadAllUsers(); loadActiveUsers(); }
+        }
+        
+        // Load statistics
+        async function loadStatistics() {
+            try {
+                const response = await fetch(`/api/admin/statistics?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('statsContainer');
+                container.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${data.total_users || 0}</div>
+                        <div class="stat-label">Всього користувачів</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-value">${data.active_users || 0}</div>
+                        <div class="stat-label">Активні списки</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-value">${data.total_products || 0}</div>
+                        <div class="stat-label">Товарів в базі</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value">${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
+                        <div class="stat-label">Зарезервовано</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+                document.getElementById('statsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження статистики</div>';
+            }
+        }
+        
+        // Load all users
+        async function loadAllUsers() {
+            try {
+                const response = await fetch(`/api/admin/users?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('allUsersList');
+                
+                if (!data.users || data.users.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає користувачів</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.users.map(user => `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
+                            <div class="user-details">ID: ${user.user_id} • Перший візит: ${new Date(user.first_seen).toLocaleDateString('uk-UA')}</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="forceSave(${user.user_id})">
+                            💾 Зберегти список
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('allUsersList').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+            }
+        }
+        
+        // Load active users
+        async function loadActiveUsers() {
+            try {
+                const response = await fetch(`/api/admin/users/active?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('activeUsersList');
+                
+                if (!data.users || data.users.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Немає активних списків</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.users.map(user => `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
+                            <div class="user-details">
+                                🏢 Відділ: ${user.department} • 
+                                📦 Товарів: ${user.items_count} • 
+                                💰 Сума: ${user.total_sum.toLocaleString('uk-UA')} ₴
+                            </div>
+                        </div>
+                        <button class="btn btn-success" onclick="forceSave(${user.user_id})">
+                            💾 Примусово зберегти
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading active users:', error);
+                document.getElementById('activeUsersList').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+            }
+        }
+        
+        // Force save user list
+        async function forceSave(targetUserId) {
+            if (!confirm(`Примусово зберегти список користувача ${targetUserId}?`)) return;
+            
+            try {
+                const response = await fetch(`/api/admin/force-save/${targetUserId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: ADMIN_ID })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    loadActiveUsers();
+                } else {
+                    alert('❌ ' + (data.message || 'Помилка збереження'));
+                }
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        // File upload handlers
+        let selectedFile = null;
+        
+        const dropZone = document.getElementById('dropZone');
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                selectedFile = files[0];
+                updateFileInfo();
+            }
+        });
+        
+        function handleFileSelect(event) {
+            selectedFile = event.target.files[0];
+            updateFileInfo();
+        }
+        
+        function updateFileInfo() {
+            if (selectedFile) {
+                document.getElementById('fileName').textContent = `📄 ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`;
+                document.getElementById('fileInfo').style.display = 'block';
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        }
+        
+        function cancelUpload() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('importAlert').innerHTML = '';
+        }
+        
+        async function uploadFile() {
+            if (!selectedFile) {
+                alert('❌ Оберіть файл для завантаження');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('user_id', ADMIN_ID);
+            formData.append('notify_users', document.getElementById('notifyUsers').checked);
+            
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadBtn').disabled = true;
+            
+            try {
+                const response = await fetch('/api/admin/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('importAlert').innerHTML = `
+                        <div class="alert alert-success">
+                            <span style="font-size: 24px;">✅</span>
+                            <div>
+                                <div style="font-weight: 600;">${data.message}</div>
+                                <div style="font-size: 13px; margin-top: 4px;">
+                                    Імпортовано: ${data.imported || 0} товарів
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    cancelUpload();
+                    loadStatistics();
+                } else {
+                    document.getElementById('importAlert').innerHTML = `
+                        <div class="alert alert-error">
+                            <span style="font-size: 24px;">❌</span>
+                            <div>${data.message || 'Помилка імпорту'}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('importAlert').innerHTML = `
+                    <div class="alert alert-error">
+                        <span style="font-size: 24px;">❌</span>
+                        <div>Помилка: ${error.message}</div>
+                    </div>
+                `;
+            } finally {
+                document.getElementById('uploadProgress').style.display = 'none';
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        }
+        
+        // Export functions
+        async function exportStock() {
+            try {
+                window.open(`/api/admin/export/stock?user_id=${ADMIN_ID}`, '_blank');
+            } catch (error) {
+                alert('❌ Помилка експорту: ' + error.message);
+            }
+        }
+        
+        async function exportCollected() {
+            try {
+                window.open(`/api/admin/export/collected?user_id=${ADMIN_ID}`, '_blank');
+            } catch (error) {
+                alert('❌ Помилка експорту: ' + error.message);
+            }
+        }
+        
+        async function subtractCollected() {
+            if (!confirm('⚠️ УВАГА! Ця операція віднімає зібрані товари з залишків.\n\nПродовжити?')) return;
+            
+            try {
+                const response = await fetch('/api/admin/subtract', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: ADMIN_ID })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    loadStatistics();
+                } else {
+                    alert('❌ ' + (data.message || 'Помилка операції'));
+                }
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        // Broadcast
+        async function sendBroadcast() {
+            const message = document.getElementById('broadcastMessage').value.trim();
+            
+            if (!message) {
+                alert('❌ Введіть текст повідомлення');
+                return;
+            }
+            
+            if (!confirm(`Розіслати повідомлення всім користувачам?\n\nТекст: "${message}"`)) return;
+            
+            try {
+                const response = await fetch('/api/admin/broadcast', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: ADMIN_ID,
+                        message: message
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('broadcastAlert').innerHTML = `
+                        <div class="alert alert-success">
+                            <span style="font-size: 24px;">✅</span>
+                            <div>
+                                <div style="font-weight: 600;">${data.message}</div>
+                                <div style="font-size: 13px; margin-top: 4px;">
+                                    Розіслано: ${data.sent || 0} користувачам
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('broadcastMessage').value = '';
+                } else {
+                    document.getElementById('broadcastAlert').innerHTML = `
+                        <div class="alert alert-error">
+                            <span style="font-size: 24px;">❌</span>
+                            <div>${data.message || 'Помилка розсилки'}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('broadcastAlert').innerHTML = `
+                    <div class="alert alert-error">
+                        <span style="font-size: 24px;">❌</span>
+                        <div>Помилка: ${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Initialize
+        loadStatistics();
+    </script>
+</body>
+</html>
