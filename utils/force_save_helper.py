@@ -8,10 +8,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
 from sqlalchemy.exc import SQLAlchemyError
 
-from config import ADMIN_IDS
 from database.engine import async_session
 from handlers.common import clean_previous_keyboard
-from keyboards.inline import get_admin_main_kb, get_user_main_kb
 from lexicon.lexicon import LEXICON
 from utils.list_processor import process_and_save_list
 
@@ -20,15 +18,14 @@ logger = logging.getLogger(__name__)
 
 async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> bool:
     """
-    Примусово зберігає тимчасовий список користувача,
-    тепер з коректним керуванням UI цього користувача.
+    Примусово зберігає тимчасовий список користувача.
     Використовується в боті з FSMContext.
+    Повідомлення надсилаються без клавіатур.
     """
     main_list_path = None
     surplus_list_path = None
     
     try:
-        # --- ОНОВЛЕНО: Використовуємо переданий state конкретного користувача ---
         user_state = state
         
         async with async_session() as session:
@@ -46,12 +43,11 @@ async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> boo
         if surplus_list_path:
             await bot.send_document(user_id, FSInputFile(surplus_list_path), caption=LEXICON.SURPLUS_LIST_CAPTION)
         
-        kb = get_admin_main_kb() if user_id in ADMIN_IDS else get_user_main_kb()
-        text = LEXICON.CMD_START_ADMIN if user_id in ADMIN_IDS else LEXICON.CMD_START_USER
-        
-        # Надсилаємо нове головне меню і зберігаємо його ID у стані користувача
-        sent_message = await bot.send_message(user_id, text, reply_markup=kb)
-        await user_state.update_data(main_message_id=sent_message.message_id)
+        # Надсилаємо повідомлення без клавіатури
+        await bot.send_message(
+            user_id,
+            "✅ Список збережено. Відкрийте Mini App для продовження роботи."
+        )
 
         return True
 
@@ -80,6 +76,7 @@ async def force_save_user_list_web(user_id: int, bot: Bot) -> bool:
     """
     Спрощена версія для виклику з веб-API без FSMContext.
     Просто зберігає список і надсилає файли користувачу.
+    Повідомлення надсилаються без клавіатур.
     """
     main_list_path = None
     surplus_list_path = None
