@@ -845,7 +845,7 @@ async function loadAdminStats() {
             </div>
             <div class="admin-stat-card danger" style="cursor: pointer;" onclick="showReservedByDepartment()">
                 <div class="admin-stat-icon">💰</div>
-                <div class="admin-stat-value">\${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
+                <div class="admin-stat-value">${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
                 <div class="admin-stat-label">Зарезервовано</div>
             </div>
         `;
