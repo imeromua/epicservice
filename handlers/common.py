@@ -44,7 +44,7 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     """
     Обробник команди /start.
     Реєструє користувача та автоматично відкриває Mini App.
-    Усі клавіатури прибрані - управління тільки через webapp.
+    Без клавіатур та зайвих повідомлень.
     """
     user = message.from_user
     try:
@@ -59,41 +59,23 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
         # Очищаємо FSM state
         await state.clear()
 
-        # Визначаємо текст та inline-клавіатуру залежно від ролі
-        if user.id in ADMIN_IDS:
-            text = (
-                f"{LEXICON.CMD_START_ADMIN}\n\n"
-                "👉 Натисніть кнопку нижче, щоб відкрити додаток."
-            )
-            # Адмінська кнопка: Mini App + Адмінка
-            inline_kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="🌐 Відкрити Mini App", web_app=WebAppInfo(url=WEBAPP_URL))],
-                    [InlineKeyboardButton(text="⚙️ Адмінка", callback_data="admin_panel")]
-                ]
-            )
-        else:
-            text = (
-                f"{LEXICON.CMD_START_USER}\n\n"
-                "👉 Натисніть кнопку нижче, щоб відкрити додаток."
-            )
-            # Кнопка для користувача: тільки Mini App
-            inline_kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="🌐 Відкрити Mini App", web_app=WebAppInfo(url=WEBAPP_URL))]
-                ]
-            )
-
-        # Прибираємо всі reply-клавіатури та надсилаємо інлайн
+        # Прибираємо всі reply-клавіатури
         await message.answer(
-            text,
-            reply_markup=ReplyKeyboardRemove()  # Видаляємо reply-клавіатуру
+            "👋",
+            reply_markup=ReplyKeyboardRemove()
         )
         
-        # Надсилаємо inline-клавіатуру
+        # Надсилаємо inline-клавіатуру з Mini App (без кнопки адмінки)
+        inline_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🌐 Відкрити EpicService", web_app=WebAppInfo(url=WEBAPP_URL))]
+            ]
+        )
+        
         await message.answer(
-            "🚀 *Ласкаво просимо до EpicService!*",
-            reply_markup=inline_kb
+            "🚀 *Ласкаво просимо!*",
+            reply_markup=inline_kb,
+            parse_mode="Markdown"
         )
 
     except Exception as e:
@@ -101,22 +83,22 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
         await message.answer(LEXICON.UNEXPECTED_ERROR)
 
 
-@router.callback_query(F.data == "admin_panel")
-async def admin_panel_callback(callback):
+@router.message(F.text == "/admin")
+async def admin_command_handler(message: Message):
     """
-    Обробник callback кнопки "Адмінка".
+    Обробник команди /admin для адміністраторів.
     Показує inline-меню з адміністративними функціями.
     """
-    user_id = callback.from_user.id
+    user_id = message.from_user.id
     
     # Перевірка чи юзер є адміном
     if user_id not in ADMIN_IDS:
-        await callback.answer("❌ У вас немає доступу до адміністративних функцій.", show_alert=True)
+        await message.answer("❌ У вас немає доступу до адміністративних функцій.")
         return
     
-    # Показуємо inline-меню (існуюча адмінська клавіатура)
-    await callback.message.answer(
+    # Показуємо inline-меню
+    await message.answer(
         "⚙️ *Панель адміністратора*\n\nОберіть дію:",
-        reply_markup=get_admin_main_kb()
+        reply_markup=get_admin_main_kb(),
+        parse_mode="Markdown"
     )
-    await callback.answer()
