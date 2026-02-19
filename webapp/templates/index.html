@@ -95,6 +95,7 @@
             white-space: nowrap; 
         }
         .tab.active { color: var(--button-color); border-bottom-color: var(--button-color); }
+        .tab.hidden { display: none; }
         .tab-badge { position: absolute; top: 6px; right: 8px; background: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
         .main-content { padding: 16px; }
         .content { display: none; }
@@ -134,7 +135,7 @@
             font-size: 12px;
             opacity: 0.9;
         }
-        .product-card, .list-item, .archive-item { 
+        .product-card, .list-item, .archive-item, .admin-card { 
             background: var(--secondary-bg-color); 
             border-radius: 12px; 
             padding: 16px; 
@@ -168,8 +169,25 @@
         .product-detail-value.highlight { color: var(--button-color); font-weight: bold; }
         .product-detail-value.warning { color: #ff9500; font-weight: bold; }
         .product-detail-value.success { color: #34c759; font-weight: bold; }
-        .list-header, .archive-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-        .action-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
+        .list-header, .archive-header, .admin-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .action-buttons { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            color: white;
+            min-width: 120px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: var(--button-color); }
+        .btn-success { background: #34c759; }
+        .btn-danger { background: #ff3b30; }
+        .btn-warning { background: #ff9500; }
         .save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
         .save-btn:active { transform: scale(0.95); }
         .clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
@@ -298,6 +316,103 @@
         .success-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #34c759; }
         .success-subtitle { text-align: center; font-size: 14px; color: var(--hint-color); margin-bottom: 24px; transition: color 0.3s ease; }
         .archive-actions { display: flex; gap: 8px; margin-top: 8px; }
+        
+        /* Admin styles */
+        .admin-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .admin-stat-card {
+            background: linear-gradient(135deg, var(--button-color) 0%, #006699 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,136,204,0.2);
+        }
+        .admin-stat-card.success { background: linear-gradient(135deg, #34c759 0%, #30b350 100%); }
+        .admin-stat-card.warning { background: linear-gradient(135deg, #ff9500 0%, #e68a00 100%); }
+        .admin-stat-card.danger { background: linear-gradient(135deg, #ff3b30 0%, #e63027 100%); }
+        .admin-stat-icon { font-size: 32px; margin-bottom: 8px; }
+        .admin-stat-value { font-size: 28px; font-weight: bold; margin-bottom: 4px; }
+        .admin-stat-label { font-size: 12px; opacity: 0.9; }
+        .user-item {
+            background: var(--secondary-bg-color);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-info { flex: 1; }
+        .user-name { font-weight: 600; margin-bottom: 4px; }
+        .user-details { font-size: 12px; color: var(--hint-color); }
+        .file-upload-area {
+            border: 2px dashed var(--hint-color);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-upload-area:hover { border-color: var(--button-color); background: rgba(0,136,204,0.05); }
+        .upload-icon { font-size: 40px; margin-bottom: 12px; }
+        .admin-section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0 12px 0;
+            color: var(--text-color);
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--hint-color);
+            border-radius: 8px;
+            font-size: 14px;
+            min-height: 100px;
+            resize: vertical;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+        .form-textarea:focus { outline: none; border-color: var(--button-color); }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .alert-success {
+            background: rgba(52,199,89,0.1);
+            color: #34c759;
+            border: 1px solid #34c759;
+        }
+        .alert-error {
+            background: rgba(255,59,48,0.1);
+            color: #ff3b30;
+            border: 1px solid #ff3b30;
+        }
     </style>
 </head>
 <body>
@@ -318,6 +433,7 @@
             <button class="tab active" onclick="switchTab('search')">🔍 Пошук</button>
             <button class="tab" onclick="switchTab('list')">📋 Список<span class="tab-badge" id="listBadge" style="display:none">0</span></button>
             <button class="tab" onclick="switchTab('archives')">📁 Архів</button>
+            <button class="tab hidden" id="adminTab" onclick="switchTab('admin')">🛠️ Адмін</button>
         </div>
     </div>
 
@@ -332,6 +448,55 @@
             <div id="statisticsCard"></div>
             <div id="archivesContent"></div>
         </div>
+        
+        <!-- Admin Tab -->
+        <div id="adminTab" class="content">
+            <div class="admin-stats-grid" id="adminStatsGrid">
+                <div class="loader">Завантаження...</div>
+            </div>
+            
+            <div class="admin-section-title">👥 Користувачі з активними списками</div>
+            <div id="adminActiveUsers">
+                <div class="loader">Завантаження...</div>
+            </div>
+            
+            <div class="admin-section-title">📥 Імпорт товарів</div>
+            <div id="importAlert"></div>
+            <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📁</div>
+                <div style="font-size: 15px; margin-bottom: 6px;">Оберіть Excel файл для імпорту</div>
+                <div style="color: var(--hint-color); font-size: 13px;">Підтримка .xlsx, .xls</div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
+            </div>
+            <div id="fileInfo" style="display: none; margin-bottom: 12px; font-size: 14px; color: var(--button-color);"></div>
+            <div class="checkbox-group" style="margin-bottom: 12px;">
+                <input type="checkbox" id="notifyUsers">
+                <label for="notifyUsers">📢 Повідомити користувачів про оновлення</label>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>📤 Імпортувати</button>
+                <button class="btn btn-danger" onclick="cancelUpload()">✖️ Скасувати</button>
+            </div>
+            
+            <div class="admin-section-title">📤 Експорт та операції</div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="exportStock()">📊 Експорт залишків</button>
+                <button class="btn btn-success" onclick="exportCollected()">📋 Зведений звіт</button>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-warning" onclick="subtractCollected()">⚠️ Відняти зібране</button>
+            </div>
+            
+            <div class="admin-section-title">📢 Розсилка повідомлень</div>
+            <div id="broadcastAlert"></div>
+            <div class="form-group">
+                <label class="form-label">Текст повідомлення:</label>
+                <textarea class="form-textarea" id="broadcastMessage" placeholder="Введіть повідомлення для всіх користувачів..."></textarea>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="sendBroadcast()">📤 Розіслати всім</button>
+            </div>
+        </div>
     </div>
 
     <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
@@ -344,10 +509,19 @@ tg.expand();
 tg.ready();
 
 const userId = tg.initDataUnsafe?.user?.id || 0;
+const ADMIN_IDS = [123456]; // TODO: Замінити на реальні ID адмінів
+const isAdmin = ADMIN_IDS.includes(userId);
+
 let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
 let cachedProducts = [];
 let currentDepartment = null;
 let pullStartY = 0, pulling = false;
+let selectedFile = null;
+
+// Show admin tab if user is admin
+if (isAdmin) {
+    document.getElementById('adminTab').classList.remove('hidden');
+}
 
 // Pull-to-refresh
 document.addEventListener('touchstart', e => {
@@ -404,10 +578,13 @@ function refreshCurrentTab() {
         case 'archives':
             loadArchives();
             break;
+        case 'admin':
+            if (isAdmin) loadAdminData();
+            break;
     }
 }
 
-document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}` : 'Тестовий режим';
+document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}${isAdmin ? ' 👑' : ''}` : 'Тестовий режим';
 
 function updateDepartmentInfo(department, count) {
     currentDepartment = department;
@@ -431,7 +608,19 @@ function updateDepartmentInfo(department, count) {
 
 function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
 function updateSearchBoxVisibility() { const searchBox = document.getElementById('searchBoxContainer'); if (currentTab === 'search') { searchBox.style.display = 'block'; } else { searchBox.style.display = 'none'; } }
-function switchTab(tab) { currentTab = tab; document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab']}; const [idx, id] = tabs[tab]; document.querySelectorAll('.tab')[idx].classList.add('active'); document.getElementById(id).classList.add('active'); updateSearchBoxVisibility(); if (tab === 'list') loadList(); if (tab === 'archives') loadArchives(); }
+function switchTab(tab) { 
+    currentTab = tab; 
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
+    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminTab']}; 
+    const [idx, id] = tabs[tab]; 
+    document.querySelectorAll('.tab')[idx].classList.add('active'); 
+    document.getElementById(id).classList.add('active'); 
+    updateSearchBoxVisibility(); 
+    if (tab === 'list') loadList(); 
+    if (tab === 'archives') loadArchives(); 
+    if (tab === 'admin' && isAdmin) loadAdminData();
+}
 function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
 function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
 document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; cachedProducts = []; return; } searchTimeout = setTimeout(() => search(query), 500); });
@@ -462,7 +651,7 @@ function renderProduct(p) {
 }
 
 function showLockedAlert(dept) {
-    tg.showAlert(`🔒 Цей товар з іншого відділу.\n\nПоточний список для відділу ${dept}.\nЗбережіть або очистіть список щоб почати новий.`);
+    tg.showAlert(`🔒 Цей товар з іншого відділу.\\n\\nПоточний список для відділу ${dept}.\\nЗбережіть або очистіть список щоб почати новий.`);
 }
 
 function updateSearchResults() {
@@ -587,7 +776,6 @@ async function loadArchives() {
     statsCard.innerHTML = '';
     
     try { 
-        // Завантажуємо статистику
         const stats = await loadStatistics();
         if (stats) statsCard.innerHTML = stats;
         
@@ -599,7 +787,6 @@ async function loadArchives() {
             return; 
         }
         
-        // Кнопка завантаження всіх архівів
         let html = `<button class="download-all-btn" onclick="downloadAllArchives()">📦 Завантажити всі архіви (${d.archives.length})</button>`;
         
         for (const a of d.archives) { 
@@ -619,6 +806,289 @@ function downloadAllArchives() {
 
 function downloadArchive(f) { window.open(`/api/archive/download/${f}`, '_blank'); tg.HapticFeedback.notificationOccurred('success'); }
 async function deleteArchive(filename) { if (!confirm(`Видалити файл "${filename}"?`)) return; try { const r = await fetch(`/api/archive/delete/${filename}?user_id=${userId}`, { method: 'DELETE' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); tg.HapticFeedback.notificationOccurred('success'); loadArchives(); } else { tg.showAlert('❌ Помилка видалення'); } } catch (e) { tg.showAlert('❌ Помилка: ' + e.message); } }
+
+// === ADMIN FUNCTIONS ===
+
+async function loadAdminData() {
+    if (!isAdmin) return;
+    await loadAdminStats();
+    await loadAdminActiveUsers();
+}
+
+async function loadAdminStats() {
+    try {
+        const response = await fetch(`/api/admin/statistics?user_id=${userId}`);
+        const data = await response.json();
+        
+        const container = document.getElementById('adminStatsGrid');
+        container.innerHTML = `
+            <div class="admin-stat-card">
+                <div class="admin-stat-icon">👥</div>
+                <div class="admin-stat-value">${data.total_users || 0}</div>
+                <div class="admin-stat-label">Користувачів</div>
+            </div>
+            <div class="admin-stat-card success">
+                <div class="admin-stat-icon">🔥</div>
+                <div class="admin-stat-value">${data.active_users || 0}</div>
+                <div class="admin-stat-label">Активних</div>
+            </div>
+            <div class="admin-stat-card warning">
+                <div class="admin-stat-icon">📦</div>
+                <div class="admin-stat-value">${data.total_products || 0}</div>
+                <div class="admin-stat-label">Товарів</div>
+            </div>
+            <div class="admin-stat-card danger">
+                <div class="admin-stat-icon">💰</div>
+                <div class="admin-stat-value">${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
+                <div class="admin-stat-label">Зарезервовано</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading admin stats:', error);
+    }
+}
+
+async function loadAdminActiveUsers() {
+    try {
+        const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
+        const data = await response.json();
+        
+        const container = document.getElementById('adminActiveUsers');
+        
+        if (!data.users || data.users.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає активних списків</div>';
+            return;
+        }
+        
+        container.innerHTML = data.users.map(user => `
+            <div class="user-item">
+                <div class="user-info">
+                    <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
+                    <div class="user-details">
+                        🏢 ${user.department} • 📦 ${user.items_count} • 💰 ${user.total_sum.toLocaleString('uk-UA')} ₴
+                    </div>
+                </div>
+                <button class="btn btn-success" style="flex: 0 0 auto; padding: 8px 16px; font-size: 12px;" onclick="forceSave(${user.user_id})">
+                    💾 Зберегти
+                </button>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading active users:', error);
+    }
+}
+
+async function forceSave(targetUserId) {
+    if (!confirm(`Примусово зберегти список користувача ${targetUserId}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/admin/force-save/${targetUserId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            tg.showAlert('✅ ' + data.message);
+            loadAdminActiveUsers();
+        } else {
+            tg.showAlert('❌ ' + (data.message || 'Помилка збереження'));
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+// File upload
+const dropZone = document.getElementById('dropZone');
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--button-color)';
+    dropZone.style.background = 'rgba(0,136,204,0.1)';
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.style.borderColor = 'var(--hint-color)';
+    dropZone.style.background = '';
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--hint-color)';
+    dropZone.style.background = '';
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        selectedFile = files[0];
+        updateFileInfo();
+    }
+});
+
+function handleFileSelect(event) {
+    selectedFile = event.target.files[0];
+    updateFileInfo();
+}
+
+function updateFileInfo() {
+    if (selectedFile) {
+        document.getElementById('fileInfo').textContent = `📄 ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`;
+        document.getElementById('fileInfo').style.display = 'block';
+        document.getElementById('uploadBtn').disabled = false;
+    }
+}
+
+function cancelUpload() {
+    selectedFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('uploadBtn').disabled = true;
+    document.getElementById('importAlert').innerHTML = '';
+}
+
+async function uploadFile() {
+    if (!selectedFile) {
+        tg.showAlert('❌ Оберіть файл для завантаження');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('user_id', userId);
+    formData.append('notify_users', document.getElementById('notifyUsers').checked);
+    
+    document.getElementById('uploadBtn').disabled = true;
+    document.getElementById('uploadBtn').textContent = '⏳ Завантаження...';
+    
+    try {
+        const response = await fetch('/api/admin/import', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('importAlert').innerHTML = `
+                <div class="alert alert-success">
+                    <span style="font-size: 20px;">✅</span>
+                    <div>${data.message}<br><small>Імпортовано: ${data.imported || 0} товарів</small></div>
+                </div>
+            `;
+            cancelUpload();
+            loadAdminStats();
+        } else {
+            document.getElementById('importAlert').innerHTML = `
+                <div class="alert alert-error">
+                    <span style="font-size: 20px;">❌</span>
+                    <div>${data.message || 'Помилка імпорту'}</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('importAlert').innerHTML = `
+            <div class="alert alert-error">
+                <span style="font-size: 20px;">❌</span>
+                <div>Помилка: ${error.message}</div>
+            </div>
+        `;
+    } finally {
+        document.getElementById('uploadBtn').disabled = false;
+        document.getElementById('uploadBtn').textContent = '📤 Імпортувати';
+    }
+}
+
+async function exportStock() {
+    try {
+        window.open(`/api/admin/export/stock?user_id=${userId}`, '_blank');
+        tg.HapticFeedback.notificationOccurred('success');
+    } catch (error) {
+        tg.showAlert('❌ Помилка експорту: ' + error.message);
+    }
+}
+
+async function exportCollected() {
+    try {
+        window.open(`/api/admin/export/collected?user_id=${userId}`, '_blank');
+        tg.HapticFeedback.notificationOccurred('success');
+    } catch (error) {
+        tg.showAlert('❌ Помилка експорту: ' + error.message);
+    }
+}
+
+async function subtractCollected() {
+    if (!confirm('⚠️ УВАГА! Ця операція відніме зібрані товари з залишків.\\n\\nПродовжити?')) return;
+    
+    try {
+        const response = await fetch('/api/admin/subtract', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            tg.showAlert('✅ ' + data.message);
+            loadAdminStats();
+        } else {
+            tg.showAlert('❌ ' + (data.message || 'Помилка операції'));
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function sendBroadcast() {
+    const message = document.getElementById('broadcastMessage').value.trim();
+    
+    if (!message) {
+        tg.showAlert('❌ Введіть текст повідомлення');
+        return;
+    }
+    
+    if (!confirm(`Розіслати повідомлення всім користувачам?\\n\\nТекст: "${message}"`)) return;
+    
+    try {
+        const response = await fetch('/api/admin/broadcast', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: userId,
+                message: message
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('broadcastAlert').innerHTML = `
+                <div class="alert alert-success">
+                    <span style="font-size: 20px;">✅</span>
+                    <div>${data.message}<br><small>Розіслано: ${data.sent || 0} користувачам</small></div>
+                </div>
+            `;
+            document.getElementById('broadcastMessage').value = '';
+        } else {
+            document.getElementById('broadcastAlert').innerHTML = `
+                <div class="alert alert-error">
+                    <span style="font-size: 20px;">❌</span>
+                    <div>${data.message || 'Помилка розсилки'}</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('broadcastAlert').innerHTML = `
+            <div class="alert alert-error">
+                <span style="font-size: 20px;">❌</span>
+                <div>Помилка: ${error.message}</div>
+            </div>
+        `;
+    }
+}
+
 if (userId) loadList();
 updateSearchBoxVisibility();
 </script>
