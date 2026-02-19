@@ -34,7 +34,7 @@
 <div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
   <div class="pwa-install-content">
     <span>📱 Встановіть Epic Service на свій телефон!</span>
-    <button id="pwa-install-btn-action" class="btn btn-primary">Встановити</button>
+    <button id="pwa-install-btn" class="btn btn-primary">Встановити</button>
     <button onclick="document.getElementById('pwa-install-banner').style.display='none'" class="btn btn-secondary">Пізніше</button>
   </div>
 </div>
@@ -53,17 +53,21 @@
   const offlineIndicator = document.getElementById('offline-indicator');
   
   window.addEventListener('online', () => {
-    offlineIndicator.classList.remove('show');
-    console.log('[✅] З'єднання відновлено');
+    if (offlineIndicator) {
+      offlineIndicator.classList.remove('show');
+      console.log('[✅] З'єднання відновлено');
+    }
   });
   
   window.addEventListener('offline', () => {
-    offlineIndicator.classList.add('show');
-    console.log('[⚠️] Втрачено з'єднання');
+    if (offlineIndicator) {
+      offlineIndicator.classList.add('show');
+      console.log('[⚠️] Втрачено з'єднання');
+    }
   });
   
   // Перевірка при завантаженні сторінки
-  if (!navigator.onLine) {
+  if (!navigator.onLine && offlineIndicator) {
     offlineIndicator.classList.add('show');
   }
   
@@ -72,4 +76,12 @@
   console.log('[📱] Display mode:', 
     window.matchMedia('(display-mode: standalone)').matches ? 'Standalone (PWA)' : 'Browser'
   );
+  
+  // Додатковий обробник для діагностики
+  window.addEventListener('load', () => {
+    if (window.PWA && window.PWA.checkCompatibility) {
+      console.log('[🔍] PWA Compatibility Check:');
+      window.PWA.checkCompatibility();
+    }
+  });
 </script>

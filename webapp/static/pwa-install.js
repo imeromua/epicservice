@@ -1,60 +1,128 @@
 // PWA Installation Handler
 let deferredPrompt;
-const installButton = document.getElementById('pwa-install-btn');
-const installBanner = document.getElementById('pwa-install-banner');
+
+// Отримуємо елементи (підтримка різних ID)
+function getInstallButton() {
+  return document.getElementById('pwa-install-btn') || 
+         document.getElementById('pwa-install-btn-action');
+}
+
+function getInstallBanner() {
+  return document.getElementById('pwa-install-banner');
+}
 
 // Відстеження події beforeinstallprompt
 window.addEventListener('beforeinstallprompt', (e) => {
-  console.log('[PWA] beforeinstallprompt event fired');
+  console.log('[PWA] ✅ beforeinstallprompt event fired');
   e.preventDefault();
   deferredPrompt = e;
   
-  // Показуємо банер установки (якщо є)
+  const installBanner = getInstallBanner();
+  const installButton = getInstallButton();
+  
+  // Показуємо банер установки
   if (installBanner) {
+    console.log('[PWA] Showing install banner');
     installBanner.style.display = 'block';
+  } else {
+    console.warn('[PWA] Install banner element not found');
   }
   
-  // Активуємо кнопку установки (якщо є)
+  // Активуємо кнопку установки
   if (installButton) {
+    console.log('[PWA] Enabling install button');
     installButton.style.display = 'inline-block';
+  } else {
+    console.warn('[PWA] Install button element not found');
   }
 });
 
-// Обробник кліку на кнопку установки
-if (installButton) {
-  installButton.addEventListener('click', async () => {
-    if (!deferredPrompt) {
-      console.log('[PWA] No deferred prompt available');
-      return;
-    }
+// Функція установки PWA
+async function installPWA() {
+  console.log('[PWA] Install button clicked');
+  
+  if (!deferredPrompt) {
+    console.error('[PWA] ❌ No deferred prompt available');
+    console.log('[PWA] Possible reasons:');
+    console.log('  1. PWA already installed');
+    console.log('  2. beforeinstallprompt event not fired yet');
+    console.log('  3. Browser does not support PWA');
+    console.log('  4. Site not served over HTTPS (or not localhost)');
     
+    // Показуємо повідомлення користувачу
+    showNotification('⚠️ Не вдалося встановити. Спробуйте через меню браузера.');
+    return;
+  }
+  
+  console.log('[PWA] Showing install prompt...');
+  
+  try {
     // Показуємо промпт установки
-    deferredPrompt.prompt();
+    await deferredPrompt.prompt();
     
     // Чекаємо на вибір користувача
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`[PWA] User response: ${outcome}`);
     
     if (outcome === 'accepted') {
-      console.log('[PWA] User accepted installation');
+      console.log('[PWA] ✅ User accepted installation');
+      showNotification('✅ Встановлення розпочато...');
     } else {
-      console.log('[PWA] User dismissed installation');
+      console.log('[PWA] ❌ User dismissed installation');
+      showNotification('ℹ️ Ви можете встановити додаток пізніше');
     }
     
     // Очищуємо deferred prompt
     deferredPrompt = null;
     
-    //Ховаємо банер
+    // Ховаємо банер
+    const installBanner = getInstallBanner();
     if (installBanner) {
       installBanner.style.display = 'none';
     }
-  });
+  } catch (error) {
+    console.error('[PWA] Install prompt failed:', error);
+    showNotification('❌ Помилка встановлення. Спробуйте ще раз.');
+  }
+}
+
+// Ініціалізація обробників після завантаження DOM
+function initPWAHandlers() {
+  const installButton = getInstallButton();
+  const installBanner = getInstallBanner();
+  
+  console.log('[PWA] Initializing PWA handlers...');
+  console.log('[PWA] Install button found:', !!installButton);
+  console.log('[PWA] Install banner found:', !!installBanner);
+  
+  // Додаємо обробник на всі можливі кнопки
+  if (installButton) {
+    console.log('[PWA] Attaching click handler to button:', installButton.id);
+    installButton.addEventListener('click', installPWA);
+  }
+  
+  // Додатковий обробник для кнопки в банері
+  const bannerButton = document.querySelector('#pwa-install-banner button.btn-primary');
+  if (bannerButton && bannerButton !== installButton) {
+    console.log('[PWA] Attaching click handler to banner button');
+    bannerButton.addEventListener('click', installPWA);
+  }
+}
+
+// Ініціалізація при завантаженні DOM
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPWAHandlers);
+} else {
+  initPWAHandlers();
 }
 
 // Відстеження успішної установки
 window.addEventListener('appinstalled', (e) => {
-  console.log('[PWA] App successfully installed');
+  console.log('[PWA] ✅ App successfully installed');
   deferredPrompt = null;
+  
+  const installBanner = getInstallBanner();
+  const installButton = getInstallButton();
   
   // Ховаємо елементи установки
   if (installBanner) {
@@ -64,8 +132,8 @@ window.addEventListener('appinstalled', (e) => {
     installButton.style.display = 'none';
   }
   
-  // Можна показати повідомлення про успішну установку
-  showNotification('Epic Service успішно встановлено! 🎉');
+  // Показуємо повідомлення про успішну установку
+  showNotification('🎉 Epic Service успішно встановлено!');
 });
 
 // Реєстрація Service Worker
@@ -75,25 +143,27 @@ if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.register('/static/sw.js', {
         scope: '/'
       });
-      console.log('[PWA] Service Worker registered:', registration.scope);
+      console.log('[PWA] ✅ Service Worker registered:', registration.scope);
       
       // Перевірка оновлень
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
-        console.log('[PWA] New Service Worker found');
+        console.log('[PWA] 🔄 New Service Worker found');
         
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Нова версія доступна
+            console.log('[PWA] ✅ New version available');
             showUpdateNotification();
           }
         });
       });
       
     } catch (error) {
-      console.error('[PWA] Service Worker registration failed:', error);
+      console.error('[PWA] ❌ Service Worker registration failed:', error);
     }
   });
+} else {
+  console.warn('[PWA] ⚠️ Service Workers not supported in this browser');
 }
 
 // Показати повідомлення про оновлення
@@ -102,7 +172,7 @@ function showUpdateNotification() {
   updateBanner.className = 'pwa-update-banner';
   updateBanner.innerHTML = `
     <div class="pwa-update-content">
-      <span>Доступна нова версія! 🎉</span>
+      <span>🎉 Доступна нова версія!</span>
       <button id="pwa-update-btn" class="btn btn-sm btn-primary">Оновити</button>
       <button id="pwa-update-dismiss" class="btn btn-sm btn-secondary">Пізніше</button>
     </div>
@@ -154,15 +224,33 @@ function isPWA() {
          window.navigator.standalone === true;
 }
 
-// Логування стану PWA
-if (isPWA()) {
-  console.log('[PWA] Running as installed app');
-} else {
-  console.log('[PWA] Running in browser');
-}
+// Діагностика при завантаженні
+window.addEventListener('load', () => {
+  console.log('\n' + '='.repeat(50));
+  console.log('[PWA] 📊 Diagnostics');
+  console.log('='.repeat(50));
+  console.log('[PWA] Running as:', isPWA() ? 'Installed PWA ✅' : 'Browser 🌐');
+  console.log('[PWA] Protocol:', window.location.protocol);
+  console.log('[PWA] Service Worker support:', 'serviceWorker' in navigator ? 'Yes ✅' : 'No ❌');
+  console.log('[PWA] Online status:', navigator.onLine ? 'Online ✅' : 'Offline ⚠️');
+  console.log('[PWA] Install button:', !!getInstallButton() ? 'Found ✅' : 'Not found ❌');
+  console.log('[PWA] Install banner:', !!getInstallBanner() ? 'Found ✅' : 'Not found ❌');
+  console.log('='.repeat(50) + '\n');
+});
 
 // Експорт для використання в інших скриптах
 window.PWA = {
   isPWA,
-  showNotification
+  showNotification,
+  installPWA,
+  checkCompatibility: () => {
+    const checks = {
+      serviceWorker: 'serviceWorker' in navigator,
+      https: window.location.protocol === 'https:' || window.location.hostname === 'localhost',
+      standalone: isPWA(),
+      online: navigator.onLine
+    };
+    console.table(checks);
+    return checks;
+  }
 };
