@@ -9,7 +9,7 @@ import sys
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -74,8 +74,9 @@ async def home(request: Request):
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request):
-    """Адмін-панель"""
-    return templates.TemplateResponse("admin.html", {"request": request})
+    """Адмін-панель - віддає статичний HTML файл"""
+    admin_html_path = os.path.join(os.path.dirname(__file__), "static", "admin.html")
+    return FileResponse(admin_html_path)
 
 
 @app.get("/health")
