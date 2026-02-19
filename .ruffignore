@@ -1,0 +1,59 @@
+# Ignore legacy code (will be refactored later)
+bot.py
+config.py
+database/engine.py
+database/models.py
+database/orm/
+handlers/
+keyboards/
+lexicon/
+middlewares/
+utils/
+webapp/api.py
+webapp/routers/
+webapp/update-html.py
+
+# Build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archives and temp
+archives/
+trash/
+*.xlsx
+*.xls
+*.zip
+
+# Alembic
+alembic/
