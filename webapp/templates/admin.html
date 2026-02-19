@@ -130,18 +130,37 @@
             padding: 24px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,136,204,0.2);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,136,204,0.3);
         }
         
         .stat-card.success {
             background: linear-gradient(135deg, var(--success) 0%, #30b350 100%);
         }
         
+        .stat-card.success:hover {
+            box-shadow: 0 8px 20px rgba(52,199,89,0.3);
+        }
+        
         .stat-card.warning {
             background: linear-gradient(135deg, var(--warning) 0%, #e68a00 100%);
         }
         
+        .stat-card.warning:hover {
+            box-shadow: 0 8px 20px rgba(255,149,0,0.3);
+        }
+        
         .stat-card.danger {
             background: linear-gradient(135deg, var(--danger) 0%, #e63027 100%);
+        }
+        
+        .stat-card.danger:hover {
+            box-shadow: 0 8px 20px rgba(255,59,48,0.3);
         }
         
         .stat-icon {
@@ -406,6 +425,83 @@
             color: var(--primary);
             font-weight: 600;
         }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: var(--bg);
+        }
+        
+        .modal-body {
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body>
@@ -546,6 +642,19 @@
         </div>
     </div>
     
+    <!-- Modal window -->
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">📊 Деталі</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be inserted here -->
+            </div>
+        </div>
+    </div>
+    
     <script>
         const ADMIN_ID = 123456;
         
@@ -569,6 +678,157 @@
             if (tab === 'users') { loadAllUsers(); loadActiveUsers(); }
         }
         
+        // Modal functions
+        function openModal(title, content) {
+            document.getElementById('modalTitle').innerHTML = title;
+            document.getElementById('modalBody').innerHTML = content;
+            document.getElementById('modal').classList.add('active');
+        }
+        
+        function closeModal(event) {
+            if (!event || event.target.id === 'modal') {
+                document.getElementById('modal').classList.remove('active');
+            }
+        }
+        
+        // Stat card click handlers
+        async function showAllUsers() {
+            openModal('👥 Всі користувачі', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
+            try {
+                const response = await fetch(`/api/admin/users?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                if (!data.users || data.users.length === 0) {
+                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає користувачів</div>';
+                    return;
+                }
+                
+                const usersList = data.users.map(userId => `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-name">👤 User ${userId}</div>
+                            <div class="user-details">ID: ${userId}</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('modalBody').innerHTML = `<div class="user-list">${usersList}</div>`;
+            } catch (error) {
+                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+            }
+        }
+        
+        async function showActiveUsers() {
+            openModal('🔥 Активні списки', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
+            try {
+                const response = await fetch(`/api/admin/users/active?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                if (!data.users || data.users.length === 0) {
+                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Немає активних списків</div>';
+                    return;
+                }
+                
+                const usersList = data.users.map(user => `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
+                            <div class="user-details">
+                                🏢 Відділ: ${user.department || 'N/A'} • 
+                                📦 Товарів: ${user.items_count} • 
+                                💰 Сума: ${user.total_sum.toLocaleString('uk-UA')} ₴
+                            </div>
+                        </div>
+                        <button class="btn btn-success" onclick="forceSave(${user.user_id})">
+                            💾 Зберегти
+                        </button>
+                    </div>
+                `).join('');
+                
+                document.getElementById('modalBody').innerHTML = `<div class="user-list">${usersList}</div>`;
+            } catch (error) {
+                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+            }
+        }
+        
+        async function showProductsStats() {
+            openModal('📦 Статистика товарів', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
+            try {
+                const response = await fetch(`/api/admin/summary?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const deptList = data.departments.map(dept => `
+                        <li class="dept-item">
+                            <span class="dept-name">Відділ ${dept.department_id}</span>
+                            <span class="dept-count">${dept.count} арт.</span>
+                        </li>
+                    `).join('');
+                    
+                    document.getElementById('modalBody').innerHTML = `
+                        <div style="margin-bottom: 20px;">
+                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">
+                                📦 Кількість артикулів: <span style="color: var(--primary);">${data.total_count} шт.</span>
+                            </div>
+                            <div style="font-size: 18px; font-weight: 600;">
+                                💰 Загальна сума збору: <span style="color: var(--success);">${data.total_sum.toLocaleString('uk-UA')} грн</span>
+                            </div>
+                        </div>
+                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">📦 По відділах:</div>
+                        <ul class="dept-list">${deptList}</ul>
+                    `;
+                } else {
+                    document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${data.message || 'Помилка завантаження'}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${error.message}</div>`;
+            }
+        }
+        
+        async function showReservedBreakdown() {
+            openModal('💰 Розбивка резервів', '<div class="loader"><div class="loader-spinner">⟳</div></div>');
+            try {
+                const response = await fetch(`/api/admin/users/active?user_id=${ADMIN_ID}`);
+                const data = await response.json();
+                
+                if (!data.users || data.users.length === 0) {
+                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div>Немає резервів</div>';
+                    return;
+                }
+                
+                const totalReserved = data.users.reduce((sum, user) => sum + user.total_sum, 0);
+                
+                const usersList = data.users
+                    .sort((a, b) => b.total_sum - a.total_sum)
+                    .map(user => `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
+                            <div class="user-details">
+                                📦 Товарів: ${user.items_count} • 
+                                🏢 Відділ: ${user.department || 'N/A'}
+                            </div>
+                        </div>
+                        <div style="font-size: 18px; font-weight: 600; color: var(--danger);">
+                            ${user.total_sum.toLocaleString('uk-UA')} ₴
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="margin-bottom: 20px; padding: 16px; background: var(--bg); border-radius: 8px;">
+                        <div style="font-size: 18px; font-weight: 600;">
+                            💰 Загальна сума резервів: <span style="color: var(--danger);">${totalReserved.toLocaleString('uk-UA')} ₴</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">По користувачах:</div>
+                    <div class="user-list">${usersList}</div>
+                `;
+            } catch (error) {
+                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+            }
+        }
+        
         async function loadStatistics() {
             try {
                 const response = await fetch(`/api/admin/statistics?user_id=${ADMIN_ID}`);
@@ -576,22 +836,22 @@
                 
                 const container = document.getElementById('statsContainer');
                 container.innerHTML = `
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="showAllUsers()">
                         <div class="stat-icon">👥</div>
                         <div class="stat-value">${data.total_users || 0}</div>
                         <div class="stat-label">Всього користувачів</div>
                     </div>
-                    <div class="stat-card success">
+                    <div class="stat-card success" onclick="showActiveUsers()">
                         <div class="stat-icon">🔥</div>
                         <div class="stat-value">${data.active_users || 0}</div>
                         <div class="stat-label">Активні списки</div>
                     </div>
-                    <div class="stat-card warning">
+                    <div class="stat-card warning" onclick="showProductsStats()">
                         <div class="stat-icon">📦</div>
                         <div class="stat-value">${data.total_products || 0}</div>
                         <div class="stat-label">Товарів в базі</div>
                     </div>
-                    <div class="stat-card danger">
+                    <div class="stat-card danger" onclick="showReservedBreakdown()">
                         <div class="stat-icon">💰</div>
                         <div class="stat-value">${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
                         <div class="stat-label">Зарезервовано</div>
@@ -677,6 +937,7 @@
                 if (data.success) {
                     alert('✅ ' + data.message);
                     loadActiveUsers();
+                    closeModal();
                 } else {
                     alert('❌ ' + (data.message || 'Помилка збереження'));
                 }
