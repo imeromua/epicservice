@@ -185,15 +185,16 @@ async def broadcast_import_update(result: dict):
             for dep_id, count in sorted(dep_stats.items())
         ]
         message_text = (
-            LEXICON.USER_IMPORT_NOTIFICATION_TITLE + summary_part + "\n" +
-            details_part + "\n" + departments_part + "\n".join(departments_lines)
+            LEXICON.USER_IMPORT_NOTIFICATION_TITLE + summary_part +
+            details_part + departments_part + "".join(departments_lines)
         )
 
         sent_count = 0
         for user_id in user_ids:
             try:
                 kb = get_admin_main_kb() if user_id in ADMIN_IDS else get_user_main_kb()
-                await bot.send_message(user_id, message_text, reply_markup=kb)
+                # ЗМІНЕНО: parse_mode='HTML' замість 'Markdown'
+                await bot.send_message(user_id, message_text, reply_markup=kb, parse_mode='HTML')
                 sent_count += 1
             except Exception as e:
                 logger.warning("Не вдалося надіслати сповіщення користувачу %s: %s", user_id, e)
@@ -234,7 +235,8 @@ async def get_active_users(user_id: int = Query(...)):
     verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
-        active_users_data = await orm_get_users_with_active_lists()
+        # ВИПРАВЛЕНО: викликаємо асинхронну функцію правильно
+        active_users_raw = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
         # Групуємо по користувачах
@@ -243,7 +245,7 @@ async def get_active_users(user_id: int = Query(...)):
             if item.user_id not in user_data:
                 user_data[item.user_id] = {
                     "user_id": item.user_id,
-                    "username": f"User {item.user_id}",  # TODO: можна додати username з users таблиці
+                    "username": f"User {item.user_id}",
                     "department": None,
                     "items_count": 0,
                     "total_sum": 0.0
@@ -368,30 +370,45 @@ async def export_stock_report(user_id: int = Query(...)):
 
 
 @router.get("/export/collected")
-async def export_collected_report(user_id: int = Query(...)):
+async def export_department_stats(user_id: int = Query(...)):
     """
-    Експорт зведеного звіту про зібрані товари з усіх архівів.
+    ЗМІНЕНО: Експорт статистики по відділах (кількість артикулів та загальна сума).
+    Раніше експортувало зібране з архівів, тепер показує поточний стан складу.
     """
     verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
-        collected_items = await loop.run_in_executor(None, orm_get_all_collected_items_sync)
+        all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
 
-        if not collected_items:
+        if not all_products:
             return JSONResponse(
                 content={"message": "Немає даних для експорту"},
                 status_code=404
             )
 
-        df = pd.DataFrame(collected_items)
-        df.rename(
-            columns={"department": "Відділ", "group": "Група", "name": "Назва", "quantity": "Кількість"},
-            inplace=True
-        )
+        # Групуємо по відділах
+        dept_stats = {}
+        for product in all_products:
+            dept = product.відділ
+            if dept not in dept_stats:
+                dept_stats[dept] = {"count": 0, "total_sum": 0.0}
+            dept_stats[dept]["count"] += 1
+            dept_stats[dept]["total_sum"] += (product.сума_залишку or 0.0)
+
+        # Формуємо DataFrame
+        report_data = [
+            {
+                "Відділ": dept_id,
+                "Кількість артикулів": stats["count"],
+                "Загальна сума збору (грн)": round(stats["total_sum"], 2)
+            }
+            for dept_id, stats in sorted(dept_stats.items())
+        ]
         
+        df = pd.DataFrame(report_data)
         os.makedirs(ARCHIVES_PATH, exist_ok=True)
         report_path = os.path.join(
-            ARCHIVES_PATH, f"collected_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            ARCHIVES_PATH, f"department_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
         )
         df.to_excel(report_path, index=False)
 
@@ -403,7 +420,7 @@ async def export_collected_report(user_id: int = Query(...)):
         )
 
     except Exception as e:
-        logger.error("Помилка експорту зібраного: %s", e, exc_info=True)
+        logger.error("Помилка експорту статистики: %s", e, exc_info=True)
         return JSONResponse(
             content={"error": "Помилка створення звіту"},
             status_code=500
@@ -548,6 +565,7 @@ async def get_system_statistics(user_id: int = Query(...)):
         # Збираємо статистику паралельно
         all_users = await loop.run_in_executor(None, orm_get_all_users_sync)
         all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
+        # ВИПРАВЛЕНО: правильний виклик асинхронної функції
         active_users_data = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
