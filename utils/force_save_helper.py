@@ -22,6 +22,7 @@ async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> boo
     """
     Примусово зберігає тимчасовий список користувача,
     тепер з коректним керуванням UI цього користувача.
+    Використовується в боті з FSMContext.
     """
     main_list_path = None
     surplus_list_path = None
@@ -63,6 +64,55 @@ async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> boo
         return False
     except Exception as e:
         logger.error("Неочікувана помилка при примусовому збереженні для %s: %s", user_id, e, exc_info=True)
+        try:
+            await bot.send_message(user_id, LEXICON.UNEXPECTED_ERROR)
+        except Exception as bot_error:
+            logger.warning("Не вдалося надіслати повідомлення про помилку користувачу %s: %s", user_id, bot_error)
+        return False
+    finally:
+        if main_list_path and os.path.exists(main_list_path):
+            os.remove(main_list_path)
+        if surplus_list_path and os.path.exists(surplus_list_path):
+            os.remove(surplus_list_path)
+
+
+async def force_save_user_list_web(user_id: int, bot: Bot) -> bool:
+    """
+    Спрощена версія для виклику з веб-API без FSMContext.
+    Просто зберігає список і надсилає файли користувачу.
+    """
+    main_list_path = None
+    surplus_list_path = None
+    
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
+
+        if not main_list_path and not surplus_list_path:
+            await bot.send_message(user_id, "⚠️ У вас немає активного списку для збереження")
+            return True
+            
+        if main_list_path:
+            await bot.send_document(user_id, FSInputFile(main_list_path), caption=LEXICON.MAIN_LIST_SAVED)
+        if surplus_list_path:
+            await bot.send_document(user_id, FSInputFile(surplus_list_path), caption=LEXICON.SURPLUS_LIST_CAPTION)
+        
+        await bot.send_message(
+            user_id,
+            "✅ Ваш список було примусово збережено адміністратором."
+        )
+        return True
+
+    except (SQLAlchemyError, ValueError) as e:
+        logger.error("Помилка транзакції при примусовому збереженні (веб) для %s: %s", user_id, e, exc_info=True)
+        try:
+            await bot.send_message(user_id, LEXICON.TRANSACTION_ERROR)
+        except Exception as bot_error:
+            logger.warning("Не вдалося надіслати повідомлення про помилку користувачу %s: %s", user_id, bot_error)
+        return False
+    except Exception as e:
+        logger.error("Неочікувана помилка при примусовому збереженні (веб) для %s: %s", user_id, e, exc_info=True)
         try:
             await bot.send_message(user_id, LEXICON.UNEXPECTED_ERROR)
         except Exception as bot_error:
