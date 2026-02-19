@@ -65,6 +65,12 @@ async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_panel(request: Request):
+    """Адмін-панель"""
+    return templates.TemplateResponse("admin.html", {"request": request})
+
+
 @app.get("/health")
 async def health_check():
     """Перевірка стану API"""
