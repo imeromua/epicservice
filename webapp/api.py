@@ -256,19 +256,29 @@ async def get_user_statistics(user_id: int):
                 file_items = 0
                 
                 # Рахуємо товари та суму (пропускаємо заголовок)
+                # Новий формат: Артикул, Кількість, Ціна, Сума
                 for row in ws.iter_rows(min_row=2, values_only=True):
                     if not row or not row[0]:
                         continue
-                    # Пропускаємо підсумки
+                    # Пропускаємо рядки підсумків
                     if str(row[0]).strip() in ["", "К-ть артикулів:", "Зібрано на суму:"]:
                         continue
                     
                     file_items += 1
-                    # Сума = кількість * ціна (зазвичай стовпці 2 і 3)
+                    
+                    # Сума у 4-й колонці (індекс 3)
                     try:
-                        qty = float(row[2]) if len(row) > 2 and row[2] else 0
-                        price = float(row[3]) if len(row) > 3 and row[3] else 0
-                        file_amount += qty * price
+                        if len(row) > 3 and row[3]:
+                            # row[3] може бути числом або рядком "123.45 грн"
+                            sum_value = row[3]
+                            if isinstance(sum_value, str):
+                                sum_value = sum_value.replace(' грн', '').replace(',', '.').strip()
+                            file_amount += float(sum_value)
+                        else:
+                            # Fallback: кількість * ціна (колонки 1 і 2)
+                            qty = float(row[1]) if len(row) > 1 and row[1] else 0
+                            price = float(row[2]) if len(row) > 2 and row[2] else 0
+                            file_amount += qty * price
                     except (ValueError, TypeError, IndexError):
                         pass
                 
