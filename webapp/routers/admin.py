@@ -193,7 +193,6 @@ async def broadcast_import_update(result: dict):
         for user_id in user_ids:
             try:
                 kb = get_admin_main_kb() if user_id in ADMIN_IDS else get_user_main_kb()
-                # ЗМІНЕНО: parse_mode='HTML' замість 'Markdown'
                 await bot.send_message(user_id, message_text, reply_markup=kb, parse_mode='HTML')
                 sent_count += 1
             except Exception as e:
@@ -235,7 +234,6 @@ async def get_active_users(user_id: int = Query(...)):
     verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
-        # ВИПРАВЛЕНО: викликаємо асинхронну функцію правильно
         active_users_raw = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
@@ -369,11 +367,67 @@ async def export_stock_report(user_id: int = Query(...)):
         )
 
 
+@router.get("/summary")
+async def get_summary_stats(user_id: int = Query(...)):
+    """
+    НОВИЙ: Отримати зведену статистику по відділах у форматі JSON.
+    Показує кількість артикулів та загальну суму збору.
+    """
+    verify_admin(user_id)
+    try:
+        loop = asyncio.get_running_loop()
+        all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
+
+        if not all_products:
+            return JSONResponse(content={
+                "success": False,
+                "message": "Немає даних для формування звіту"
+            }, status_code=404)
+
+        # Групуємо по відділах
+        dept_stats = {}
+        total_count = 0
+        total_sum = 0.0
+        
+        for product in all_products:
+            dept = product.відділ
+            if dept not in dept_stats:
+                dept_stats[dept] = {"count": 0, "total_sum": 0.0}
+            dept_stats[dept]["count"] += 1
+            dept_stats[dept]["total_sum"] += (product.сума_залишку or 0.0)
+            total_count += 1
+            total_sum += (product.сума_залишку or 0.0)
+
+        # Форматуємо для відповіді
+        departments = [
+            {
+                "department_id": dept_id,
+                "count": stats["count"],
+                "total_sum": round(stats["total_sum"], 2)
+            }
+            for dept_id, stats in sorted(dept_stats.items())
+        ]
+
+        return JSONResponse(content={
+            "success": True,
+            "total_count": total_count,
+            "total_sum": round(total_sum, 2),
+            "departments": departments
+        })
+
+    except Exception as e:
+        logger.error("Помилка отримання зведеної статистики: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"error": "Помилка отримання статистики"},
+            status_code=500
+        )
+
+
 @router.get("/export/collected")
 async def export_department_stats(user_id: int = Query(...)):
     """
-    ЗМІНЕНО: Експорт статистики по відділах (кількість артикулів та загальна сума).
-    Раніше експортувало зібране з архівів, тепер показує поточний стан складу.
+    ЗАСТАРІЛО: Експорт статистики по відділах у вигляді Excel файлу.
+    Рекомендується використовувати /summary для отримання JSON.
     """
     verify_admin(user_id)
     try:
@@ -565,7 +619,6 @@ async def get_system_statistics(user_id: int = Query(...)):
         # Збираємо статистику паралельно
         all_users = await loop.run_in_executor(None, orm_get_all_users_sync)
         all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
-        # ВИПРАВЛЕНО: правильний виклик асинхронної функції
         active_users_data = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
