@@ -436,6 +436,63 @@ async def get_summary_stats(user_id: int = Query(...)):
             status_code=500
         )
 
+@router.get("/report/summary")
+async def get_warehouse_summary(user_id: int = Query(...)):
+    """Повертає зведену статистику по складу для відображення в адмін-панелі."""
+    verify_admin(user_id)
+    try:
+        loop = asyncio.get_running_loop()
+        
+        def _calc_summary():
+            products = orm_get_all_products_sync()
+            temp_list_items = orm_get_all_temp_list_items_sync()
+
+            # Збираємо всі зарезервовані товари з тимчасових списків користувачів
+            temp_reservations = {}
+            for item in temp_list_items:
+                temp_reservations[item.product_id] = temp_reservations.get(item.product_id, 0) + item.quantity
+
+            total_articles = 0
+            total_sum = 0.0
+            departments = {}
+
+            for product in products:
+                # Безпечна конвертація кількості
+                try:
+                    stock_qty = float(str(product.кількість).replace(',', '.'))
+                except (ValueError, TypeError):
+                    stock_qty = 0
+
+                reserved = (product.відкладено or 0) + temp_reservations.get(product.id, 0)
+                available = stock_qty - reserved
+                
+                # Враховуємо лише ті артикули, які фізично є в наявності (доступні > 0)
+                if available > 0:
+                    total_articles += 1
+                    available_sum = available * (product.ціна or 0.0)
+                    total_sum += available_sum
+                    
+                    dep = str(product.відділ)
+                    departments[dep] = departments.get(dep, 0) + 1
+            
+            # Сортуємо відділи за зростанням для красивого виводу
+            sorted_deps = dict(sorted(departments.items(), key=lambda x: int(x[0]) if x[0].isdigit() else x[0]))
+            
+            return {
+                "total_articles": total_articles,
+                "total_sum": total_sum,
+                "departments": sorted_deps
+            }
+            
+        summary = await loop.run_in_executor(None, _calc_summary)
+        return JSONResponse(content={"success": True, "data": summary})
+    
+    except Exception as e:
+        logger.error("Помилка формування зведеного звіту: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "error": "Помилка формування зведеного звіту"},
+            status_code=500
+        )
 
 @router.get("/export/collected")
 async def export_department_stats(user_id: int = Query(...), background_tasks: BackgroundTasks = None):

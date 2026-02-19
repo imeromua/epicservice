@@ -1118,6 +1118,50 @@
             }
         }
         
+        async function showSummaryReport() {
+    // Відкриваємо модалку та показуємо лоадер, поки чекаємо відповідь від сервера
+    showModal('Зведений звіт по складу', '<div style="text-align:center; padding: 30px; color: var(--text-secondary);">⏳ Збираємо дані...</div>');
+    
+    try {
+        const response = await fetch(`/api/admin/report/summary?user_id=${ADMIN_ID}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            
+            // Форматуємо суму у вигляді "741 736.24"
+            const formatMoney = (sum) => new Intl.NumberFormat('uk-UA', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+            }).format(sum).replace(/,/g, '.'); // Примусово ставимо крапку замість коми, як у зразку
+            
+            let html = `
+                <div style="font-size: 16px; margin-bottom: 20px; background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                    <p style="margin-bottom: 8px;"><strong>Кількість артикулів:</strong> <span style="color: var(--primary); font-weight: bold;">${data.total_articles}</span> шт.</p>
+                    <p><strong>Загальна сума збору:</strong> <span style="color: var(--success); font-weight: bold;">${formatMoney(data.total_sum)}</span> грн</p>
+                </div>
+                <div style="font-size: 15px;">
+                    <p style="margin-bottom: 12px;">📦 <strong>Актуальна кількість артикулів по відділах:</strong></p>
+                    <div style="display: grid; gap: 8px; padding-left: 10px;">
+            `;
+            
+            for (const [dep, count] of Object.entries(data.departments)) {
+                html += `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--primary); font-size: 12px;">●</span> 
+                        <span>Відділ ${dep}: <strong>${count}</strong> арт.</span>
+                    </div>`;
+            }
+            
+            html += `</div></div>`;
+            document.getElementById('modalBody').innerHTML = html;
+        } else {
+            document.getElementById('modalBody').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>${result.error || 'Помилка завантаження'}</div>`;
+        }
+    } catch (error) {
+        document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка з\'єднання із сервером</div>';
+    }
+        }
         async function sendBroadcast() {
             const message = document.getElementById('broadcastMessage').value.trim();
             
