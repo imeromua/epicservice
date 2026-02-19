@@ -13,12 +13,11 @@ from sqlalchemy import text
 
 from config import BOT_TOKEN, REDIS_ENABLED, REDIS_URL
 from database.engine import async_session
-from handlers import (archive, common, error_handler, user_search, webapp_handler)
+from handlers import common, error_handler, webapp_handler
 from handlers.admin import (archive_handlers as admin_archive,
                             core as admin_core,
                             import_handlers as admin_import,
                             report_handlers as admin_reports)
-from handlers.user import (list_editing, list_management, list_saving)
 from middlewares.logging_middleware import LoggingMiddleware
 from utils.archive_manager import cleanup_trash, ensure_archive_dirs
 
@@ -111,18 +110,21 @@ async def main():
     dp.update.middleware(LoggingMiddleware())
 
     # --- Реєстрація роутерів ---
+    # Порядок важливий: спочатку error handler, потім admin, потім common
     dp.include_router(error_handler.router)
+    
+    # Адміністративні роутери
     dp.include_router(admin_core.router)
     dp.include_router(admin_import.router)
     dp.include_router(admin_reports.router)
     dp.include_router(admin_archive.router)
-    dp.include_router(common.router)
+    
+    # Загальні роутери (для всіх користувачів)
+    dp.include_router(common.router)  # /start і кнопка Адмінка
     dp.include_router(webapp_handler.router)  # Web App handler
-    dp.include_router(archive.router)
-    dp.include_router(list_management.router)
-    dp.include_router(list_editing.router)
-    dp.include_router(list_saving.router)
-    dp.include_router(user_search.router)
+    
+    # ВИДАЛЕНО: archive, user_search, list_management, list_editing, list_saving
+    # Причина: весь user-функціонал тепер у webapp (Mini App)
 
     try:
         await set_main_menu(bot)
