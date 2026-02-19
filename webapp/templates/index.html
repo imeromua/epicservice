@@ -1056,6 +1056,143 @@ async function showAdminArchives() {
     }
 }
 
+
+async function showAllUsers() {
+    try {
+        const response = await fetch(`/api/admin/users/all?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.users && data.users.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">👥 Всі користувачі</h2>';
+            html += '<div style="max-height: 450px; overflow-y: auto;">';
+            data.users.forEach(user => {
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px;">`;
+                html += `<div style="font-weight: 600;">👤 ID: ${user.user_id}${user.username ? ' (@' + user.username + ')' : ''}</div>`;
+                html += `<div style="font-size: 12px; color: var(--hint-color); margin-top: 4px;">`;
+                html += `📁 Архівів: ${user.archives_count || 0} | 💰 Сума: ${(user.total_amount || 0).toLocaleString('uk-UA')} ₴`;
+                if (user.last_activity) html += ` | 🕐 ${user.last_activity}`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає користувачів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function showActiveUsers() {
+    try {
+        const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.users && data.users.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">🔥 Активні користувачі</h2>';
+            html += '<div style="max-height: 450px; overflow-y: auto;">';
+            data.users.forEach(user => {
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px;">`;
+                html += `<div style="font-weight: 600;">👤 ${user.username || 'User ' + user.user_id}</div>`;
+                html += `<div style="font-size: 12px; color: var(--hint-color); margin-top: 4px;">`;
+                html += `🏢 ${user.department || '-'} | 📦 ${user.items_count} товарів | 💰 ${(user.total_sum || 0).toLocaleString('uk-UA')} ₴`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає активних користувачів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function showProductsInfo() {
+    try {
+        const response = await fetch(`/api/admin/products/info?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            let html = '<h2 style="margin-bottom: 8px;">📦 Інформація про товари</h2>';
+            if (data.last_import) {
+                html += `<div style="padding: 10px; background: rgba(52,199,89,0.1); border-radius: 8px; margin-bottom: 12px; font-size: 13px;">`;
+                html += `✅ Базу оновлено ${data.last_import}`;
+                html += `</div>`;
+            }
+            html += `<div style="padding: 12px; background: var(--secondary-bg-color); border-radius: 8px; margin-bottom: 12px;">`;
+            html += `<div style="font-weight: 600; margin-bottom: 4px;">Кількість артикулів: ${data.total_articles || 0} шт.</div>`;
+            html += `<div style="font-size: 13px; color: var(--hint-color);">Загальна сума збору: ${(data.total_sum || 0).toLocaleString('uk-UA')} грн</div>`;
+            html += `</div>`;
+            html += '<div style="font-weight: 600; margin-bottom: 8px;">📦 Актуальна кількість артикулів по відділах:</div>';
+            html += '<div style="max-height: 350px; overflow-y: auto;">';
+            if (data.departments && data.departments.length > 0) {
+                data.departments.forEach(dept => {
+                    html += `<div style="padding: 8px 12px; background: var(--secondary-bg-color); margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between;">`;
+                    html += `<span>🏢 Відділ ${dept.department}</span>`;
+                    html += `<span style="font-weight: 600;">${dept.count} арт.</span>`;
+                    html += `</div>`;
+                });
+            }
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає даних');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function showReservedByDepartment() {
+    try {
+        const response = await fetch(`/api/admin/reserved/by-department?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.departments && data.departments.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">💰 Резерви по відділах</h2>';
+            html += '<div style="max-height: 450px; overflow-y: auto;">';
+            const total = data.departments.reduce((sum, d) => sum + (d.reserved_sum || 0), 0);
+            data.departments.forEach(dept => {
+                const percent = total > 0 ? ((dept.reserved_sum / total) * 100).toFixed(1) : 0;
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px;">`;
+                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
+                html += `<div style="font-weight: 600;">🏢 Відділ ${dept.department}</div>`;
+                html += `<div style="font-weight: 600; color: var(--button-color);">${(dept.reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>`;
+                html += `</div>`;
+                html += `<div style="background: var(--hint-color); height: 6px; border-radius: 3px; overflow: hidden;">`;
+                html += `<div style="background: var(--button-color); width: ${percent}%; height: 100%;"></div>`;
+                html += `</div>`;
+                html += `<div style="font-size: 12px; color: var(--hint-color); margin-top: 4px;">`;
+                html += `📦 ${dept.products_count || 0} товарів | 👥 ${dept.users_count || 0} користувачів | ${percent}%`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає резервів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+function closeStatsModal() {
+    document.getElementById('statsModal').classList.remove('active');
+}
+
 function closeAdminArchivesModal() {
     document.getElementById('adminArchivesModal').classList.remove('active');
 }
