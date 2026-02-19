@@ -14,7 +14,7 @@ from typing import List, Optional
 import openpyxl
 import pandas as pd
 from aiogram import Bot
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
@@ -206,11 +206,12 @@ async def broadcast_import_update(result: dict):
 # === Ендпоїнти ===
 
 @router.get("/users")
-async def get_all_users(user_id: int = Depends(verify_admin)):
+async def get_all_users(user_id: int = Query(...)):
     """
     Отримати список всіх користувачів системи.
     Потрібні права адміністратора.
     """
+    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -225,20 +226,36 @@ async def get_all_users(user_id: int = Depends(verify_admin)):
 
 
 @router.get("/users/active")
-async def get_active_users(user_id: int = Depends(verify_admin)):
+async def get_active_users(user_id: int = Query(...)):
     """
     Отримати користувачів з активними списками (temp_list).
     Потрібні права адміністратора.
     """
+    verify_admin(user_id)
     try:
-        active_users = await orm_get_users_with_active_lists()
+        loop = asyncio.get_running_loop()
+        active_users_data = await orm_get_users_with_active_lists()
+        temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
+        
+        # Групуємо по користувачах
+        user_data = {}
+        for item in temp_list_items:
+            if item.user_id not in user_data:
+                user_data[item.user_id] = {
+                    "user_id": item.user_id,
+                    "username": f"User {item.user_id}",  # TODO: можна додати username з users таблиці
+                    "department": None,
+                    "items_count": 0,
+                    "total_sum": 0.0
+                }
+            user_data[item.user_id]["items_count"] += 1
+            user_data[item.user_id]["total_sum"] += (item.quantity * item.price)
+            if not user_data[item.user_id]["department"]:
+                user_data[item.user_id]["department"] = item.department
+        
         return JSONResponse(content={
             "success": True,
-            "users": [{
-                "user_id": uid,
-                "items_count": count
-            } for uid, count in active_users],
-            "count": len(active_users)
+            "users": list(user_data.values())
         })
     except Exception as e:
         logger.error("Помилка отримання активних користувачів: %s", e, exc_info=True)
@@ -248,14 +265,16 @@ async def get_active_users(user_id: int = Depends(verify_admin)):
 @router.post("/import")
 async def import_products(
     file: UploadFile = File(...),
-    user_id: int = Depends(verify_admin),
-    notify_users: bool = False
+    user_id: int = Query(...),
+    notify_users: bool = Query(False)
 ):
     """
     Імпорт товарів з Excel файлу.
     Підтримує розумне розпізнавання колонок.
     Опціонально розсилає сповіщення користувачам.
     """
+    verify_admin(user_id)
+    
     if not file.filename.endswith((".xlsx", ".xls")):
         return JSONResponse(
             content={"error": "Невірний формат файлу. Потрібен Excel (.xlsx або .xls)"},
@@ -317,11 +336,12 @@ async def import_products(
 
 
 @router.get("/export/stock")
-async def export_stock_report(user_id: int = Depends(verify_admin)):
+async def export_stock_report(user_id: int = Query(...)):
     """
     Експорт звіту про залишки на складі.
     Враховує резерви з temp_list.
     """
+    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         report_path = await loop.run_in_executor(None, _create_stock_report_sync)
@@ -348,10 +368,11 @@ async def export_stock_report(user_id: int = Depends(verify_admin)):
 
 
 @router.get("/export/collected")
-async def export_collected_report(user_id: int = Depends(verify_admin)):
+async def export_collected_report(user_id: int = Query(...)):
     """
     Експорт зведеного звіту про зібрані товари з усіх архівів.
     """
+    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         collected_items = await loop.run_in_executor(None, orm_get_all_collected_items_sync)
@@ -391,65 +412,59 @@ async def export_collected_report(user_id: int = Depends(verify_admin)):
 
 @router.post("/subtract")
 async def subtract_collected(
-    file: UploadFile = File(...),
-    user_id: int = Depends(verify_admin)
+    user_id: int = Query(...)
 ):
     """
-    Віднімання зібраних товарів з залишків.
-    Приймає Excel файл з артикулами та кількістю.
+    Віднімання зібраних товарів з залишків на основі архівів.
     """
-    tmp_fd, temp_file_path = tempfile.mkstemp(suffix=".tmp", prefix=f"subtract_{user_id}_")
-    os.close(tmp_fd)
-
+    verify_admin(user_id)
     try:
-        contents = await file.read()
-        with open(temp_file_path, 'wb') as f:
-            f.write(contents)
-
-        df = await asyncio.to_thread(pd.read_excel, temp_file_path)
-        standardized_df = _parse_and_validate_subtract_file(df)
+        # Отримуємо всі зібрані товари з архівів
+        loop = asyncio.get_running_loop()
+        collected_items = await loop.run_in_executor(None, orm_get_all_collected_items_sync)
         
-        if standardized_df is None:
+        if not collected_items:
             return JSONResponse(
-                content={"error": "Невірна структура файлу. Потрібні колонки: Артикул та Кількість"},
-                status_code=400
+                content={"success": False, "message": "Немає зібраних товарів для віднімання"},
+                status_code=404
             )
-
-        result = await orm_subtract_collected(standardized_df)
+        
+        # Створюємо DataFrame для віднімання
+        df = pd.DataFrame([
+            {"артикул": item["article"], "кількість": item["quantity"]}
+            for item in collected_items
+        ])
+        
+        result = await orm_subtract_collected(df)
         
         return JSONResponse(content={
             "success": True,
+            "message": "Залишки успішно оновлено",
             "processed": result['processed'],
             "not_found": result['not_found'],
             "errors": result['errors']
         })
 
-    except SQLAlchemyError as e:
-        logger.critical("Помилка БД під час віднімання: %s", e, exc_info=True)
-        return JSONResponse(
-            content={"error": f"Помилка бази даних: {str(e)}"},
-            status_code=500
-        )
     except Exception as e:
-        logger.error("Помилка обробки файлу віднімання: %s", e, exc_info=True)
+        logger.error("Помилка віднімання зібраного: %s", e, exc_info=True)
         return JSONResponse(
-            content={"error": f"Помилка обробки файлу: {str(e)}"},
+            content={"error": "Помилка операції"},
             status_code=500
         )
-    finally:
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
 
 
 @router.post("/force-save/{target_user_id}")
 async def force_save_user_list_endpoint(
     target_user_id: int,
-    user_id: int = Depends(verify_admin)
+    request: dict
 ):
     """
     Примусово зберегти список користувача.
     Використовується перед важливими операціями (імпорт, експорт).
     """
+    user_id = request.get("user_id")
+    verify_admin(user_id)
+    
     try:
         success = await force_save_user_list(target_user_id, bot)
         
@@ -474,13 +489,14 @@ async def force_save_user_list_endpoint(
 
 @router.post("/broadcast")
 async def broadcast_message(
-    request: BroadcastRequest,
-    user_id: int = Depends(verify_admin)
+    request: BroadcastRequest
 ):
     """
     Розіслати повідомлення всім користувачам системи.
     Використовується для важливих оголошень.
     """
+    verify_admin(request.user_id)
+    
     try:
         loop = asyncio.get_running_loop()
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -504,6 +520,7 @@ async def broadcast_message(
 
         return JSONResponse(content={
             "success": True,
+            "message": "Розсилка завершена",
             "sent": sent_count,
             "failed": failed_count,
             "total": len(user_ids)
@@ -518,46 +535,30 @@ async def broadcast_message(
 
 
 @router.get("/statistics")
-async def get_system_statistics(user_id: int = Depends(verify_admin)):
+async def get_system_statistics(user_id: int = Query(...)):
     """
-    Отримати загальну статистику системи.
-    Включає інформацію про користувачів, товари та активність.
+    Отримати загальну статистику системи для адмін-панелі.
+    Включає інформацію про користувачів, товари та резерви.
     """
+    verify_admin(user_id)
+    
     try:
         loop = asyncio.get_running_loop()
         
         # Збираємо статистику паралельно
         all_users = await loop.run_in_executor(None, orm_get_all_users_sync)
         all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
-        active_users = await orm_get_users_with_active_lists()
+        active_users_data = await orm_get_users_with_active_lists()
+        temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
-        # Підраховуємо дані
-        total_stock_sum = sum(p.сума_залишку for p in all_products if p.сума_залишку)
-        departments = {}
-        for p in all_products:
-            dept = p.відділ
-            if dept not in departments:
-                departments[dept] = {"count": 0, "sum": 0}
-            departments[dept]["count"] += 1
-            departments[dept]["sum"] += float(p.сума_залишку or 0)
-
+        # Підраховуємо загальну зарезервовану суму
+        total_reserved_sum = sum(item.quantity * item.price for item in temp_list_items)
+        
         return JSONResponse(content={
-            "success": True,
-            "users": {
-                "total": len(all_users),
-                "active": len(active_users)
-            },
-            "products": {
-                "total": len(all_products),
-                "total_value": round(total_stock_sum, 2)
-            },
-            "departments": {
-                dept: {
-                    "items": data["count"],
-                    "value": round(data["sum"], 2)
-                }
-                for dept, data in departments.items()
-            }
+            "total_users": len(all_users),
+            "active_users": len(active_users_data),
+            "total_products": len(all_products),
+            "total_reserved_sum": round(total_reserved_sum, 2)
         })
 
     except Exception as e:
