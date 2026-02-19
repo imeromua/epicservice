@@ -4,13 +4,13 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/home/epicservice
-Environment="PATH=/home/epicservice/venv/bin"
+User=anubis
+Group=anubis
+WorkingDirectory=/home/anubis/epicservice
+Environment="PATH=/home/anubis/epicservice/venv/bin"
 
 # Правильний запуск через uvicorn з import string
-ExecStart=/home/epicservice/venv/bin/uvicorn webapp.api:app \
+ExecStart=/home/anubis/epicservice/venv/bin/uvicorn webapp.api:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 2 \
