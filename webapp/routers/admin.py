@@ -260,9 +260,10 @@ async def get_active_users(user_id: int = Query(...)):
                     "total_sum": 0.0
                 }
             user_data[item.user_id]["items_count"] += 1
-            user_data[item.user_id]["total_sum"] += (item.quantity * item.price)
+            # Використовуємо item.product.ціна замість item.price
+            user_data[item.user_id]["total_sum"] += (item.quantity * (item.product.ціна or 0.0))
             if not user_data[item.user_id]["department"]:
-                user_data[item.user_id]["department"] = item.department
+                user_data[item.user_id]["department"] = item.product.відділ
         
         return JSONResponse(content={
             "success": True,
@@ -637,8 +638,8 @@ async def get_system_statistics(user_id: int = Query(...)):
         active_users_data = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
-        # Підраховуємо загальну зарезервовану суму
-        total_reserved_sum = sum(item.quantity * item.price for item in temp_list_items)
+        # Підраховуємо загальну зарезервовану суму (використовуємо item.product.ціна)
+        total_reserved_sum = sum(item.quantity * (item.product.ціна or 0.0) for item in temp_list_items)
         
         return JSONResponse(content={
             "total_users": len(all_users),
