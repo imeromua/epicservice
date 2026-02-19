@@ -9,6 +9,8 @@ import os
 import traceback
 from aiogram import Bot
 from aiogram.types import FSInputFile
+import openpyxl
+from collections import defaultdict
 
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -189,6 +191,82 @@ async def get_user_archives(user_id: int):
         print(f"❌ ERROR in get_user_archives: {type(e).__name__}: {e}")
         traceback.print_exc()
         return JSONResponse(content={"error": "Помилка отримання архівів", "details": str(e)}, status_code=500)
+
+
+@app.get("/api/archive/stats/{filename}")
+async def get_archive_stats(filename: str, user_id: int):
+    """
+    Отримати статистику з Excel файлу архіву.
+    Парсить файл і повертає: кількість товарів, загальну суму, список відділів.
+    """
+    try:
+        # Перевірка безпеки
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        
+        # Перевіряємо що файл належить користувачу
+        parsed = parse_filename(filename)
+        if not parsed or parsed["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        file_path = os.path.join(ACTIVE_DIR, filename)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Парсимо Excel
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        ws = wb.active
+        
+        items_count = 0
+        total_sum = 0.0
+        departments = defaultdict(int)
+        
+        # Пропускаємо заголовок (перший рядок)
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not row or not row[0]:  # Пропускаємо порожні рядки
+                continue
+            
+            items_count += 1
+            
+            # Сума в останній колонці (індекс 5)
+            try:
+                if len(row) > 5 and row[5] is not None:
+                    total_sum += float(row[5])
+            except (ValueError, TypeError):
+                pass
+            
+            # Відділ у колонці 3 (індекс 2)
+            try:
+                if len(row) > 2 and row[2]:
+                    dept = str(row[2]).strip()
+                    if dept:
+                        departments[dept] += 1
+            except:
+                pass
+        
+        wb.close()
+        
+        # Формуємо список відділів
+        dept_list = [f"{dept} ({count})" for dept, count in sorted(departments.items())]
+        
+        print(f"📊 Stats for {filename}: {items_count} items, {total_sum:.2f} грн, {len(departments)} departments")
+        
+        return JSONResponse(content={
+            "success": True,
+            "items_count": items_count,
+            "total_sum": round(total_sum, 2),
+            "departments": dept_list
+        }, status_code=200)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERROR in get_archive_stats: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(content={
+            "success": False,
+            "error": "Помилка читання статистики"
+        }, status_code=500)
 
 
 @app.get("/api/archive/download/{filename}")
