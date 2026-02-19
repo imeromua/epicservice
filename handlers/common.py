@@ -2,13 +2,14 @@
 
 import logging
 
-from aiogram import Bot, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 
 from config import ADMIN_IDS, WEBAPP_URL
 from database.orm import orm_upsert_user
+from keyboards.inline import get_admin_main_kb
 from lexicon.lexicon import LEXICON
 
 logger = logging.getLogger(__name__)
@@ -80,3 +81,23 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     except Exception as e:
         logger.error("Неочікувана помилка в cmd_start для %s: %s", user.id, e, exc_info=True)
         await message.answer(LEXICON.UNEXPECTED_ERROR)
+
+
+@router.message(F.text == "⚙️ Адмінка")
+async def admin_button_handler(message: Message):
+    """
+    Обробник натискання кнопки "Адмінка".
+    Показує inline-меню з адміністративними функціями.
+    """
+    user_id = message.from_user.id
+    
+    # Перевірка чи юзер є адміном
+    if user_id not in ADMIN_IDS:
+        await message.answer("❌ У вас немає доступу до адміністративних функцій.")
+        return
+    
+    # Показуємо inline-меню (існуюча адмінська клавіатура)
+    await message.answer(
+        "⚙️ *Панель адміністратора*\n\nОберіть дію:",
+        reply_markup=get_admin_main_kb()
+    )
