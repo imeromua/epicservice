@@ -479,12 +479,11 @@
             </div>
             
             <div class="admin-section-title">📤 Експорт та операції</div>
+            <div class="admin-section-title">📤 Звіти та Архіви</div>
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="exportStock()">📊 Експорт залишків</button>
-                <button class="btn btn-success" onclick="exportCollected()">📋 Зведений звіт</button>
+                <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
+                <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
             </div>
-            <div class="action-buttons">
-                <button class="btn btn-warning" onclick="subtractCollected()">⚠️ Відняти зібране</button>
             </div>
             
             <div class="admin-section-title">📢 Розсилка повідомлень</div>
@@ -1026,37 +1025,17 @@ async function exportStock() {
     }
 }
 
-async function exportCollected() {
-    try {
-        window.open(`/api/admin/export/collected?user_id=${userId}`, '_blank');
-        tg.HapticFeedback.notificationOccurred('success');
-    } catch (error) {
-        tg.showAlert('❌ Помилка експорту: ' + error.message);
-    }
-}
 
-async function subtractCollected() {
-    if (!confirm('⚠️ УВАГА! Ця операція відніме зібрані товари з залишків.\\n\\nПродовжити?')) return;
-    
+
+async function showAdminArchives() {
     try {
-        const response = await fetch(`/api/admin/subtract?user_id=${userId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId })
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        
-        if (data.success) {
-            tg.showAlert('✅ ' + data.message);
-            loadAdminStats();
-        } else {
-            tg.showAlert('❌ ' + (data.message || 'Помилка операції'));
-        }
+        window.open(`/api/admin/archives?user_id=${userId}`, '_blank');
+        tg.HapticFeedback.notificationOccurred('success');
     } catch (error) {
         tg.showAlert('❌ Помилка: ' + error.message);
     }
 }
+
 
 async function sendBroadcast() {
     const message = document.getElementById('broadcastMessage').value.trim();
