@@ -35,8 +35,39 @@ async def orm_clear_temp_list(user_id: int, session: Optional[AsyncSession] = No
 async def orm_add_item_to_temp_list(user_id: int, product_id: int, quantity: int):
     """
     Додає товар до тимчасового списку користувача.
+    Перевіряє правило: один список = один відділ.
     """
     async with async_session() as session:
+        # Отримуємо відділ нового товару
+        product_query = select(Product).where(Product.id == product_id)
+        new_product = await session.scalar(product_query)
+        
+        if not new_product:
+            raise ValueError(f"Product {product_id} not found")
+        
+        new_department = new_product.відділ
+        
+        # Перевіряємо відділ поточного списку
+        current_dept_query = (
+            select(TempList)
+            .where(TempList.user_id == user_id)
+            .options(selectinload(TempList.product))
+            .limit(1)
+        )
+        first_item = await session.scalar(current_dept_query)
+        
+        if first_item and first_item.product:
+            current_department = first_item.product.відділ
+            
+            # Якщо відділи не співпадають - забороняємо
+            if current_department != new_department:
+                raise ValueError(
+                    f"Неможливо додати товар з відділу {new_department}. "
+                    f"Поточний список для відділу {current_department}. "
+                    f"Збережіть або очистіть список."
+                )
+        
+        # Перевіряємо чи товар вже є в списку
         query = select(TempList).where(
             TempList.user_id == user_id, TempList.product_id == product_id
         )

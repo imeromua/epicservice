@@ -21,7 +21,8 @@ from database.orm import (
     orm_add_item_to_temp_list,
     orm_update_temp_list_item_quantity,
     orm_delete_temp_list_item,
-    orm_clear_temp_list
+    orm_clear_temp_list,
+    orm_get_temp_list_department
 )
 from utils.list_processor import process_and_save_list
 from utils.archive_manager import get_user_archives as get_archives_for_user, ACTIVE_DIR, parse_filename
@@ -78,6 +79,16 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/api/list/department/{user_id}")
+async def get_user_list_department(user_id: int):
+    """Отримати відділ поточного списку користувача."""
+    try:
+        department = await orm_get_temp_list_department(user_id)
+        return JSONResponse(content={"department": department}, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
 @app.post("/api/search")
 async def search_products(req: SearchRequest):
     """
@@ -100,6 +111,9 @@ async def search_products(req: SearchRequest):
             temp_list = await orm_get_temp_list(req.user_id, session=session)
             user_reserved = {item.product_id: item.quantity for item in temp_list} if temp_list else {}
         
+        # Отримуємо відділ поточного списку
+        current_department = await orm_get_temp_list_department(req.user_id)
+        
         # Формуємо відповідь з детальною інформацією
         result = []
         for product in products:
@@ -113,6 +127,11 @@ async def search_products(req: SearchRequest):
             user_reserved_qty = user_reserved.get(product.id, 0)
             user_reserved_sum = user_reserved_qty * float(product.ціна)
             
+            # Перевіряємо чи товар з іншого відділу
+            is_different_department = False
+            if current_department is not None and product.відділ != current_department:
+                is_different_department = True
+            
             result.append({
                 "id": product.id,
                 "article": product.артикул,
@@ -125,10 +144,12 @@ async def search_products(req: SearchRequest):
                 "balance_sum": float(product.сума_залишку or 0.0),
                 "reserved": product.відкладено,
                 "user_reserved": user_reserved_qty,
-                "user_reserved_sum": user_reserved_sum
+                "user_reserved_sum": user_reserved_sum,
+                "is_different_department": is_different_department,
+                "current_list_department": current_department
             })
         
-        print(f"✅ Returning {len(result)} products")
+        print(f"✅ Returning {len(result)} products (current_department={current_department})")
         return JSONResponse(content={"products": result}, status_code=200)
         
     except SQLAlchemyError as e:
@@ -320,6 +341,10 @@ async def add_to_list(req: AddToListRequest):
         await orm_add_item_to_temp_list(user_id=req.user_id, product_id=req.product_id, quantity=req.quantity)
         print(f"✅ Successfully added to temp list")
         return JSONResponse(content={"success": True, "message": f"Додано {req.quantity} шт."}, status_code=200)
+    except ValueError as e:
+        # Помилка валідації відділу
+        print(f"⚠️ Validation error: {e}")
+        return JSONResponse(content={"success": False, "message": str(e)}, status_code=400)
     except Exception as e:
         print(f"❌ ERROR in add_to_list: {type(e).__name__}: {e}")
         traceback.print_exc()
