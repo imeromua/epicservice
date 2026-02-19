@@ -1,0 +1,33 @@
+[Unit]
+Description=EpicService WebApp
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/home/epicservice
+Environment="PATH=/home/epicservice/venv/bin"
+
+# Правильний запуск через uvicorn з import string
+ExecStart=/home/epicservice/venv/bin/uvicorn webapp.api:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 2 \
+    --log-level info \
+    --access-log
+
+# Автоматичний перезапуск при падінні
+Restart=always
+RestartSec=5
+
+# Обмеження ресурсів
+LimitNOFILE=4096
+
+# Логування
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=webapp
+
+[Install]
+WantedBy=multi-user.target
