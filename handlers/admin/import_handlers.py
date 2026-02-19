@@ -21,7 +21,7 @@ from database.orm.products import SmartColumnMapper
 from handlers.admin.core import _show_admin_panel
 from handlers.admin.lock_common import handle_lock_notify_common, handle_lock_force_save_common
 from keyboards.inline import (get_admin_lock_kb, get_admin_main_kb,
-                              get_notify_confirmation_kb, get_user_main_kb)
+                              get_notify_confirmation_kb)
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list
 
@@ -70,6 +70,10 @@ def _format_admin_report(result: dict) -> str:
 
 
 async def broadcast_import_update(bot: Bot, result: dict):
+    """
+    Розсилає повідомлення про оновлення бази всім користувачам.
+    Повідомлення надсилаються без клавіатур (тільки текст).
+    """
     loop = asyncio.get_running_loop()
     try:
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -103,8 +107,8 @@ async def broadcast_import_update(bot: Bot, result: dict):
         sent_count = 0
         for user_id in user_ids:
             try:
-                kb = get_admin_main_kb() if user_id in ADMIN_IDS else get_user_main_kb()
-                await bot.send_message(user_id, message_text, reply_markup=kb)
+                # Повідомлення без клавіатури - parse_mode HTML
+                await bot.send_message(user_id, message_text, parse_mode='HTML')
                 sent_count += 1
             except Exception as e:
                 logger.warning("Не вдалося надіслати сповіщення користувачу %s: %s", user_id, e)
