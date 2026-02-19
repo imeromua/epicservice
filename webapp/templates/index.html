@@ -509,7 +509,8 @@ tg.expand();
 tg.ready();
 
 const userId = tg.initDataUnsafe?.user?.id || 0;
-const ADMIN_IDS = [1962821395];
+// Читаємо ADMIN_IDS з шаблону (backend передає з .env)
+const ADMIN_IDS = {{ admin_ids | tojson }};
 const isAdmin = ADMIN_IDS.includes(userId);
 
 let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
