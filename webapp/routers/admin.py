@@ -652,6 +652,7 @@ async def get_system_statistics(user_id: int = Query(...)):
 async def get_all_users_with_stats(user_id: int = Query(...)):
     """
     Отримати всіх користувачів з історією архівів та загальною сумою.
+    Формат файлів: {відділ}_{user_id}_{дата}_{час}.xlsx
     """
     verify_admin(user_id)
     try:
@@ -668,7 +669,9 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
             last_activity = None
             
             if os.path.exists(archives_dir):
-                user_files = [f for f in os.listdir(archives_dir) if f.startswith(f"user_{uid}_")]
+                # Шукаємо файли за патерном: *_{user_id}_*.xlsx
+                user_files = [f for f in os.listdir(archives_dir) 
+                             if f.endswith('.xlsx') and f"_{uid}_" in f]
                 archives_count = len(user_files)
                 
                 # Знаходимо останній файл
