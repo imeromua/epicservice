@@ -1026,15 +1026,6 @@ async function exportStock() {
 
 
 
-async function showAdminArchives() {
-    try {
-        window.open(`/api/admin/archives?user_id=${userId}`, '_blank');
-        tg.HapticFeedback.notificationOccurred('success');
-    } catch (error) {
-        tg.showAlert('❌ Помилка: ' + error.message);
-    }
-}
-
 
 async function sendBroadcast() {
     const message = document.getElementById('broadcastMessage').value.trim();
