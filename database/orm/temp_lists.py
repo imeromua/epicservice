@@ -191,9 +191,9 @@ async def orm_get_users_with_active_lists() -> List[Tuple[int, int]]:
 
 def orm_get_all_temp_list_items_sync() -> list[TempList]:
     """
-    Синхронно отримує всі позиції з усіх тимчасових списків.
+    Синхронно отримує всі позиції з усіх тимчасових списків з eager loading.
     """
     with sync_session() as session:
-        query = select(TempList)
+        query = select(TempList).options(selectinload(TempList.product))
         result = session.execute(query)
         return result.scalars().all()
