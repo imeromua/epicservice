@@ -74,9 +74,14 @@ async def home(request: Request):
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request):
-    """Адмін-панель - віддає статичний HTML файл"""
+    """Адмін-панель - віддає статичний HTML файл без кешування"""
     admin_html_path = os.path.join(os.path.dirname(__file__), "static", "admin.html")
-    return FileResponse(admin_html_path)
+    response = FileResponse(admin_html_path)
+    # Забороняємо кешування
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.get("/health")
