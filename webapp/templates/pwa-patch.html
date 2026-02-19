@@ -1,0 +1,75 @@
+<!-- 
+  Цей файл містить код, який потрібно додати до index.html
+  Для автоматичного впровадження можна використати скрипт update-html.py
+-->
+
+<!-- ========== Додати в <head> секцію ========== -->
+
+<!-- PWA Meta Tags -->
+<meta name="theme-color" content="#3b82f6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EpicService">
+<meta name="description" content="Система обліку та замовлення запчастин">
+
+<!-- Manifest -->
+<link rel="manifest" href="/static/manifest.json">
+
+<!-- Icons -->
+<link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-192x192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-192x192.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-192x192.png">
+
+<!-- PWA Styles -->
+<link rel="stylesheet" href="/static/pwa-styles.css">
+
+<!-- iOS Splash Screens (опціонально, для кращого досвіду на iOS) -->
+<link rel="apple-touch-startup-image" href="/static/icons/icon-512x512.png">
+
+
+<!-- ========== Додати перед закриваючим </body> ========== -->
+
+<!-- PWA Install Banner -->
+<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
+  <div class="pwa-install-content">
+    <span>📱 Встановіть Epic Service на свій телефон!</span>
+    <button id="pwa-install-btn-action" class="btn btn-primary">Встановити</button>
+    <button onclick="document.getElementById('pwa-install-banner').style.display='none'" class="btn btn-secondary">Пізніше</button>
+  </div>
+</div>
+
+<!-- Offline Indicator -->
+<div id="offline-indicator" class="offline-indicator">
+  ⚠️ Немає з'єднання з інтернетом
+</div>
+
+<!-- PWA Scripts -->
+<script src="/static/pwa-install.js"></script>
+
+<!-- Offline/Online Detection -->
+<script>
+  // Відстеження стану мережі
+  const offlineIndicator = document.getElementById('offline-indicator');
+  
+  window.addEventListener('online', () => {
+    offlineIndicator.classList.remove('show');
+    console.log('[✅] З'єднання відновлено');
+  });
+  
+  window.addEventListener('offline', () => {
+    offlineIndicator.classList.add('show');
+    console.log('[⚠️] Втрачено з'єднання');
+  });
+  
+  // Перевірка при завантаженні сторінки
+  if (!navigator.onLine) {
+    offlineIndicator.classList.add('show');
+  }
+  
+  // Лог в консоль для дебагу
+  console.log('[🚀] PWA Ready!');
+  console.log('[📱] Display mode:', 
+    window.matchMedia('(display-mode: standalone)').matches ? 'Standalone (PWA)' : 'Browser'
+  );
+</script>
