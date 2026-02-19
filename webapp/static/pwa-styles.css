@@ -1,0 +1,223 @@
+/* PWA стилі для Epic Service */
+
+/* Банер встановки PWA */
+.pwa-install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  padding: 16px;
+  box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+  display: none;
+  animation: slideUp 0.3s ease-out;
+}
+
+.pwa-install-content {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pwa-install-content span {
+  flex: 1;
+  min-width: 200px;
+  font-weight: 500;
+}
+
+.pwa-install-banner .btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pwa-install-banner .btn-primary {
+  background: white;
+  color: #3b82f6;
+}
+
+.pwa-install-banner .btn-primary:hover {
+  background: #f1f5f9;
+  transform: scale(1.05);
+}
+
+.pwa-install-banner .btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.pwa-install-banner .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Банер оновлення */
+.pwa-update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 12px 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 10000;
+  animation: slideDown 0.3s ease-out;
+}
+
+.pwa-update-content {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pwa-update-content span {
+  flex: 1;
+  min-width: 200px;
+  font-weight: 500;
+}
+
+/* Кнопка встановки в header (опціонально) */
+#pwa-install-btn {
+  display: none;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#pwa-install-btn:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+/* Анімації */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Оптимізація для standalone режиму */
+@media (display-mode: standalone) {
+  /* Приховати банери встановки, якщо додаток вже встановлено */
+  .pwa-install-banner,
+  #pwa-install-btn {
+    display: none !important;
+  }
+  
+  /* Додатковий padding зверху для урахування status bar */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Адаптивність для мобільних пристроїв */
+@media (max-width: 640px) {
+  .pwa-install-content,
+  .pwa-update-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .pwa-install-content span,
+  .pwa-update-content span {
+    width: 100%;
+  }
+  
+  .pwa-install-banner .btn,
+  .pwa-update-banner .btn {
+    width: 100%;
+  }
+}
+
+/* Офлайн індикатор */
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #ef4444;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 10001;
+  display: none;
+}
+
+.offline-indicator.show {
+  display: block;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* PWA splash screen стилі (для iOS) */
+@media (display-mode: standalone) and (prefers-color-scheme: dark) {
+  :root {
+    --pwa-bg: #1e293b;
+    --pwa-text: #f1f5f9;
+  }
+}
+
+@media (display-mode: standalone) and (prefers-color-scheme: light) {
+  :root {
+    --pwa-bg: #ffffff;
+    --pwa-text: #1e293b;
+  }
+}
