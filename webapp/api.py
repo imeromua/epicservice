@@ -10,7 +10,6 @@ import traceback
 from aiogram import Bot
 from aiogram.types import FSInputFile
 import openpyxl
-from collections import defaultdict
 
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -197,7 +196,7 @@ async def get_user_archives(user_id: int):
 async def get_archive_stats(filename: str, user_id: int):
     """
     Отримати статистику з Excel файлу архіву.
-    Парсить файл і повертає: кількість товарів, загальну суму, список відділів.
+    Парсить файл і повертає: кількість товарів, відділ (з імені файлу), автор (user_id).
     """
     try:
         # Перевірка безпеки
@@ -218,44 +217,30 @@ async def get_archive_stats(filename: str, user_id: int):
         ws = wb.active
         
         items_count = 0
-        total_sum = 0.0
-        departments = defaultdict(int)
         
-        # Пропускаємо заголовок (перший рядок)
+        # Пропускаємо заголовок (перший рядок) і рахуємо товари
         for row in ws.iter_rows(min_row=2, values_only=True):
             if not row or not row[0]:  # Пропускаємо порожні рядки
                 continue
-            
+            # Пропускаємо рядки підсумків
+            if str(row[0]).strip() in ["", "К-ть артикулів:", "Зібрано на суму:"]:
+                continue
             items_count += 1
-            
-            # Сума в останній колонці (індекс 5)
-            try:
-                if len(row) > 5 and row[5] is not None:
-                    total_sum += float(row[5])
-            except (ValueError, TypeError):
-                pass
-            
-            # Відділ у колонці 3 (індекс 2)
-            try:
-                if len(row) > 2 and row[2]:
-                    dept = str(row[2]).strip()
-                    if dept:
-                        departments[dept] += 1
-            except:
-                pass
         
         wb.close()
         
-        # Формуємо список відділів
-        dept_list = [f"{dept} ({count})" for dept, count in sorted(departments.items())]
+        # Отримуємо відділ з імені файлу
+        # Формат: {prefix}{department}_{user_id}_{timestamp}.xlsx
+        # або лишки_{department}_{user_id}_{timestamp}.xlsx
+        department = parsed.get("department", "Невідомо")
         
-        print(f"📊 Stats for {filename}: {items_count} items, {total_sum:.2f} грн, {len(departments)} departments")
+        print(f"📊 Stats for {filename}: {items_count} items, department={department}, author={user_id}")
         
         return JSONResponse(content={
             "success": True,
             "items_count": items_count,
-            "total_sum": round(total_sum, 2),
-            "departments": dept_list
+            "department": str(department),
+            "author_id": user_id
         }, status_code=200)
         
     except HTTPException:
