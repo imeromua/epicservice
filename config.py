@@ -36,6 +36,10 @@ def get_required_env(var_name: str) -> str:
 # --- Конфігурація Бота ---
 BOT_TOKEN = get_required_env("BOT_TOKEN")
 
+# URL для Mini App (WebApp)
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://epicservice.example.com")
+logger.info("WebApp URL: %s", WEBAPP_URL)
+
 
 def get_admin_ids() -> List[int]:
     """
