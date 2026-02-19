@@ -830,17 +830,17 @@ async function loadAdminStats() {
         container.innerHTML = `
             <div class="admin-stat-card" style="cursor: pointer;" onclick="showAllUsers()">
                 <div class="admin-stat-icon">👥</div>
-                <div class="admin-stat-value">\${data.total_users || 0}</div>
+                <div class="admin-stat-value">${data.total_users || 0}</div>
                 <div class="admin-stat-label">Користувачів</div>
             </div>
             <div class="admin-stat-card success" style="cursor: pointer;" onclick="showActiveUsers()">
                 <div class="admin-stat-icon">🔥</div>
-                <div class="admin-stat-value">\${data.active_users || 0}</div>
+                <div class="admin-stat-value">${data.active_users || 0}</div>
                 <div class="admin-stat-label">Активних</div>
             </div>
             <div class="admin-stat-card warning" style="cursor: pointer;" onclick="showProductsInfo()">
                 <div class="admin-stat-icon">📦</div>
-                <div class="admin-stat-value">\${data.total_products || 0}</div>
+                <div class="admin-stat-value">${data.total_products || 0}</div>
                 <div class="admin-stat-label">Товарів</div>
             </div>
             <div class="admin-stat-card danger" style="cursor: pointer;" onclick="showReservedByDepartment()">
