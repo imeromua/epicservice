@@ -23,6 +23,7 @@ class User(Base):
 
     saved_lists: Mapped[List["SavedList"]] = relationship(back_populates="user")
     temp_list_items: Mapped[List["TempList"]] = relationship(back_populates="user")
+    archives: Mapped[List["Archive"]] = relationship(back_populates="user")
 
 
 class Product(Base):
@@ -79,3 +80,19 @@ class TempList(Base):
 
     product: Mapped["Product"] = relationship()
     user: Mapped["User"] = relationship(back_populates="temp_list_items")
+
+
+class Archive(Base):
+    """Модель, що представляє архів збережених списків користувача.
+    
+    Зберігає інформацію про примусово збережені списки (force save),
+    які доступні користувачу через Mini App у розділі 'Архів'.
+    """
+    __tablename__ = 'archives'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    main_list_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    surplus_list_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="archives")
