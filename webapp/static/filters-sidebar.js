@@ -91,6 +91,11 @@ function createFiltersSidebar() {
     
     // Завантажуємо відділи
     loadDepartments();
+    
+    // Встановлюємо початкову видимість кнопки
+    setTimeout(() => {
+        updateFiltersButtonVisibility();
+    }, 100);
 }
 
 async function loadDepartments() {
@@ -299,12 +304,9 @@ function closeFiltersSidebar() {
         sidebar.classList.remove('active');
         overlay.classList.remove('active');
         
-        // Показуємо floating button після закриття анімації
+        // Показуємо floating button після закриття анімації тільки якщо на вкладці Пошук
         setTimeout(() => {
-            const currentTab = document.querySelector('.tab.active')?.textContent?.includes('Пошук');
-            if (currentTab) {
-                floatingBtn.style.display = 'flex';
-            }
+            updateFiltersButtonVisibility();
         }, 300);
     }
 }
@@ -314,11 +316,22 @@ function closeFiltersSidebar() {
 function updateFiltersButtonVisibility() {
     const floatingBtn = document.getElementById('filtersFloatingBtn');
     
-    if (floatingBtn && typeof window.currentTab !== 'undefined') {
-        if (window.currentTab === 'search') {
-            floatingBtn.style.display = 'flex';
+    if (floatingBtn) {
+        // Перевіряємо глобальну змінну currentTab
+        if (typeof window.currentTab !== 'undefined') {
+            if (window.currentTab === 'search') {
+                floatingBtn.style.display = 'flex';
+            } else {
+                floatingBtn.style.display = 'none';
+            }
         } else {
-            floatingBtn.style.display = 'none';
+            // Якщо currentTab ще не визначений, показуємо тільки якщо активна вкладка "Пошук"
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab && activeTab.textContent.includes('Пошук')) {
+                floatingBtn.style.display = 'flex';
+            } else {
+                floatingBtn.style.display = 'none';
+            }
         }
     }
 }
