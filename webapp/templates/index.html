@@ -687,6 +687,12 @@ function switchTab(tab) {
     document.querySelectorAll('.tab')[idx].classList.add('active'); 
     document.getElementById(id).classList.add('active'); 
     updateSearchBoxVisibility(); 
+    
+    // Update filters button visibility
+    if (typeof updateFiltersButtonVisibility === 'function') {
+        updateFiltersButtonVisibility();
+    }
+    
     if (tab === 'list') loadList(); 
     if (tab === 'archives') loadArchives(); 
     if (tab === 'admin' && isAdmin) loadAdminData();
