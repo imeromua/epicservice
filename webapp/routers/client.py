@@ -272,11 +272,15 @@ async def get_departments():
     """
     try:
         async with async_session() as session:
-            # Виправлено приведення типу для PostgreSQL
+            # Виправлено приведення типу для PostgreSQL + виключаємо відділ 0
             query = select(
                 Product.відділ,
                 func.count(Product.id).label('count')
-            ).where(cast(Product.кількість, Float) > 0).group_by(Product.відділ).order_by(Product.відділ)
+            ).where(
+                cast(Product.кількість, Float) > 0,
+                Product.відділ != 0,  # виключаємо відділ 0
+                Product.відділ.isnot(None)  # виключаємо NULL
+            ).group_by(Product.відділ).order_by(Product.відділ)
             
             result = await session.execute(query)
             departments = result.all()
@@ -286,7 +290,7 @@ async def get_departments():
                 for dept in departments
             ]
             
-            print(f"📊 Returning {len(dept_list)} departments")
+            print(f"📊 Returning {len(dept_list)} departments (filtered out dept 0)")
             return JSONResponse(content={"departments": dept_list}, status_code=200)
             
     except Exception as e:
