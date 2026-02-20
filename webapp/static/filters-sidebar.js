@@ -299,12 +299,16 @@ function closeFiltersSidebar() {
         sidebar.classList.remove('active');
         overlay.classList.remove('active');
         
-        // Показуємо floating button тільки на вкладці пошуку
-        if (typeof window.currentTab !== 'undefined' && window.currentTab === 'search') {
-            floatingBtn.style.display = 'flex';
-        }
+        // Показуємо floating button після закриття анімації
+        setTimeout(() => {
+            const currentTab = document.querySelector('.tab.active')?.textContent?.includes('Пошук');
+            if (currentTab) {
+                floatingBtn.style.display = 'flex';
+            }
+        }, 300);
     }
 }
+
 
 // Показ/ховаємо floating button в залежності від табу
 function updateFiltersButtonVisibility() {
