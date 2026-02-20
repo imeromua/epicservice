@@ -1,7 +1,8 @@
 /* =============================================
-   BASE.CSS - Базові стилі (без admin + modals)
+   BASE.CSS - Ядро системи (лейаут + tabs + базові елементи)
    ============================================= */
 
+/* Telegram Theme Variables */
 :root {
     --bg-color: var(--tg-theme-bg-color, #ffffff);
     --text-color: var(--tg-theme-text-color, #000000);
@@ -11,7 +12,15 @@
     --button-text-color: var(--tg-theme-button-text-color, #ffffff);
     --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* Global Reset */
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+}
+
+/* Body */
 body { 
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     background: var(--bg-color); 
@@ -19,6 +28,8 @@ body {
     padding-bottom: 80px;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* Sticky Header Container */
 .sticky-container { 
     position: sticky; 
     top: 0; 
@@ -27,6 +38,8 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transition: background-color 0.3s ease;
 }
+
+/* Pull-to-Refresh Indicator */
 .pull-indicator {
     text-align: center;
     padding: 10px;
@@ -36,11 +49,17 @@ body {
     transition: all 0.3s ease;
     background: var(--bg-color);
 }
+
 .pull-indicator.active {
     opacity: 1;
     transform: translateY(0);
 }
-.header { padding: 16px 16px 8px 16px; }
+
+/* Header */
+.header { 
+    padding: 16px 16px 8px 16px; 
+}
+
 h1 { 
     color: var(--button-color); 
     font-size: 24px; 
@@ -48,11 +67,14 @@ h1 {
     transition: color 0.3s ease;
     text-align: center;
 }
+
 #userInfo {
     text-align: center;
     font-size: 14px;
     color: var(--hint-color);
 }
+
+/* Department Info */
 .department-info { 
     background: var(--button-color); 
     opacity: 0.15;
@@ -63,8 +85,20 @@ h1 {
     display: none;
     transition: opacity 0.3s ease;
 }
-.department-info.active { display: block; opacity: 1; background: rgba(0,136,204,0.1); }
-.search-box { position: relative; margin-bottom: 12px; padding: 0 16px; }
+
+.department-info.active { 
+    display: block; 
+    opacity: 1; 
+    background: rgba(0,136,204,0.1); 
+}
+
+/* Search Box */
+.search-box { 
+    position: relative; 
+    margin-bottom: 12px; 
+    padding: 0 16px; 
+}
+
 .search-input { 
     width: 100%; 
     padding: 12px 16px; 
@@ -75,8 +109,21 @@ h1 {
     color: var(--text-color);
     transition: all 0.3s ease;
 }
-.search-input:focus { outline: none; border-color: var(--link-color); }
-.tabs { display: flex; gap: 4px; padding: 0 16px 8px 16px; border-bottom: 1px solid var(--hint-color); overflow-x: auto; }
+
+.search-input:focus { 
+    outline: none; 
+    border-color: var(--link-color); 
+}
+
+/* Tabs */
+.tabs { 
+    display: flex; 
+    gap: 4px; 
+    padding: 0 16px 8px 16px; 
+    border-bottom: 1px solid var(--hint-color); 
+    overflow-x: auto; 
+}
+
 .tab { 
     position: relative; 
     padding: 12px 16px; 
@@ -89,126 +136,65 @@ h1 {
     transition: all 0.3s; 
     white-space: nowrap; 
 }
-.tab.active { color: var(--button-color); border-bottom-color: var(--button-color); }
-.tab.hidden { display: none; }
-.tab-badge { position: absolute; top: 6px; right: 8px; background: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
-.main-content { padding: 16px; }
-.content { display: none; }
-.content.active { display: block; }
-.stats-card {
-    background: linear-gradient(135deg, var(--button-color) 0%, var(--link-color) 100%);
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 16px;
-    color: white;
-    box-shadow: 0 4px 12px rgba(0,136,204,0.3);
+
+.tab.active { 
+    color: var(--button-color); 
+    border-bottom-color: var(--button-color); 
 }
-.stats-title {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+
+.tab.hidden { 
+    display: none; 
 }
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+
+.tab-badge { 
+    position: absolute; 
+    top: 6px; 
+    right: 8px; 
+    background: #ff3b30; 
+    color: white; 
+    font-size: 10px; 
+    font-weight: bold; 
+    padding: 2px 6px; 
+    border-radius: 10px; 
+    min-width: 18px; 
+    text-align: center; 
 }
-.stat-item {
-    background: rgba(255,255,255,0.15);
-    border-radius: 12px;
-    padding: 12px;
-}
-.stat-value {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-.stat-label {
-    font-size: 12px;
-    opacity: 0.9;
-}
-.product-card, .list-item, .archive-item, .admin-card { 
-    background: var(--secondary-bg-color); 
-    border-radius: 12px; 
+
+/* Main Content */
+.main-content { 
     padding: 16px; 
-    margin-bottom: 12px; 
-    cursor: pointer; 
-    transition: transform 0.2s, background-color 0.3s ease; 
-    position: relative; 
 }
-.product-card:active, .list-item:active { transform: scale(0.98); }
-.product-card.locked { 
-    opacity: 0.5; 
-    cursor: not-allowed; 
-    background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--secondary-bg-color) 100%);
-    filter: grayscale(50%);
+
+.content { 
+    display: none; 
 }
-.product-card.locked:active { transform: none; }
-.lock-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; opacity: 0.3; pointer-events: none; display: none; }
-.product-card.locked .lock-overlay { display: block; }
-.product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.product-article { font-weight: bold; color: var(--button-color); font-size: 16px; transition: color 0.3s ease; }
-.product-card.locked .product-article { color: var(--hint-color); }
-.product-status { background: #34c759; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
-.product-status.locked { background: #ff3b30; }
-.product-name { font-size: 14px; margin-bottom: 12px; color: var(--text-color); transition: color 0.3s ease; }
-.product-card.locked .product-name { color: var(--hint-color); }
-.product-details { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--hint-color); }
-.product-detail-row { display: flex; justify-content: space-between; }
-.product-detail-label { font-weight: 500; }
-.product-detail-value { color: var(--text-color); transition: color 0.3s ease; }
-.product-card.locked .product-detail-value { color: var(--hint-color); opacity: 0.6; }
-.product-detail-value.highlight { color: var(--button-color); font-weight: bold; }
-.product-detail-value.warning { color: #ff9500; font-weight: bold; }
-.product-detail-value.success { color: #34c759; font-weight: bold; }
-.list-header, .archive-header, .admin-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.action-buttons { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.btn {
-    flex: 1;
-    padding: 12px;
-    border: none;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.2s;
-    color: white;
-    min-width: 120px;
+
+.content.active { 
+    display: block; 
 }
-.btn:active { transform: scale(0.95); }
-.btn-primary { background: var(--button-color); }
-.btn-success { background: #34c759; }
-.btn-danger { background: #ff3b30; }
-.btn-warning { background: #ff9500; }
-.save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-.save-btn:active { transform: scale(0.95); }
-.clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-.clear-btn:active { transform: scale(0.95); }
-.download-btn { flex: 1; padding: 12px; background: var(--button-color); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s, background-color 0.3s ease; }
-.download-btn:active { transform: scale(0.95); }
-.download-all-btn {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(135deg, #34c759 0%, #30b350 100%);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: bold;
-    cursor: pointer;
-    margin-bottom: 16px;
-    box-shadow: 0 3px 10px rgba(52,199,89,0.3);
-    transition: transform 0.2s;
+
+/* Empty State */
+.empty-state { 
+    text-align: center; 
+    padding: 40px 20px; 
+    color: var(--hint-color); 
+    transition: color 0.3s ease; 
 }
-.download-all-btn:active { transform: scale(0.97); }
-.delete-archive-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-.delete-archive-btn:active { transform: scale(0.95); }
-.empty-state { text-align: center; padding: 40px 20px; color: var(--hint-color); transition: color 0.3s ease; }
-.empty-icon { font-size: 48px; margin-bottom: 16px; }
-.loader { text-align: center; padding: 20px; color: var(--hint-color); transition: color 0.3s ease; }
+
+.empty-icon { 
+    font-size: 48px; 
+    margin-bottom: 16px; 
+}
+
+/* Loader */
+.loader { 
+    text-align: center; 
+    padding: 20px; 
+    color: var(--hint-color); 
+    transition: color 0.3s ease; 
+}
+
+/* Total Box (Fixed Bottom) */
 .total-box { 
     position: fixed; 
     bottom: 0; 
@@ -223,35 +209,8 @@ h1 {
     z-index: 50;
     transition: background-color 0.3s ease, border-color 0.3s ease;
 }
-.total-text { font-size: 18px; font-weight: bold; }
-.add-btn { 
-    width: 100%; 
-    padding: 16px; 
-    background: var(--button-color); 
-    color: var(--button-text-color); 
-    border: none; 
-    border-radius: 12px; 
-    font-size: 16px; 
+
+.total-text { 
+    font-size: 18px; 
     font-weight: bold; 
-    cursor: pointer; 
-    margin-top: 12px;
-    transition: transform 0.2s, background-color 0.3s ease;
 }
-.add-btn:active { transform: scale(0.95); }
-.delete-btn { background: #ff3b30; }
-.cancel-btn { background: var(--hint-color) !important; }
-.archive-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-left: 8px; }
-.archive-badge.main { background: #34c759; color: white; }
-.archive-badge.surplus { background: #ff9500; color: white; }
-.archive-stats { 
-    font-size: 12px; 
-    color: var(--hint-color); 
-    margin-top: 8px; 
-    padding: 8px; 
-    background: rgba(0,136,204,0.05); 
-    border-radius: 8px;
-    transition: color 0.3s ease;
-}
-.stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.stat-row:last-child { margin-bottom: 0; }
-.archive-actions { display: flex; gap: 8px; margin-top: 8px; }
