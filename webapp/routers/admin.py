@@ -718,11 +718,13 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
 async def get_products_info(user_id: int = Query(...)):
     """
     Отримати інформацію про товари: кількість артикулів, сума, розбивка по відділах.
+    Враховує тільки доступні товари (кількість > 0 після резерву).
     """
     verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
+        temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
         if not all_products:
             return JSONResponse(content={
@@ -730,15 +732,32 @@ async def get_products_info(user_id: int = Query(...)):
                 "message": "Немає товарів у базі"
             }, status_code=404)
         
-        # Підрахунки
-        total_articles = len(all_products)
-        total_sum = sum(p.сума_залишку for p in all_products if p.сума_залишку)
+        # Підраховуємо резерви з temp_list
+        temp_reservations = {}
+        for item in temp_list_items:
+            temp_reservations[item.product_id] = temp_reservations.get(item.product_id, 0) + item.quantity
         
-        # Групуємо по відділах
+        # Фільтруємо тільки товари з доступною кількістю > 0
+        available_products = []
         dept_stats = {}
+        total_sum = 0.0
+        
         for product in all_products:
-            dept = product.відділ
-            dept_stats[dept] = dept_stats.get(dept, 0) + 1
+            try:
+                stock_qty = float(str(product.кількість).replace(',', '.'))
+            except (ValueError, TypeError):
+                stock_qty = 0
+            
+            # Рахуємо доступну кількість (залишок - резерв)
+            reserved = (product.відкладено or 0) + temp_reservations.get(product.id, 0)
+            available = stock_qty - reserved
+            
+            # ✅ Враховуємо тільки товари з доступною кількістю > 0
+            if available > 0:
+                available_products.append(product)
+                dept = product.відділ
+                dept_stats[dept] = dept_stats.get(dept, 0) + 1
+                total_sum += available * (product.ціна or 0.0)
         
         departments = [
             {"department": dept_id, "count": count}
@@ -748,13 +767,13 @@ async def get_products_info(user_id: int = Query(...)):
         # Остання дата імпорту (з першого товару)
         last_import = None
         if all_products and hasattr(all_products[0], 'created_at'):
-            last_import = all_products[0].created_at.strftime('%d.%m - %H.%M')
+            last_import = all_products[0].created_at.strftime('%d.%m - %H:%M')
         
         return JSONResponse(content={
             "success": True,
-            "total_articles": total_articles,
-            "total_sum": round(total_sum, 2),
-            "departments": departments,
+            "total_articles": len(available_products),  # ✅ Тільки доступні
+            "total_sum": round(total_sum, 2),           # ✅ Сума доступних
+            "departments": departments,                  # ✅ По відділах
             "last_import": last_import
         })
     
