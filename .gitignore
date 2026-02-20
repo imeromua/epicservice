@@ -32,11 +32,25 @@ __pycache__/
 # Вони можуть містити чутливу інформацію та швидко рости в розмірах.
 *.log
 archives/
+
+# --- Excel файли ---
+# Всі Excel файли (експорти, імпорти, тимчасові)
+*.xlsx
+*.xls
+*.xlsm
 data.csv
-data.xlsx
 *.json
+
+# --- Тимчасові файли ---
+# Тимчасові директорії та файли
+temp_files/
+webapp/temp_files/
+*.tmp
+*.temp
+
+# --- Backup файли ---
 .env.save
-# Backup files
 *.bak.*
 *.pwa-backup
 *.bak
+*.old
