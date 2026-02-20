@@ -3,27 +3,24 @@
 import logging
 import os
 import shutil
-from datetime import datetime
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import FSInputFile
 from sqlalchemy.exc import SQLAlchemyError
 
 from database.engine import async_session
-from database.models import Archive
 from handlers.common import clean_previous_keyboard
 from lexicon.lexicon import LEXICON
 from utils.list_processor import process_and_save_list
 
 logger = logging.getLogger(__name__)
 
-# Директорія для архівів
-ARCHIVES_DIR = "archives"
+# Директорія для архівів (та ж сама що у archive_manager.py)
+ARCHIVES_DIR = os.path.join("archives", "active")
 
 
 def _ensure_archives_dir():
-    """Переконується що директорія archives існує"""
+    """Переконується що директорія archives/active існує"""
     if not os.path.exists(ARCHIVES_DIR):
         os.makedirs(ARCHIVES_DIR)
         logger.info(f"Створено директорію {ARCHIVES_DIR}")
@@ -31,7 +28,7 @@ def _ensure_archives_dir():
 
 def _move_to_archives(temp_file_path: str) -> str:
     """
-    Переміщує тимчасовий файл в директорію archives
+    Переміщує тимчасовий файл в директорію archives/active/
     Повертає новий шлях до файлу
     """
     if not temp_file_path or not os.path.exists(temp_file_path):
@@ -39,7 +36,7 @@ def _move_to_archives(temp_file_path: str) -> str:
     
     _ensure_archives_dir()
     
-    # Генеруємо нову назву файлу в archives
+    # Генеруємо нову назву файлу в archives/active/
     filename = os.path.basename(temp_file_path)
     archive_path = os.path.join(ARCHIVES_DIR, filename)
     
@@ -50,31 +47,11 @@ def _move_to_archives(temp_file_path: str) -> str:
     return archive_path
 
 
-async def _save_to_database(session, user_id: int, main_list_path: str, surplus_list_path: str):
-    """
-    Зберігає інформацію про архів в базу даних
-    """
-    try:
-        archive = Archive(
-            user_id=user_id,
-            main_list_path=main_list_path,
-            surplus_list_path=surplus_list_path,
-            created_at=datetime.now()
-        )
-        session.add(archive)
-        await session.flush()
-        logger.info(f"Архів збережено в БД для користувача {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Помилка збереження архіву в БД для {user_id}: {e}")
-        return False
-
-
 async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> bool:
     """
     Примусово зберігає тимчасовий список користувача.
     Використовується в боті з FSMContext.
-    Файли зберігаються в archives/ та записуються в БД.
+    Файли зберігаються в archives/active/ і автоматично відображаються в Mini App.
     Користувач отримує повідомлення БЕЗ файлу з інструкцією.
     """
     main_list_path = None
@@ -93,14 +70,11 @@ async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> boo
                 if not main_list_path and not surplus_list_path:
                     return True
                 
-                # Переміщуємо файли в archives/
+                # Переміщуємо файли в archives/active/
                 if main_list_path:
                     archive_main_path = _move_to_archives(main_list_path)
                 if surplus_list_path:
                     archive_surplus_path = _move_to_archives(surplus_list_path)
-                
-                # Зберігаємо в БД
-                await _save_to_database(session, user_id, archive_main_path, archive_surplus_path)
 
         # Прибираємо клавіатуру з попереднього головного меню користувача
         await clean_previous_keyboard(user_state, bot, user_id)
@@ -147,7 +121,7 @@ async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> boo
 async def force_save_user_list_web(user_id: int, bot: Bot) -> bool:
     """
     Спрощена версія для виклику з веб-API без FSMContext.
-    Файли зберігаються в archives/ та записуються в БД.
+    Файли зберігаються в archives/active/ і автоматично відображаються в Mini App.
     Користувач отримує повідомлення БЕЗ файлу з інструкцією.
     """
     main_list_path = None
@@ -165,14 +139,11 @@ async def force_save_user_list_web(user_id: int, bot: Bot) -> bool:
                     await bot.send_message(user_id, "⚠️ У вас немає активного списку для збереження")
                     return True
                 
-                # Переміщуємо файли в archives/
+                # Переміщуємо файли в archives/active/
                 if main_list_path:
                     archive_main_path = _move_to_archives(main_list_path)
                 if surplus_list_path:
                     archive_surplus_path = _move_to_archives(surplus_list_path)
-                
-                # Зберігаємо в БД
-                await _save_to_database(session, user_id, archive_main_path, archive_surplus_path)
         
         # Надсилаємо повідомлення БЕЗ файлу
         message = (
