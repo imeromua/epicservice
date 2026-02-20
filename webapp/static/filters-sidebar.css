@@ -78,6 +78,10 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    /* Обмежуємо висоту до ~5 елементів */
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .department-checkbox {
@@ -89,6 +93,8 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    /* Запобігаємо стисканню */
+    flex-shrink: 0;
 }
 
 .department-checkbox:active {
@@ -310,5 +316,23 @@
 }
 
 .filters-content::-webkit-scrollbar-thumb:hover {
+    background: var(--button-color);
+}
+
+/* Scrollbar styling for department list */
+.department-checkboxes::-webkit-scrollbar {
+    width: 4px;
+}
+
+.department-checkboxes::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.department-checkboxes::-webkit-scrollbar-thumb {
+    background: var(--hint-color);
+    border-radius: 2px;
+}
+
+.department-checkboxes::-webkit-scrollbar-thumb:hover {
     background: var(--button-color);
 }
