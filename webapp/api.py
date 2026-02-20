@@ -8,6 +8,7 @@ import os
 import sys
 
 import uvicorn
+from sqlalchemy import text
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -113,29 +114,30 @@ if __name__ == "__main__":
         port=8000,
         reload=True  # Автоперезавантаження під час розробки
     )
+
 @app.route('/api/products/departments', methods=['GET'])
-def get_departments():
+async def get_departments():
     """Отримати список всіх активних відділів"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT DISTINCT department 
-            FROM products 
-            WHERE is_active = 1 
-            ORDER BY CAST(department AS INTEGER)
-        """)
-        
-        departments = [row[0] for row in cursor.fetchall()]
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'departments': departments
-        })
+        async with async_session() as session:
+            # PostgreSQL with Ukrainian column names
+            result = await session.execute(
+                text("""
+                    SELECT DISTINCT "відділ"
+                    FROM products 
+                    WHERE "кількість" > 0
+                    ORDER BY "відділ"::INTEGER
+                """)
+            )
+            
+            departments = [row[0] for row in result.fetchall()]
+            
+            return jsonify({
+                'success': True,
+                'departments': departments
+            })
         
     except Exception as e:
-        print(f"❌ Error getting departments: {e}")
+        print(f"❌ ERROR in get_departments: {e}")
         return jsonify({'error': 'Помилка отримання відділів'}), 500
 
