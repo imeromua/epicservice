@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import select, func, Float
+from sqlalchemy import select, func, Float, cast
 
 from config import BOT_TOKEN
 from database.engine import async_session
@@ -155,7 +155,7 @@ async def filter_products(req: FilterProductsRequest):
         
         async with async_session() as session:
             # Базовий запит - виправлено приведення типу для PostgreSQL
-            query = select(Product).where(func.cast(Product.кількість, Float) > 0)
+            query = select(Product).where(cast(Product.кількість, Float) > 0)
             
             # Фільтр по відділах (якщо вказано) - конвертуємо рядки в числа
             if req.departments:
@@ -193,12 +193,12 @@ async def filter_products(req: FilterProductsRequest):
             # Отримуємо відділ поточного списку
             current_department = await orm_get_temp_list_department(req.user_id)
             
-            # Статистика по фільтру - виправлено приведення типу для PostgreSQL
+            # Статистика по фільтру - приведення типів для PostgreSQL
             stats_query = select(
                 func.count(Product.id).label('total_articles'),
                 func.sum(Product.сума_залишку).label('total_sum'),
-                func.sum(Product.кількість).label('total_quantity')
-            ).where(func.cast(Product.кількість, Float) > 0)
+                func.sum(cast(Product.кількість, Float)).label('total_quantity')
+            ).where(cast(Product.кількість, Float) > 0)
             
             # Фільтр по відділах для статистики - конвертуємо рядки в числа
             if req.departments:
@@ -276,7 +276,7 @@ async def get_departments():
             query = select(
                 Product.відділ,
                 func.count(Product.id).label('count')
-            ).where(func.cast(Product.кількість, Float) > 0).group_by(Product.відділ).order_by(Product.відділ)
+            ).where(cast(Product.кількість, Float) > 0).group_by(Product.відділ).order_by(Product.відділ)
             
             result = await session.execute(query)
             departments = result.all()
