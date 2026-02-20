@@ -9,6 +9,7 @@ import traceback
 import zipfile
 from datetime import datetime, timedelta
 from io import BytesIO
+from typing import List, Optional
 
 import openpyxl
 from aiogram import Bot
@@ -16,9 +17,11 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select, func
 
 from config import BOT_TOKEN
 from database.engine import async_session
+from database.models import Product
 from database.orm import (
     orm_add_item_to_temp_list,
     orm_clear_temp_list,
@@ -57,6 +60,14 @@ class UpdateQuantityRequest(BaseModel):
 class DeleteItemRequest(BaseModel):
     user_id: int
     product_id: int
+
+
+class FilterProductsRequest(BaseModel):
+    user_id: int
+    departments: List[str] = []  # ["10", "20", "310"]
+    sort_by: str = "balance_sum"  # balance_sum, months_without_movement, quantity, article
+    offset: int = 0
+    limit: int = 20
 
 
 # === Ендпоїнти ===
@@ -131,6 +142,154 @@ async def search_products(req: SearchRequest):
         print(f"❌ ERROR: {type(e).__name__}: {e}")
         traceback.print_exc()
         return JSONResponse(content={"error": "Неочікувана помилка", "details": str(e)}, status_code=500)
+
+
+@router.post("/products/filter")
+async def filter_products(req: FilterProductsRequest):
+    """
+    Фільтрація товарів за відділами з сортуванням та пагінацією.
+    Повертає список товарів + статистику по фільтру.
+    """
+    try:
+        print(f"🎛️ Filter request: user_id={req.user_id}, departments={req.departments}, sort_by={req.sort_by}, offset={req.offset}, limit={req.limit}")
+        
+        async with async_session() as session:
+            # Базовий запит
+            query = select(Product).where(Product.кількість > 0)
+            
+            # Фільтр по відділах (якщо вказано)
+            if req.departments:
+                query = query.where(Product.відділ.in_(req.departments))
+            
+            # Підрахунок загальної кількості (для статистики)
+            count_query = select(func.count()).select_from(query.subquery())
+            total_count_result = await session.execute(count_query)
+            total_count = total_count_result.scalar()
+            
+            # Сортування
+            if req.sort_by == "balance_sum":
+                query = query.order_by(Product.сума_залишку.desc())
+            elif req.sort_by == "months_without_movement":
+                query = query.order_by(Product.місяці_без_руху.desc())
+            elif req.sort_by == "quantity":
+                query = query.order_by(Product.кількість.desc())
+            elif req.sort_by == "article":
+                query = query.order_by(Product.артикул.asc())
+            else:
+                query = query.order_by(Product.сума_залишку.desc())
+            
+            # Пагінація
+            query = query.offset(req.offset).limit(req.limit)
+            
+            # Виконуємо запит
+            result = await session.execute(query)
+            products = result.scalars().all()
+            
+            # Отримуємо temp_list користувача для резерву
+            temp_list = await orm_get_temp_list(req.user_id, session=session)
+            user_reserved = {item.product_id: item.quantity for item in temp_list} if temp_list else {}
+            
+            # Отримуємо відділ поточного списку
+            current_department = await orm_get_temp_list_department(req.user_id)
+            
+            # Статистика по фільтру
+            stats_query = select(
+                func.count(Product.id).label('total_articles'),
+                func.sum(Product.сума_залишку).label('total_sum'),
+                func.sum(Product.кількість).label('total_quantity')
+            ).where(Product.кількість > 0)
+            
+            if req.departments:
+                stats_query = stats_query.where(Product.відділ.in_(req.departments))
+            
+            stats_result = await session.execute(stats_query)
+            stats = stats_result.first()
+            
+            # Формуємо відповідь
+            result_products = []
+            for product in products:
+                try:
+                    total_quantity = float(product.кількість)
+                except (ValueError, TypeError):
+                    total_quantity = 0.0
+                
+                available = total_quantity - product.відкладено
+                
+                user_reserved_qty = user_reserved.get(product.id, 0)
+                user_reserved_sum = user_reserved_qty * float(product.ціна)
+                
+                # Перевіряємо чи товар з іншого відділу
+                is_different_department = False
+                if current_department is not None and product.відділ != current_department:
+                    is_different_department = True
+                
+                result_products.append({
+                    "id": product.id,
+                    "article": product.артикул,
+                    "name": product.назва,
+                    "price": float(product.ціна),
+                    "available": available,
+                    "department": product.відділ,
+                    "group": product.група,
+                    "months_without_movement": product.місяці_без_руху or 0,
+                    "balance_sum": float(product.сума_залишку or 0.0),
+                    "reserved": product.відкладено,
+                    "user_reserved": user_reserved_qty,
+                    "user_reserved_sum": user_reserved_sum,
+                    "is_different_department": is_different_department,
+                    "current_list_department": current_department
+                })
+            
+            print(f"✅ Filter returned {len(result_products)} products (total={total_count})")
+            
+            return JSONResponse(content={
+                "products": result_products,
+                "statistics": {
+                    "total_articles": stats.total_articles or 0,
+                    "total_sum": float(stats.total_sum or 0.0),
+                    "total_quantity": float(stats.total_quantity or 0.0),
+                    "current_count": len(result_products),
+                    "has_more": (req.offset + len(result_products)) < total_count
+                }
+            }, status_code=200)
+            
+    except SQLAlchemyError as e:
+        print(f"❌ SQLAlchemy ERROR: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(content={"error": "Помилка бази даних", "details": str(e)}, status_code=500)
+    except Exception as e:
+        print(f"❌ ERROR in filter_products: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(content={"error": "Неочікувана помилка", "details": str(e)}, status_code=500)
+
+
+@router.get("/products/departments")
+async def get_departments():
+    """
+    Отримати список всіх доступних відділів з кількістю товарів.
+    """
+    try:
+        async with async_session() as session:
+            query = select(
+                Product.відділ,
+                func.count(Product.id).label('count')
+            ).where(Product.кількість > 0).group_by(Product.відділ).order_by(Product.відділ)
+            
+            result = await session.execute(query)
+            departments = result.all()
+            
+            dept_list = [
+                {"department": dept.відділ, "count": dept.count}
+                for dept in departments
+            ]
+            
+            print(f"📊 Returning {len(dept_list)} departments")
+            return JSONResponse(content={"departments": dept_list}, status_code=200)
+            
+    except Exception as e:
+        print(f"❌ ERROR in get_departments: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(content={"error": "Помилка отримання відділів"}, status_code=500)
 
 
 @router.get("/list/{user_id}")
