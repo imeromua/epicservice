@@ -113,3 +113,29 @@ if __name__ == "__main__":
         port=8000,
         reload=True  # Автоперезавантаження під час розробки
     )
+@app.route('/api/products/departments', methods=['GET'])
+def get_departments():
+    """Отримати список всіх активних відділів"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT DISTINCT department 
+            FROM products 
+            WHERE is_active = 1 
+            ORDER BY CAST(department AS INTEGER)
+        """)
+        
+        departments = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'departments': departments
+        })
+        
+    except Exception as e:
+        print(f"❌ Error getting departments: {e}")
+        return jsonify({'error': 'Помилка отримання відділів'}), 500
+
