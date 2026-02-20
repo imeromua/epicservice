@@ -1,0 +1,223 @@
+/* =============================================
+   CARDS.CSS - Всі картки та елементи списків
+   Product cards, List items, Archive items, Stats cards
+   ============================================= */
+
+/* Product Cards */
+.product-card, .list-item, .archive-item, .admin-card { 
+    background: var(--secondary-bg-color); 
+    border-radius: 12px; 
+    padding: 16px; 
+    margin-bottom: 12px; 
+    cursor: pointer; 
+    transition: transform 0.2s, background-color 0.3s ease; 
+    position: relative; 
+}
+
+.product-card:active, .list-item:active { 
+    transform: scale(0.98); 
+}
+
+.product-card.locked { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+    background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--secondary-bg-color) 100%);
+    filter: grayscale(50%);
+}
+
+.product-card.locked:active { 
+    transform: none; 
+}
+
+.lock-overlay { 
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    font-size: 48px; 
+    opacity: 0.3; 
+    pointer-events: none; 
+    display: none; 
+}
+
+.product-card.locked .lock-overlay { 
+    display: block; 
+}
+
+.product-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 8px; 
+}
+
+.product-article { 
+    font-weight: bold; 
+    color: var(--button-color); 
+    font-size: 16px; 
+    transition: color 0.3s ease; 
+}
+
+.product-card.locked .product-article { 
+    color: var(--hint-color); 
+}
+
+.product-status { 
+    background: #34c759; 
+    color: white; 
+    padding: 4px 8px; 
+    border-radius: 6px; 
+    font-size: 12px; 
+    font-weight: bold; 
+}
+
+.product-status.locked { 
+    background: #ff3b30; 
+}
+
+.product-name { 
+    font-size: 14px; 
+    margin-bottom: 12px; 
+    color: var(--text-color); 
+    transition: color 0.3s ease; 
+}
+
+.product-card.locked .product-name { 
+    color: var(--hint-color); 
+}
+
+.product-details { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 6px; 
+    font-size: 13px; 
+    color: var(--hint-color); 
+}
+
+.product-detail-row { 
+    display: flex; 
+    justify-content: space-between; 
+}
+
+.product-detail-label { 
+    font-weight: 500; 
+}
+
+.product-detail-value { 
+    color: var(--text-color); 
+    transition: color 0.3s ease; 
+}
+
+.product-card.locked .product-detail-value { 
+    color: var(--hint-color); 
+    opacity: 0.6; 
+}
+
+.product-detail-value.highlight { 
+    color: var(--button-color); 
+    font-weight: bold; 
+}
+
+.product-detail-value.warning { 
+    color: #ff9500; 
+    font-weight: bold; 
+}
+
+.product-detail-value.success { 
+    color: #34c759; 
+    font-weight: bold; 
+}
+
+/* List & Archive Items */
+.list-header, .archive-header, .admin-header { 
+    display: flex; 
+    justify-content: space-between; 
+    margin-bottom: 8px; 
+}
+
+.archive-badge { 
+    display: inline-block; 
+    padding: 4px 8px; 
+    border-radius: 6px; 
+    font-size: 11px; 
+    font-weight: bold; 
+    margin-left: 8px; 
+}
+
+.archive-badge.main { 
+    background: #34c759; 
+    color: white; 
+}
+
+.archive-badge.surplus { 
+    background: #ff9500; 
+    color: white; 
+}
+
+.archive-stats { 
+    font-size: 12px; 
+    color: var(--hint-color); 
+    margin-top: 8px; 
+    padding: 8px; 
+    background: rgba(0,136,204,0.05); 
+    border-radius: 8px;
+    transition: color 0.3s ease;
+}
+
+.stat-row { 
+    display: flex; 
+    justify-content: space-between; 
+    margin-bottom: 4px; 
+}
+
+.stat-row:last-child { 
+    margin-bottom: 0; 
+}
+
+.archive-actions { 
+    display: flex; 
+    gap: 8px; 
+    margin-top: 8px; 
+}
+
+/* Stats Card */
+.stats-card {
+    background: linear-gradient(135deg, var(--button-color) 0%, var(--link-color) 100%);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0,136,204,0.3);
+}
+
+.stats-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.stat-item {
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 12px;
+    opacity: 0.9;
+}
