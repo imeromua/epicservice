@@ -157,9 +157,10 @@ async def filter_products(req: FilterProductsRequest):
             # Базовий запит - виправлено приведення типу для PostgreSQL
             query = select(Product).where(func.cast(Product.кількість, Float) > 0)
             
-            # Фільтр по відділах (якщо вказано)
+            # Фільтр по відділах (якщо вказано) - конвертуємо рядки в числа
             if req.departments:
-                query = query.where(Product.відділ.in_(req.departments))
+                dept_integers = [int(d) for d in req.departments]
+                query = query.where(Product.відділ.in_(dept_integers))
             
             # Підрахунок загальної кількості (для статистики)
             count_query = select(func.count()).select_from(query.subquery())
@@ -199,8 +200,9 @@ async def filter_products(req: FilterProductsRequest):
                 func.sum(Product.кількість).label('total_quantity')
             ).where(func.cast(Product.кількість, Float) > 0)
             
+            # Фільтр по відділах для статистики - конвертуємо рядки в числа
             if req.departments:
-                stats_query = stats_query.where(Product.відділ.in_(req.departments))
+                stats_query = stats_query.where(Product.відділ.in_(dept_integers))
             
             stats_result = await session.execute(stats_query)
             stats = stats_result.first()
