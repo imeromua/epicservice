@@ -32,7 +32,7 @@ from database.orm import (
     orm_subtract_collected,
 )
 from database.orm.products import SmartColumnMapper
-from keyboards.inline import get_admin_main_kb, get_user_main_kb
+from keyboards.inline import get_admin_main_kb
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
 
@@ -180,7 +180,7 @@ async def broadcast_import_update(result: dict):
         sent_count = 0
         for user_id in user_ids:
             try:
-                kb = get_admin_main_kb() if user_id in ADMIN_IDS else get_user_main_kb()
+                kb = get_admin_main_kb()
                 await bot.send_message(user_id, message_text, reply_markup=kb, parse_mode='HTML')
                 sent_count += 1
             except Exception as e:
