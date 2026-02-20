@@ -1,143 +1,1381 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <script src="/static/pwa-redirect.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EpicService</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F4E6;</text></svg>">
+    
+    <!-- PWA Detection and Telegram Integration (MUST BE FIRST!) -->
+    <script src="/static/pwa-redirect.js"></script>
 
+    <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#3b82f6">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="EpicService">
-    <meta name="description" content="Система обліку товарів без руху">
+    <meta name="description" content="Система обліку та замовлення запчастин">
 
+    <!-- Manifest -->
     <link rel="manifest" href="/static/manifest.json">
+
+    <!-- Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-192x192.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-192x192.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-192x192.png">
 
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <link rel="stylesheet" href="/static/css/admin.css">
-    <link rel="stylesheet" href="/static/filters-sidebar.css">
+    <!-- PWA Styles -->
     <link rel="stylesheet" href="/static/pwa-styles.css">
-
-    <script>
-        // Безпечно передаємо список ID адміністраторів з бекенду у глобальну змінну
-        window.ADMIN_IDS = {{ admin_ids | default([]) | tojson }};
-    </script>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Filters Sidebar -->
+    <link rel="stylesheet" href="/static/filters-sidebar.css">
+    <script src="/static/filters-sidebar.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --hint-color: var(--tg-theme-hint-color, #999999);
+            --link-color: var(--tg-theme-link-color, #0088cc);
+            --button-color: var(--tg-theme-button-color, #0088cc);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg-color); 
+            color: var(--text-color); 
+            padding-bottom: 80px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .sticky-container { 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            background: var(--bg-color); 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
+        }
+        .pull-indicator {
+            text-align: center;
+            padding: 10px;
+            font-size: 24px;
+            opacity: 0;
+            transform: translateY(-100%);
+            transition: all 0.3s ease;
+            background: var(--bg-color);
+        }
+        .pull-indicator.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .header { padding: 16px 16px 8px 16px; }
+        h1 { 
+            color: var(--button-color); 
+            font-size: 24px; 
+            margin-bottom: 8px; 
+            transition: color 0.3s ease;
+            text-align: center;
+        }
+        #userInfo {
+            text-align: center;
+            font-size: 14px;
+            color: var(--hint-color);
+        }
+        .department-info { 
+            background: var(--button-color); 
+            opacity: 0.15;
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            font-size: 13px; 
+            display: none;
+            transition: opacity 0.3s ease;
+        }
+        .department-info.active { display: block; opacity: 1; background: rgba(0,136,204,0.1); }
+        .search-box { position: relative; margin-bottom: 12px; padding: 0 16px; }
+        .search-input { 
+            width: 100%; 
+            padding: 12px 16px; 
+            border: 2px solid var(--button-color); 
+            border-radius: 12px; 
+            font-size: 16px; 
+            background: var(--bg-color); 
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+        .search-input:focus { outline: none; border-color: var(--link-color); }
+        .tabs { display: flex; gap: 4px; padding: 0 16px 8px 16px; border-bottom: 1px solid var(--hint-color); overflow-x: auto; }
+        .tab { 
+            position: relative; 
+            padding: 12px 16px; 
+            background: none; 
+            border: none; 
+            color: var(--hint-color); 
+            cursor: pointer; 
+            font-size: 14px; 
+            border-bottom: 2px solid transparent; 
+            transition: all 0.3s; 
+            white-space: nowrap; 
+        }
+        .tab.active { color: var(--button-color); border-bottom-color: var(--button-color); }
+        .tab.hidden { display: none; }
+        .tab-badge { position: absolute; top: 6px; right: 8px; background: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+        .main-content { padding: 16px; }
+        .content { display: none; }
+        .content.active { display: block; }
+        .stats-card {
+            background: linear-gradient(135deg, var(--button-color) 0%, var(--link-color) 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,136,204,0.3);
+        }
+        .stats-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        .product-card, .list-item, .archive-item, .admin-card { 
+            background: var(--secondary-bg-color); 
+            border-radius: 12px; 
+            padding: 16px; 
+            margin-bottom: 12px; 
+            cursor: pointer; 
+            transition: transform 0.2s, background-color 0.3s ease; 
+            position: relative; 
+        }
+        .product-card:active, .list-item:active { transform: scale(0.98); }
+        .product-card.locked { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--secondary-bg-color) 100%);
+            filter: grayscale(50%);
+        }
+        .product-card.locked:active { transform: none; }
+        .lock-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; opacity: 0.3; pointer-events: none; display: none; }
+        .product-card.locked .lock-overlay { display: block; }
+        .product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .product-article { font-weight: bold; color: var(--button-color); font-size: 16px; transition: color 0.3s ease; }
+        .product-card.locked .product-article { color: var(--hint-color); }
+        .product-status { background: #34c759; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+        .product-status.locked { background: #ff3b30; }
+        .product-name { font-size: 14px; margin-bottom: 12px; color: var(--text-color); transition: color 0.3s ease; }
+        .product-card.locked .product-name { color: var(--hint-color); }
+        .product-details { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--hint-color); }
+        .product-detail-row { display: flex; justify-content: space-between; }
+        .product-detail-label { font-weight: 500; }
+        .product-detail-value { color: var(--text-color); transition: color 0.3s ease; }
+        .product-card.locked .product-detail-value { color: var(--hint-color); opacity: 0.6; }
+        .product-detail-value.highlight { color: var(--button-color); font-weight: bold; }
+        .product-detail-value.warning { color: #ff9500; font-weight: bold; }
+        .product-detail-value.success { color: #34c759; font-weight: bold; }
+        .list-header, .archive-header, .admin-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .action-buttons { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            color: white;
+            min-width: 120px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: var(--button-color); }
+        .btn-success { background: #34c759; }
+        .btn-danger { background: #ff3b30; }
+        .btn-warning { background: #ff9500; }
+        .save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .save-btn:active { transform: scale(0.95); }
+        .clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .clear-btn:active { transform: scale(0.95); }
+        .download-btn { flex: 1; padding: 12px; background: var(--button-color); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s, background-color 0.3s ease; }
+        .download-btn:active { transform: scale(0.95); }
+        .download-all-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #34c759 0%, #30b350 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 16px;
+            box-shadow: 0 3px 10px rgba(52,199,89,0.3);
+            transition: transform 0.2s;
+        }
+        .download-all-btn:active { transform: scale(0.97); }
+        .delete-archive-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .delete-archive-btn:active { transform: scale(0.95); }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--hint-color); transition: color 0.3s ease; }
+        .empty-icon { font-size: 48px; margin-bottom: 16px; }
+        .loader { text-align: center; padding: 20px; color: var(--hint-color); transition: color 0.3s ease; }
+        .total-box { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            background: var(--bg-color); 
+            border-top: 1px solid var(--hint-color); 
+            padding: 16px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            z-index: 50;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .total-text { font-size: 18px; font-weight: bold; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { 
+            background: var(--bg-color); 
+            border-radius: 16px; 
+            padding: 24px; 
+            max-width: 90%; 
+            max-height: 80%; 
+            overflow-y: auto;
+            transition: background-color 0.3s ease;
+        }
+        .quantity-selector { display: flex; align-items: center; gap: 16px; margin: 20px 0; justify-content: center; }
+        .qty-btn { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            border: 2px solid var(--button-color); 
+            background: var(--button-color); 
+            color: white; 
+            font-size: 20px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: transform 0.2s, background-color 0.3s ease;
+        }
+        .qty-btn:active { transform: scale(0.9); }
+        .qty-display { font-size: 24px; font-weight: bold; min-width: 60px; text-align: center; }
+        .quick-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+        .quick-btn { 
+            flex: 1; 
+            padding: 12px; 
+            background: var(--secondary-bg-color); 
+            color: var(--text-color); 
+            border: 2px solid var(--button-color); 
+            border-radius: 8px; 
+            font-size: 14px; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+        }
+        .quick-btn:active { transform: scale(0.95); background: var(--button-color); color: white; }
+        .add-btn { 
+            width: 100%; 
+            padding: 16px; 
+            background: var(--button-color); 
+            color: var(--button-text-color); 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 12px;
+            transition: transform 0.2s, background-color 0.3s ease;
+        }
+        .add-btn:active { transform: scale(0.95); }
+        .delete-btn { background: #ff3b30; }
+        .cancel-btn { background: var(--hint-color) !important; }
+        .custom-input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid var(--button-color); 
+            border-radius: 8px; 
+            font-size: 18px; 
+            text-align: center; 
+            margin: 16px 0; 
+            background: var(--bg-color); 
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+        .archive-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-left: 8px; }
+        .archive-badge.main { background: #34c759; color: white; }
+        .archive-badge.surplus { background: #ff9500; color: white; }
+        .archive-stats { 
+            font-size: 12px; 
+            color: var(--hint-color); 
+            margin-top: 8px; 
+            padding: 8px; 
+            background: rgba(0,136,204,0.05); 
+            border-radius: 8px;
+            transition: color 0.3s ease;
+        }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .stat-row:last-child { margin-bottom: 0; }
+        .success-icon { font-size: 64px; text-align: center; margin-bottom: 12px; }
+        .success-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #34c759; }
+        .success-subtitle { text-align: center; font-size: 14px; color: var(--hint-color); margin-bottom: 24px; transition: color 0.3s ease; }
+        .archive-actions { display: flex; gap: 8px; margin-top: 8px; }
+        
+        /* Admin styles */
+        .admin-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .admin-stat-card {
+            background: linear-gradient(135deg, var(--button-color) 0%, #006699 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,136,204,0.2);
+        }
+        .admin-stat-card.success { background: linear-gradient(135deg, #34c759 0%, #30b350 100%); }
+        .admin-stat-card.warning { background: linear-gradient(135deg, #ff9500 0%, #e68a00 100%); }
+        .admin-stat-card.danger { background: linear-gradient(135deg, #ff3b30 0%, #e63027 100%); }
+        .admin-stat-icon { font-size: 32px; margin-bottom: 8px; }
+        .admin-stat-value { font-size: 28px; font-weight: bold; margin-bottom: 4px; }
+        .admin-stat-label { font-size: 12px; opacity: 0.9; }
+        .user-item {
+            background: var(--secondary-bg-color);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-info { flex: 1; }
+        .user-name { font-weight: 600; margin-bottom: 4px; }
+        .user-details { font-size: 12px; color: var(--hint-color); }
+        .file-upload-area {
+            border: 2px dashed var(--hint-color);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-upload-area:hover { border-color: var(--button-color); background: rgba(0,136,204,0.05); }
+        .upload-icon { font-size: 40px; margin-bottom: 12px; }
+        .admin-section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0 12px 0;
+            color: var(--text-color);
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--hint-color);
+            border-radius: 8px;
+            font-size: 14px;
+            min-height: 100px;
+            resize: vertical;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+        .form-textarea:focus { outline: none; border-color: var(--button-color); }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .alert-success {
+            background: rgba(52,199,89,0.1);
+            color: #34c759;
+            border: 1px solid #34c759;
+        }
+        .alert-error {
+            background: rgba(255,59,48,0.1);
+            color: #ff3b30;
+            border: 1px solid #ff3b30;
+        }
+    </style>
 </head>
 <body>
-    <div id="pwa-install-banner" class="pwa-install-banner">
-        <div class="pwa-install-content">
-            <span>Встановити EpicService на екран "Додому"</span>
-            <div>
-                <button id="pwa-install-btn" class="btn btn-primary">Встановити</button>
-                <button onclick="document.getElementById('pwa-install-banner').style.display='none'" class="btn" style="background: transparent; color: white;">Пізніше</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="offline-indicator" class="offline-indicator hidden">
-        ⚠️ Немає з'єднання з інтернетом
-    </div>
-
+    <div class="pull-indicator" id="pullIndicator">↓ Потягніть для оновлення</div>
     <div class="sticky-container">
-        <div id="userInfo" style="font-size: 14px; font-weight: 500; margin-bottom: 12px; color: var(--hint-color);">
-            Завантаження...
+        <div class="header">
+            <h1>📦 EpicService</h1>
+            <p id="userInfo">Завантаження...</p>
+            <div class="department-info" id="departmentInfo">
+                🏢 <strong>Відділ:</strong> <span id="currentDepartment">-</span> (<span id="itemCount">0</span> товарів)<br>
+                🔒 <span style="color: #ff9500">Можна додавати тільки з цього відділу</span>
+            </div>
         </div>
-
+        <div class="search-box" id="searchBoxContainer">
+            <input type="text" id="searchInput" class="search-input" placeholder="Введіть артикул або назву...">
+        </div>
         <div class="tabs">
-            <div class="tab active" data-tab="search">🔍 Пошук</div>
-            <div class="tab" data-tab="cart">🛒 Список</div>
-            <div class="tab" data-tab="archives">📁 Архіви</div>
-            <div class="tab hidden" data-tab="admin" id="adminTabBtn">⚙️ Адмінка</div>
+            <button class="tab active" onclick="switchTab('search')">🔍 Пошук</button>
+            <button class="tab" onclick="switchTab('list')">📋 Список<span class="tab-badge" id="listBadge" style="display:none">0</span></button>
+            <button class="tab" onclick="switchTab('archives')">📁 Архів</button>
+            <button class="tab hidden" id="adminTabBtn" onclick="switchTab('admin')">🛠️ Адмін</button>
         </div>
     </div>
 
-    <div id="searchTab" class="tab-content active">
-        <div class="search-box">
-            <input type="text" id="searchInput" class="search-input" placeholder="Введіть назву або артикул...">
+    <div class="main-content">
+        <div id="searchTab" class="content active">
+            <div id="searchResults"></div>
         </div>
-        <div id="searchResults">
-            <div style="text-align:center; padding:20px; color:var(--hint-color);">
-                Почніть вводити назву для пошуку
-            </div>
+        <div id="listTab" class="content">
+            <div id="listContent"></div>
         </div>
-    </div>
-
-    <div id="cartTab" class="tab-content">
-        <div id="cartTotal" style="font-size: 18px; font-weight: 600; margin-bottom: 16px; text-align: right;">Разом: 0.00 ₴</div>
-        <div id="cartList"></div>
+        <div id="archivesTab" class="content">
+            <div id="statisticsCard"></div>
+            <div id="archivesContent"></div>
+        </div>
         
-        <div style="display: flex; gap: 12px; margin-top: 20px;">
-            <button id="checkoutBtn" class="btn btn-primary" style="display: none;">Відправити замовлення</button>
-            <button id="clearCartBtn" class="btn btn-danger" style="display: none; width: auto;">Очистити</button>
-        </div>
-    </div>
-
-    <div id="archivesTab" class="tab-content">
-        <div id="archivesList"></div>
-    </div>
-
-    <div id="adminTab" class="tab-content">
-        <div id="adminPanelContainer">
-            <div class="admin-section-title">📊 Статистика</div>
-            <div class="stats-grid">
-                <div class="stat-card" id="totalUsers">
-                    <div class="stat-value" id="totalUsersVal">0</div>
-                    <div class="stat-label">Користувачів</div>
-                </div>
-                <div class="stat-card" id="totalProducts">
-                    <div class="stat-value" id="totalProductsVal">0</div>
-                    <div class="stat-label">Товарів</div>
-                </div>
-                <div class="stat-card" id="activeUsers">
-                    <div class="stat-value" id="activeUsersVal">0</div>
-                    <div class="stat-label">Активних</div>
-                </div>
-                <div class="stat-card" id="reservedSum">
-                    <div class="stat-value" id="reservedSumVal">0 ₴</div>
-                    <div class="stat-label">В резерві</div>
-                </div>
+        <!-- Admin Tab -->
+        <div id="adminContent" class="content">
+            <div class="admin-stats-grid" id="adminStatsGrid">
+                <div class="loader">Завантаження...</div>
             </div>
-
-            <div class="admin-section-title">Активні списки</div>
-            <div id="activeUsersSection" style="margin-bottom: 24px;"></div>
-
-            <div class="admin-section-title">Оновлення бази</div>
-            <label class="file-upload-area" for="dbUpload">
-                <span class="upload-icon">📄</span>
-                <div>Натисніть для завантаження Excel файлу</div>
-                <input type="file" id="dbUpload" accept=".xlsx" style="display: none;">
-            </label>
-            <div id="uploadStatus" style="display: none;"></div>
-
-            <div class="admin-section-title">Розсилка</div>
-            <div class="form-group">
-                <textarea id="broadcastMessage" class="form-textarea" placeholder="Введіть текст повідомлення для всіх користувачів..."></textarea>
+            
+            <div class="admin-section-title">👥 Користувачі з активними списками</div>
+            <div id="adminActiveUsers">
+                <div class="loader">Завантаження...</div>
             </div>
-            <button id="sendBroadcastBtn" class="btn btn-primary">Відправити всім</button>
+            
+            <div class="admin-section-title">📥 Імпорт товарів</div>
+            <div id="importAlert"></div>
+            <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📁</div>
+                <div style="font-size: 15px; margin-bottom: 6px;">Оберіть Excel файл для імпорту</div>
+                <div style="color: var(--hint-color); font-size: 13px;">Підтримка .xlsx, .xls</div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
+            </div>
+            <div id="fileInfo" style="display: none; margin-bottom: 12px; font-size: 14px; color: var(--button-color);"></div>
+            <div class="checkbox-group" style="margin-bottom: 12px;">
+                <input type="checkbox" id="notifyUsers">
+                <label for="notifyUsers">📢 Повідомити користувачів про оновлення</label>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>📤 Імпортувати</button>
+                <button class="btn btn-danger" onclick="cancelUpload(true)">✖️ Скасувати</button>
+            </div>
+            
+            <div class="admin-section-title">📤 Експорт та операції</div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
+                <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
+            </div>
+            
+            <div class="admin-section-title">📢 Розсилка повідомлень</div>
             <div id="broadcastAlert"></div>
+            <div class="form-group">
+                <label class="form-label">Текст повідомлення:</label>
+                <textarea class="form-textarea" id="broadcastMessage" placeholder="Введіть повідомлення для всіх користувачів..."></textarea>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="sendBroadcast()">📤 Розіслати всім</button>
+            </div>
         </div>
     </div>
 
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/admin.js"></script>
-    <script src="/static/filters-sidebar.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/pwa-install.js"></script>
+    <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
+    <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
+    <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
+    <div id="statsModal" class="modal"><div class="modal-content" id="statsModalContent"></div></div>
+    <div id="adminArchivesModal" class="modal"><div class="modal-content" id="adminArchivesModalContent"></div></div>
+    <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
 
-    <script>
-        window.addEventListener('online', () => document.getElementById('offline-indicator')?.classList.add('hidden'));
-        window.addEventListener('offline', () => document.getElementById('offline-indicator')?.classList.remove('hidden'));
-        if (!navigator.onLine) document.getElementById('offline-indicator')?.classList.remove('hidden');
-    </script>
+<!-- PWA Install Banner -->
+<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
+  <div class="pwa-install-content">
+    <span>📱 Встановіть Epic Service на свій телефон!</span>
+    <button id="pwa-install-btn" class="btn btn-primary">Встановити</button>
+    <button onclick="document.getElementById('pwa-install-banner').style.display='none'" class="btn btn-secondary">Пізніше</button>
+  </div>
+</div>
+
+<!-- Offline Indicator -->
+<div id="offline-indicator" class="offline-indicator">
+  ⚠️ Немає з'єднання з інтернетом
+</div>
+
+<!-- PWA Scripts -->
+<script src="/static/pwa-install.js"></script>
+
+<!-- Offline/Online Detection -->
+<script>
+  const offlineIndicator = document.getElementById('offline-indicator');
+  
+  window.addEventListener('online', () => {
+    if (offlineIndicator) {
+      offlineIndicator.classList.remove('show');
+      console.log('[✅] З\'єднання відновлено');
+    }
+  });
+  
+  window.addEventListener('offline', () => {
+    if (offlineIndicator) {
+      offlineIndicator.classList.add('show');
+      console.log('[⚠️] Втрачено з\'єднання');
+    }
+  });
+  
+  if (!navigator.onLine && offlineIndicator) {
+    offlineIndicator.classList.add('show');
+  }
+</script>
+
+<script>
+const tg = window.Telegram.WebApp; 
+tg.expand();
+tg.ready();
+
+const userId = tg.initDataUnsafe?.user?.id || 0;
+// Читаємо ADMIN_IDS з шаблону (backend передає з .env)
+const ADMIN_IDS = {{ admin_ids | tojson }};
+const isAdmin = ADMIN_IDS.includes(userId);
+
+let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
+let cachedProducts = [];
+let currentDepartment = null;
+let pullStartY = 0, pulling = false;
+let selectedFile = null;
+let cachedProductsInfo = null;
+
+// Show admin tab if user is admin
+if (isAdmin) {
+    const adminBtn = document.getElementById('adminTabBtn');
+    if (adminBtn) adminBtn.classList.remove('hidden');
+}
+
+// Pull-to-refresh
+document.addEventListener('touchstart', e => {
+    if (window.scrollY === 0) {
+        pullStartY = e.touches[0].clientY;
+        pulling = true;
+    }
+}, {passive: true});
+
+document.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const pullDistance = e.touches[0].clientY - pullStartY;
+    const indicator = document.getElementById('pullIndicator');
+    
+    if (pullDistance > 0 && pullDistance < 80) {
+        indicator.style.opacity = pullDistance / 80;
+        indicator.style.transform = `translateY(${pullDistance - 50}px)`;
+    } else if (pullDistance >= 80) {
+        indicator.classList.add('active');
+        indicator.textContent = '↻ Відпустіть для оновлення';
+    }
+}, {passive: true});
+
+document.addEventListener('touchend', e => {
+    if (!pulling) return;
+    const pullDistance = e.changedTouches[0].clientY - pullStartY;
+    const indicator = document.getElementById('pullIndicator');
+    
+    if (pullDistance >= 80) {
+        indicator.textContent = '⟳ Оновлення...';
+        tg.HapticFeedback.impactOccurred('medium');
+        refreshCurrentTab();
+    }
+    
+    setTimeout(() => {
+        indicator.classList.remove('active');
+        indicator.style.opacity = 0;
+        indicator.style.transform = 'translateY(-100%)';
+        indicator.textContent = '↓ Потягніть для оновлення';
+    }, 500);
+    
+    pulling = false;
+}, {passive: true});
+
+function refreshCurrentTab() {
+    switch(currentTab) {
+        case 'search':
+            const query = document.getElementById('searchInput').value.trim();
+            if (query.length >= 2) search(query);
+            break;
+        case 'list':
+            loadList();
+            break;
+        case 'archives':
+            loadArchives();
+            break;
+        case 'admin':
+            if (isAdmin) loadAdminData();
+            break;
+    }
+}
+
+document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}${isAdmin ? ' 👑' : ''}` : 'Тестовий режим';
+
+function updateDepartmentInfo(department, count) {
+    currentDepartment = department;
+    const info = document.getElementById('departmentInfo');
+    if (department !== null && count > 0) {
+        document.getElementById('currentDepartment').textContent = department;
+        document.getElementById('itemCount').textContent = count;
+        info.classList.add('active');
+    } else {
+        info.classList.remove('active');
+    }
+    
+    if (cachedProducts.length > 0) {
+        cachedProducts.forEach(p => {
+            p.is_different_department = (department !== null && p.department !== department);
+            p.current_list_department = department;
+        });
+        updateSearchResults();
+    }
+}
+
+function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
+function updateSearchBoxVisibility() { const searchBox = document.getElementById('searchBoxContainer'); if (currentTab === 'search') { searchBox.style.display = 'block'; } else { searchBox.style.display = 'none'; } }
+function switchTab(tab) { 
+    currentTab = tab; 
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
+    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminContent']}; 
+    const [idx, id] = tabs[tab]; 
+    document.querySelectorAll('.tab')[idx].classList.add('active'); 
+    document.getElementById(id).classList.add('active'); 
+    updateSearchBoxVisibility(); 
+    
+    // Update filters button visibility
+    if (typeof updateFiltersButtonVisibility === 'function') {
+        updateFiltersButtonVisibility();
+    }
+    
+    if (tab === 'list') loadList(); 
+    if (tab === 'archives') loadArchives(); 
+    if (tab === 'admin' && isAdmin) loadAdminData();
+}
+function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
+function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
+document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; cachedProducts = []; return; } searchTimeout = setTimeout(() => search(query), 500); });
+
+function renderProduct(p) {
+    const isLocked = p.is_different_department;
+    const lockedClass = isLocked ? ' locked' : '';
+    const statusClass = isLocked ? ' locked' : '';
+    const statusText = isLocked ? '🔒 Заблоковано' : '✅ Знайдено';
+    const clickHandler = isLocked ? `onclick="showLockedAlert(${p.current_list_department})"` : `onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
+    
+    return `<div class="product-card${lockedClass}" data-product-id="${p.id}" ${clickHandler}>
+        <div class="lock-overlay">🔒</div>
+        <div class="product-header">
+            <span class="product-article">🆔 ${p.article}</span>
+            <span class="product-status${statusClass}">${statusText}</span>
+        </div>
+        <div class="product-name">📝 ${p.name}</div>
+        <div class="product-details">
+            <div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">⌛ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div>
+            <div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>
+            ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
+        </div>
+    </div>`;
+}
+
+function showLockedAlert(dept) {
+    tg.showAlert(`🔒 Цей товар з іншого відділу.\n\nПоточний список для відділу ${dept}.\nЗбережіть або очистіть список щоб почати новий.`);
+}
+
+function updateSearchResults() {
+    const results = document.getElementById('searchResults');
+    const visibleProducts = cachedProducts.filter(p => p.available > 0);
+    
+    if (visibleProducts.length === 0) {
+        results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено або все зарезервовано</div>';
+        return;
+    }
+    
+    results.innerHTML = visibleProducts.map(p => renderProduct(p)).join('');
+}
+
+async function search(query) { 
+    const results = document.getElementById('searchResults'); 
+    results.innerHTML = '<div class="loader">🔍 Пошук...</div>'; 
+    try { 
+        const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) }); 
+        const data = await response.json(); 
+        if (!data.products || data.products.length === 0) { 
+            results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; 
+            cachedProducts = [];
+            return; 
+        }
+        cachedProducts = data.products.filter(p => p.available > 0);
+        updateSearchResults();
+    } catch (error) { 
+        results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; 
+        cachedProducts = [];
+    } 
+}
+
+function openAddModal(product) { selectedProduct = product; currentQuantity = 1; document.getElementById('modalTitle').textContent = product.article; document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`; document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`; document.getElementById('qtyDisplay').textContent = 1; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; document.getElementById('customQtyInput').value = ''; document.getElementById('addModal').classList.add('active'); }
+function closeModal() { document.getElementById('addModal').classList.remove('active'); }
+function changeQty(d) { currentQuantity = Math.max(1, Math.min(selectedProduct.available, currentQuantity + d)); document.getElementById('qtyDisplay').textContent = currentQuantity; }
+function addAllAvailable() { currentQuantity = selectedProduct.available; document.getElementById('qtyDisplay').textContent = currentQuantity; tg.HapticFeedback.notificationOccurred('success'); }
+function showCustomInput() { document.getElementById('customInputBox').style.display = 'block'; document.getElementById('normalSelector').style.display = 'none'; document.getElementById('customQtyInput').focus(); }
+function applyCustomQty() { const v = parseInt(document.getElementById('customQtyInput').value); if (isNaN(v) || v < 1) { tg.showAlert('❌ Введіть коректне число'); return; } if (v > selectedProduct.available) { tg.showAlert(`⚠️ Максимум: ${selectedProduct.available} шт.`); return; } currentQuantity = v; document.getElementById('qtyDisplay').textContent = v; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; tg.HapticFeedback.notificationOccurred('success'); }
+
+async function confirmAdd() { 
+    try { 
+        const r = await fetch('/api/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: selectedProduct.id, quantity: currentQuantity}) }); 
+        const d = await r.json(); 
+        if (d.success) { 
+            tg.showAlert(`✅ ${d.message}`); 
+            closeModal(); 
+            
+            const productIndex = cachedProducts.findIndex(p => p.id === selectedProduct.id);
+            if (productIndex !== -1) {
+                cachedProducts[productIndex].user_reserved += currentQuantity;
+                cachedProducts[productIndex].user_reserved_sum += currentQuantity * selectedProduct.price;
+                cachedProducts[productIndex].available -= currentQuantity;
+            }
+            
+            const listResponse = await fetch(`/api/list/${userId}`);
+            const listData = await listResponse.json();
+            
+            const deptResponse = await fetch(`/api/list/department/${userId}`);
+            const deptData = await deptResponse.json();
+            
+            updateDepartmentInfo(deptData.department, listData.count || 0);
+            updateListBadge(listData.count || 0);
+        } else { 
+            tg.showAlert('❌ ' + d.message); 
+        } 
+    } catch (e) { 
+        tg.showAlert('❌ ' + e.message); 
+    } 
+}
+
+function openEditModal(item) { editingItem = item; editQuantity = item.quantity; document.getElementById('editModalTitle').textContent = item.article; document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`; document.getElementById('editQtyDisplay').textContent = editQuantity; document.getElementById('editModal').classList.add('active'); }
+function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
+function changeEditQty(d) { editQuantity = Math.max(1, editQuantity + d); document.getElementById('editQtyDisplay').textContent = editQuantity; }
+async function confirmUpdate() { try { const r = await fetch('/api/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id, quantity: editQuantity}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function confirmDelete() { if (!confirm('Видалити товар зі списку?')) return; try { const r = await fetch('/api/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function saveList() { try { const r = await fetch(`/api/save/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.HapticFeedback.notificationOccurred('success'); if (d.cleared) { loadList(); updateDepartmentInfo(null, 0); } document.getElementById('successModal').classList.add('active'); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function clearList() { if (!confirm('Очистити весь список?')) return; try { const r = await fetch(`/api/clear/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); updateDepartmentInfo(null, 0); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⌛ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); updateDepartmentInfo(null, 0); return; } const deptR = await fetch(`/api/list/department/${userId}`); const deptD = await deptR.json(); updateDepartmentInfo(deptD.department, d.count); let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--hint-color)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); updateDepartmentInfo(null, 0); } }
+
+async function loadStatistics() {
+    try {
+        const r = await fetch(`/api/statistics/${userId}`);
+        const d = await r.json();
+        
+        if (d.total_lists === 0) return '';
+        
+        return `<div class="stats-card">
+            <div class="stats-title">📊 Ваша статистика</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">${d.total_lists}</div>
+                    <div class="stat-label">📝 Всього списків</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${d.total_amount.toLocaleString('uk-UA')} ₴</div>
+                    <div class="stat-label">💰 Загальна сума</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${d.this_month_lists}</div>
+                    <div class="stat-label">📅 За місяць</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${d.popular_department || '-'}</div>
+                    <div class="stat-label">🏢 Популярний відділ</div>
+                </div>
+            </div>
+        </div>`;
+    } catch (e) {
+        console.error('Stats error:', e);
+        return '';
+    }
+}
+
+async function loadArchiveStats(filename) { try { const r = await fetch(`/api/archive/stats/${filename}?user_id=${userId}`); const d = await r.json(); if (d.success) { return `<div class="stat-row"><span class="stat-label">📦 Товарів:</span><span class="stat-value">${d.items_count}</span></div><div class="stat-row"><span class="stat-label">🏢 Відділ:</span><span class="stat-value">${d.department}</span></div><div class="stat-row"><span class="stat-label">👤 Автор:</span><span class="stat-value">ID ${d.author_id}</span></div>`; } return ''; } catch (e) { return ''; } }
+
+async function loadArchives() { 
+    const el = document.getElementById('archivesContent'); 
+    const statsCard = document.getElementById('statisticsCard');
+    
+    el.innerHTML = '<div class="loader">📁 Завантаження...</div>'; 
+    statsCard.innerHTML = '';
+    
+    try { 
+        const stats = await loadStatistics();
+        if (stats) statsCard.innerHTML = stats;
+        
+        const r = await fetch(`/api/archives/${userId}`); 
+        const d = await r.json(); 
+        
+        if (!d.archives || d.archives.length === 0) { 
+            el.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div>Архів порожній</div>'; 
+            return; 
+        }
+        
+        let html = `<button class="download-all-btn" onclick="downloadAllArchives()">📦 Завантажити всі архіви (${d.archives.length})</button>`;
+        
+        for (const a of d.archives) { 
+            const stats = await loadArchiveStats(a.filename); 
+            html += `<div class="archive-item"><div class="archive-header"><strong>📄 ${a.date}</strong><span class="archive-badge ${a.is_surplus ? 'surplus' : 'main'}">${a.type}</span></div>${stats ? `<div class="archive-stats">${stats}</div>` : ''}<div class="archive-actions"><button class="download-btn" onclick="downloadArchive('${a.filename}')">📥 Завантажити</button><button class="delete-archive-btn" onclick="deleteArchive('${a.filename}')">🗑️ Видалити</button></div></div>`; 
+        } 
+        el.innerHTML = html; 
+    } catch (e) { 
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка</div>'; 
+    } 
+}
+
+function downloadAllArchives() {
+    window.open(`/api/archives/download-all/${userId}`, '_blank');
+    tg.HapticFeedback.notificationOccurred('success');
+}
+
+function downloadArchive(f) { window.open(`/api/archive/download/${f}`, '_blank'); tg.HapticFeedback.notificationOccurred('success'); }
+async function deleteArchive(filename) { if (!confirm(`Видалити файл "${filename}"?`)) return; try { const r = await fetch(`/api/archive/delete/${filename}?user_id=${userId}`, { method: 'DELETE' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); tg.HapticFeedback.notificationOccurred('success'); loadArchives(); } else { tg.showAlert('❌ Помилка видалення'); } } catch (e) { tg.showAlert('❌ Помилка: ' + e.message); } }
+
+// === ADMIN FUNCTIONS ===
+
+async function loadAdminData() {
+    if (!isAdmin) return;
+    console.log('👑 Loading admin data...');
+    await loadAdminStats();
+    await loadAdminActiveUsers();
+}
+
+async function loadAdminStats() {
+    const container = document.getElementById('adminStatsGrid');
+    try {
+        console.log('📊 Fetching admin statistics...');
+        const response = await fetch(`/api/admin/statistics?user_id=${userId}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (data && data.success === false) throw new Error(data.message || data.error || 'Admin statistics error');
+        console.log('📊 Stats data:', data);
+        
+        // Load products info for tile
+        const productsResponse = await fetch(`/api/admin/products/info?user_id=${userId}`);
+        const productsData = await productsResponse.json();
+        cachedProductsInfo = productsData;
+        
+        const productsDisplay = productsData.success 
+            ? `${productsData.current_articles} / ${productsData.original_articles}`
+            : (data.total_products || 0);
+        
+        container.innerHTML = `
+            <div class="admin-stat-card" style="cursor: pointer;" onclick="showAllUsers()">
+                <div class="admin-stat-icon">👥</div>
+                <div class="admin-stat-value">${data.total_users || 0}</div>
+                <div class="admin-stat-label">Користувачів</div>
+            </div>
+            <div class="admin-stat-card success" style="cursor: pointer;" onclick="showActiveUsers()">
+                <div class="admin-stat-icon">🔥</div>
+                <div class="admin-stat-value">${data.active_users || 0}</div>
+                <div class="admin-stat-label">Активних</div>
+            </div>
+            <div class="admin-stat-card warning" style="cursor: pointer;" onclick="showProductsInfo()">
+                <div class="admin-stat-icon">📦</div>
+                <div class="admin-stat-value">${productsDisplay}</div>
+                <div class="admin-stat-label">Товарів</div>
+            </div>
+            <div class="admin-stat-card danger" style="cursor: pointer;" onclick="showReservedByDepartment()">
+                <div class="admin-stat-icon">💰</div>
+                <div class="admin-stat-value">${(data.total_reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>
+                <div class="admin-stat-label">Зарезервовано</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('❌ Error loading admin stats:', error);
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+    }
+}
+
+async function loadAdminActiveUsers() {
+    try {
+        console.log('👥 Fetching active users...');
+        const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (data && data.success === false) throw new Error(data.message || data.error || 'Active users error');
+        console.log('👥 Active users data:', data);
+        
+        const container = document.getElementById('adminActiveUsers');
+        
+        if (!data.users || data.users.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає активних списків</div>';
+            return;
+        }
+        
+        container.innerHTML = data.users.map(user => `
+            <div class="user-item">
+                <div class="user-info">
+                    <div class="user-name">👤 ${user.username || 'User ' + user.user_id}</div>
+                    <div class="user-details">
+                        🏢 ${user.department || '-'} • 📦 ${user.items_count} • 💰 ${(user.total_sum || 0).toLocaleString('uk-UA')} ₴
+                    </div>
+                </div>
+                <button class="btn btn-success" style="flex: 0 0 auto; padding: 8px 16px; font-size: 12px;" onclick="forceSave(${user.user_id})">
+                    💾 Зберегти
+                </button>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('❌ Error loading active users:', error);
+        document.getElementById('adminActiveUsers').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
+    }
+}
+
+async function forceSave(targetUserId) {
+    if (!confirm(`Примусово зберегти список користувача ${targetUserId}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/admin/force-save/${targetUserId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            tg.showAlert('✅ ' + data.message);
+            loadAdminActiveUsers();
+        } else {
+            tg.showAlert('❌ ' + (data.message || 'Помилка збереження'));
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+// File upload
+const dropZone = document.getElementById('dropZone');
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--button-color)';
+    dropZone.style.background = 'rgba(0,136,204,0.1)';
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.style.borderColor = 'var(--hint-color)';
+    dropZone.style.background = '';
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--hint-color)';
+    dropZone.style.background = '';
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        selectedFile = files[0];
+        updateFileInfo();
+    }
+});
+
+function handleFileSelect(event) {
+    selectedFile = event.target.files[0];
+    updateFileInfo();
+}
+
+function updateFileInfo() {
+    if (selectedFile) {
+        document.getElementById('fileInfo').textContent = `📄 ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`;
+        document.getElementById('fileInfo').style.display = 'block';
+        document.getElementById('uploadBtn').disabled = false;
+    }
+}
+
+function cancelUpload(clearAlert = false) {
+    selectedFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('uploadBtn').disabled = true;
+    if (clearAlert) {
+        document.getElementById('importAlert').innerHTML = '';
+    }
+}
+
+async function uploadFile() {
+    if (!selectedFile) {
+        tg.showAlert('❌ Оберіть файл для завантаження');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    const notifyChecked = document.getElementById('notifyUsers').checked;
+    
+    document.getElementById('uploadBtn').disabled = true;
+    document.getElementById('uploadBtn').textContent = '⌛ Завантаження...';
+    
+    try {
+        const response = await fetch(`/api/admin/import?user_id=${userId}&notify_users=${notifyChecked}`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        if (data.success || data.added !== undefined) {
+            document.getElementById('importAlert').innerHTML = `
+                <div class="alert alert-success">
+                    <span style="font-size: 20px;">✅</span>
+                    <div>Імпорт успішний<br><small>Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}, Деактивовано: ${data.deactivated || 0}</small></div>
+                </div>
+            `;
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
+            loadAdminStats();
+        } else {
+            document.getElementById('importAlert').innerHTML = `
+                <div class="alert alert-error">
+                    <span style="font-size: 20px;">❌</span>
+                    <div>${data.error || data.message || 'Помилка імпорту'}</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('importAlert').innerHTML = `
+            <div class="alert alert-error">
+                <span style="font-size: 20px;">❌</span>
+                <div>Помилка: ${error.message}</div>
+            </div>
+        `;
+    } finally {
+        document.getElementById('uploadBtn').disabled = false;
+        document.getElementById('uploadBtn').textContent = '📤 Імпортувати';
+    }
+}
+
+async function exportStock() {
+    try {
+        window.open(`/api/admin/export/stock?user_id=${userId}`, '_blank');
+        tg.HapticFeedback.notificationOccurred('success');
+    } catch (error) {
+        tg.showAlert('❌ Помилка експорту: ' + error.message);
+    }
+}
+
+
+
+
+
+async function showAdminArchives() {
+    try {
+        const response = await fetch(`/api/admin/archives?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.files && data.files.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">🗄 Архіви користувачів</h2>';
+            html += '<button class="btn btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="downloadAllAdminArchives(); closeAdminArchivesModal();">📥 Завантажити всі (ZIP)</button>';
+            html += '<div style="max-height: 400px; overflow-y: auto;">';
+            data.files.forEach(file => {
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">`;
+                html += `<div><div style="font-weight: 600;">📄 ${file.filename}</div><div style="font-size: 12px; color: var(--hint-color);">${(file.size / 1024).toFixed(1)} KB | ${file.modified}</div></div>`;
+                html += `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; min-width: auto;" onclick="downloadAdminArchive('${file.filename}')">📥</button></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeAdminArchivesModal()">Закрити</button>';
+            
+            document.getElementById('adminArchivesModalContent').innerHTML = html;
+            document.getElementById('adminArchivesModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає архівів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+
+async function showAllUsers() {
+    try {
+        const response = await fetch(`/api/admin/users/all?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.users && data.users.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">👥 Всі користувачі</h2>';
+            html += '<div style="max-height: 450px; overflow-y: auto;">';
+            data.users.forEach(user => {
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px;">`;
+                html += `<div style="font-weight: 600;">👤 ID: ${user.user_id}${user.username ? ' (@' + user.username + ')' : ''}</div>`;
+                html += `<div style="font-size: 12px; color: var(--hint-color); margin-top: 4px;">`;
+                html += `📁 Архівів: ${user.archives_count || 0} | 💰 Сума: ${(user.total_amount || 0).toLocaleString('uk-UA')} ₴`;
+                if (user.last_activity) html += ` | 🕐 ${user.last_activity}`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає користувачів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function showActiveUsers() {
+    try {
+        const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.users && data.users.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">🔥 Активні користувачі</h2>';
+            html += '<div style="max-height: 450px; overflow-y: auto;">';
+            data.users.forEach(user => {
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px;">`;
+                html += `<div style="font-weight: 600;">👤 ${user.username || 'User ' + user.user_id}</div>`;
+                html += `<div style="font-size: 12px; color: var(--hint-color); margin-top: 4px;">`;
+                html += `🏢 ${user.department || '-'} | 📦 ${user.items_count} товарів | 💰 ${(user.total_sum || 0).toLocaleString('uk-UA')} ₴`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає активних користувачів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function showProductsInfo() {
+    try {
+        let data = cachedProductsInfo;
+        if (!data) {
+            const response = await fetch(`/api/admin/products/info?user_id=${userId}`);
+            data = await response.json();
+            cachedProductsInfo = data;
+        }
+        
+        if (data.success) {
+            let html = '<h2 style="margin-bottom: 8px;">📦 Інформація про товари</h2>';
+            if (data.last_import) {
+                html += `<div style="padding: 10px; background: rgba(52,199,89,0.1); border-radius: 8px; margin-bottom: 12px; font-size: 13px;">`;
+                html += `✅ Базу оновлено ${data.last_import}`;
+                html += `</div>`;
+            }
+            
+            // Було/Стало summary
+            html += `<div style="padding: 14px; background: linear-gradient(135deg, rgba(255,152,0,0.15) 0%, rgba(255,204,0,0.15) 100%); border-radius: 10px; margin-bottom: 14px;">`;
+            html += `<div style="text-align: center; font-size: 15px; font-weight: 600; margin-bottom: 10px;">📊 Було / Стало</div>`;
+            html += `<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">`;
+            html += `<div><div style="font-size: 22px; font-weight: 700; color: #ff9500;">${data.original_articles || 0}</div><div style="font-size: 11px; opacity: 0.7;">Було артикулів</div></div>`;
+            html += `<div><div style="font-size: 22px; font-weight: 700; color: #34c759;">→</div><div style="font-size: 11px; opacity: 0.7;">Зібрано</div></div>`;
+            html += `<div><div style="font-size: 22px; font-weight: 700; color: #0088cc;">${data.current_articles || 0}</div><div style="font-size: 11px; opacity: 0.7;">Залишилось</div></div>`;
+            html += `</div></div>`;
+            
+            // Детальна статистика
+            html += `<div style="padding: 12px; background: var(--secondary-bg-color); border-radius: 8px; margin-bottom: 12px;">`;
+            html += `<div style="font-weight: 600; margin-bottom: 8px;">💰 Суми:</div>`;
+            html += `<div style="font-size: 13px; line-height: 1.6;">`;
+            html += `📌 Було: <strong>${(data.original_sum || 0).toLocaleString('uk-UA')} грн</strong><br>`;
+            html += `🛒 Зібрано: <strong style="color: #ff9500;">${(data.collected_sum || 0).toLocaleString('uk-UA')} грн</strong> (${data.collected_articles || 0} арт.)<br>`;
+            html += `✅ Залишилось: <strong style="color: #34c759;">${(data.current_sum || 0).toLocaleString('uk-UA')} грн</strong>`;
+            html += `</div></div>`;
+            
+            html += '<div style="font-weight: 600; margin-bottom: 8px;">📦 По відділах (було → стало):</div>';
+            html += '<div style="max-height: 300px; overflow-y: auto;">';
+            if (data.departments && data.departments.length > 0) {
+                data.departments.forEach(dept => {
+                    const wasCollected = (dept.original_count || 0) - (dept.current_count || 0);
+                    const collectedPercent = dept.original_count > 0 ? Math.round((wasCollected / dept.original_count) * 100) : 0;
+                    html += `<div style="padding: 10px 12px; background: var(--secondary-bg-color); margin-bottom: 6px; border-radius: 6px;">`;
+                    html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
+                    html += `<span style="font-weight: 600;">🏢 Відділ ${dept.department}</span>`;
+                    html += `<span style="font-weight: 600; color: var(--button-color);">${dept.original_count || 0} → ${dept.current_count || 0}</span>`;
+                    html += `</div>`;
+                    if (wasCollected > 0) {
+                        html += `<div style="font-size: 12px; color: var(--hint-color);">`;
+                        html += `🛒 Зібрано: ${wasCollected} арт. (${collectedPercent}%)`;
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                });
+            }
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає даних');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+async function showReservedByDepartment() {
+    try {
+        const response = await fetch(`/api/admin/reserved/by-department?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.departments && data.departments.length > 0) {
+            let html = '<h2 style="margin-bottom: 16px;">💰 Резерви по відділах</h2>';
+            html += '<div style="max-height: 450px; overflow-y: auto;">';
+            const total = data.departments.reduce((sum, d) => sum + (d.reserved_sum || 0), 0);
+            data.departments.forEach(dept => {
+                const percent = total > 0 ? ((dept.reserved_sum / total) * 100).toFixed(1) : 0;
+                html += `<div style="background: var(--secondary-bg-color); padding: 12px; margin-bottom: 8px; border-radius: 8px;">`;
+                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
+                html += `<div style="font-weight: 600;">🏢 Відділ ${dept.department}</div>`;
+                html += `<div style="font-weight: 600; color: var(--button-color);">${(dept.reserved_sum || 0).toLocaleString('uk-UA')} ₴</div>`;
+                html += `</div>`;
+                html += `<div style="background: var(--hint-color); height: 6px; border-radius: 3px; overflow: hidden;">`;
+                html += `<div style="background: var(--button-color); width: ${percent}%; height: 100%;"></div>`;
+                html += `</div>`;
+                html += `<div style="font-size: 12px; color: var(--hint-color); margin-top: 4px;">`;
+                html += `📦 ${dept.products_count || 0} товарів | 👥 ${dept.users_count || 0} користувачів | ${percent}%`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            html += '<button class="add-btn cancel-btn" style="margin-top: 16px;" onclick="closeStatsModal()">Закрити</button>';
+            
+            document.getElementById('statsModalContent').innerHTML = html;
+            document.getElementById('statsModal').classList.add('active');
+        } else {
+            tg.showAlert('📁 Немає резервів');
+        }
+    } catch (error) {
+        tg.showAlert('❌ Помилка: ' + error.message);
+    }
+}
+
+function closeStatsModal() {
+    document.getElementById('statsModal').classList.remove('active');
+}
+
+function closeAdminArchivesModal() {
+    document.getElementById('adminArchivesModal').classList.remove('active');
+}
+
+function downloadAdminArchive(filename) {
+    window.open(`/api/admin/archives/download/${filename}?user_id=${userId}`, '_blank');
+    tg.HapticFeedback.notificationOccurred('success');
+}
+
+function downloadAllAdminArchives() {
+    window.open(`/api/admin/archives/download-all?user_id=${userId}`, '_blank');
+    tg.HapticFeedback.notificationOccurred('success');
+}
+
+async function sendBroadcast() {
+    const message = document.getElementById('broadcastMessage').value.trim();
+    
+    if (!message) {
+        tg.showAlert('❌ Введіть текст повідомлення');
+        return;
+    }
+    
+    if (!confirm(`Розіслати повідомлення всім користувачам?\n\nТекст: "${message}"`)) return;
+    
+    try {
+        const response = await fetch(`/api/admin/broadcast?user_id=${userId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: userId,
+                message: message
+            })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('broadcastAlert').innerHTML = `
+                <div class="alert alert-success">
+                    <span style="font-size: 20px;">✅</span>
+                    <div>${data.message || 'Розсилка завершена'}<br><small>Розіслано: ${data.sent || 0} користувачам</small></div>
+                </div>
+            `;
+            document.getElementById('broadcastMessage').value = '';
+        } else {
+            document.getElementById('broadcastAlert').innerHTML = `
+                <div class="alert alert-error">
+                    <span style="font-size: 20px;">❌</span>
+                    <div>${data.message || 'Помилка розсилки'}</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('broadcastAlert').innerHTML = `
+            <div class="alert alert-error">
+                <span style="font-size: 20px;">❌</span>
+                <div>Помилка: ${error.message}</div>
+            </div>
+        `;
+    }
+}
+
+if (userId) loadList();
+updateSearchBoxVisibility();
+
+// Debug info
+console.log('App initialized:', { userId, isAdmin, ADMIN_IDS });
+console.log('🚀 PWA Ready!');
+console.log('📱 Display mode:', 
+  window.matchMedia('(display-mode: standalone)').matches ? 'Standalone (PWA)' : 'Browser'
+);
+</script>
 </body>
 </html>
