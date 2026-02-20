@@ -581,6 +581,7 @@ let cachedProducts = [];
 let currentDepartment = null;
 let pullStartY = 0, pulling = false;
 let selectedFile = null;
+let cachedProductsInfo = null;
 
 // Show admin tab if user is admin
 if (isAdmin) {
@@ -891,6 +892,15 @@ async function loadAdminStats() {
         if (data && data.success === false) throw new Error(data.message || data.error || 'Admin statistics error');
         console.log('📊 Stats data:', data);
         
+        // Load products info for tile
+        const productsResponse = await fetch(`/api/admin/products/info?user_id=${userId}`);
+        const productsData = await productsResponse.json();
+        cachedProductsInfo = productsData;
+        
+        const productsDisplay = productsData.success 
+            ? `${productsData.current_articles} / ${productsData.original_articles}`
+            : (data.total_products || 0);
+        
         container.innerHTML = `
             <div class="admin-stat-card" style="cursor: pointer;" onclick="showAllUsers()">
                 <div class="admin-stat-icon">👥</div>
@@ -904,7 +914,7 @@ async function loadAdminStats() {
             </div>
             <div class="admin-stat-card warning" style="cursor: pointer;" onclick="showProductsInfo()">
                 <div class="admin-stat-icon">📦</div>
-                <div class="admin-stat-value">${data.total_products || 0}</div>
+                <div class="admin-stat-value">${productsDisplay}</div>
                 <div class="admin-stat-label">Товарів</div>
             </div>
             <div class="admin-stat-card danger" style="cursor: pointer;" onclick="showReservedByDepartment()">
@@ -1180,8 +1190,12 @@ async function showActiveUsers() {
 
 async function showProductsInfo() {
     try {
-        const response = await fetch(`/api/admin/products/info?user_id=${userId}`);
-        const data = await response.json();
+        let data = cachedProductsInfo;
+        if (!data) {
+            const response = await fetch(`/api/admin/products/info?user_id=${userId}`);
+            data = await response.json();
+            cachedProductsInfo = data;
+        }
         
         if (data.success) {
             let html = '<h2 style="margin-bottom: 8px;">📦 Інформація про товари</h2>';
@@ -1190,17 +1204,41 @@ async function showProductsInfo() {
                 html += `✅ Базу оновлено ${data.last_import}`;
                 html += `</div>`;
             }
+            
+            // Було/Стало summary
+            html += `<div style="padding: 14px; background: linear-gradient(135deg, rgba(255,152,0,0.15) 0%, rgba(255,204,0,0.15) 100%); border-radius: 10px; margin-bottom: 14px;">`;
+            html += `<div style="text-align: center; font-size: 15px; font-weight: 600; margin-bottom: 10px;">📊 Було / Стало</div>`;
+            html += `<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">`;
+            html += `<div><div style="font-size: 22px; font-weight: 700; color: #ff9500;">${data.original_articles || 0}</div><div style="font-size: 11px; opacity: 0.7;">Було артикулів</div></div>`;
+            html += `<div><div style="font-size: 22px; font-weight: 700; color: #34c759;">→</div><div style="font-size: 11px; opacity: 0.7;">Зібрано</div></div>`;
+            html += `<div><div style="font-size: 22px; font-weight: 700; color: #0088cc;">${data.current_articles || 0}</div><div style="font-size: 11px; opacity: 0.7;">Залишилось</div></div>`;
+            html += `</div></div>`;
+            
+            // Детальна статистика
             html += `<div style="padding: 12px; background: var(--secondary-bg-color); border-radius: 8px; margin-bottom: 12px;">`;
-            html += `<div style="font-weight: 600; margin-bottom: 4px;">Кількість артикулів: ${data.total_articles || 0} шт.</div>`;
-            html += `<div style="font-size: 13px; color: var(--hint-color);">Загальна сума збору: ${(data.total_sum || 0).toLocaleString('uk-UA')} грн</div>`;
-            html += `</div>`;
-            html += '<div style="font-weight: 600; margin-bottom: 8px;">📦 Актуальна кількість артикулів по відділах:</div>';
-            html += '<div style="max-height: 350px; overflow-y: auto;">';
+            html += `<div style="font-weight: 600; margin-bottom: 8px;">💰 Суми:</div>`;
+            html += `<div style="font-size: 13px; line-height: 1.6;">`;
+            html += `📌 Було: <strong>${(data.original_sum || 0).toLocaleString('uk-UA')} грн</strong><br>`;
+            html += `🛒 Зібрано: <strong style="color: #ff9500;">${(data.collected_sum || 0).toLocaleString('uk-UA')} грн</strong> (${data.collected_articles || 0} арт.)<br>`;
+            html += `✅ Залишилось: <strong style="color: #34c759;">${(data.current_sum || 0).toLocaleString('uk-UA')} грн</strong>`;
+            html += `</div></div>`;
+            
+            html += '<div style="font-weight: 600; margin-bottom: 8px;">📦 По відділах (було → стало):</div>';
+            html += '<div style="max-height: 300px; overflow-y: auto;">';
             if (data.departments && data.departments.length > 0) {
                 data.departments.forEach(dept => {
-                    html += `<div style="padding: 8px 12px; background: var(--secondary-bg-color); margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between;">`;
-                    html += `<span>🏢 Відділ ${dept.department}</span>`;
-                    html += `<span style="font-weight: 600;">${dept.count} арт.</span>`;
+                    const wasCollected = (dept.original_count || 0) - (dept.current_count || 0);
+                    const collectedPercent = dept.original_count > 0 ? Math.round((wasCollected / dept.original_count) * 100) : 0;
+                    html += `<div style="padding: 10px 12px; background: var(--secondary-bg-color); margin-bottom: 6px; border-radius: 6px;">`;
+                    html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
+                    html += `<span style="font-weight: 600;">🏢 Відділ ${dept.department}</span>`;
+                    html += `<span style="font-weight: 600; color: var(--button-color);">${dept.original_count || 0} → ${dept.current_count || 0}</span>`;
+                    html += `</div>`;
+                    if (wasCollected > 0) {
+                        html += `<div style="font-size: 12px; color: var(--hint-color);">`;
+                        html += `🛒 Зібрано: ${wasCollected} арт. (${collectedPercent}%)`;
+                        html += `</div>`;
+                    }
                     html += `</div>`;
                 });
             }
