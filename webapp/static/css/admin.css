@@ -1,0 +1,102 @@
+/**
+ * css/admin.css
+ * Специфічні стилі для панелі адміністратора.
+ */
+
+.admin-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 20px 0 12px 0;
+    color: var(--text-color);
+}
+
+/* ===== СІТКА СТАТИСТИКИ ===== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--secondary-bg-color);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.stat-card:active {
+    transform: scale(0.96);
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--button-color);
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: var(--hint-color);
+    font-weight: 500;
+}
+
+/* ===== ЗОНА ЗАВАНТАЖЕННЯ ФАЙЛІВ (EXCEL) ===== */
+.file-upload-area {
+    border: 2px dashed var(--hint-color);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: transparent;
+}
+
+.file-upload-area:hover {
+    border-color: var(--button-color);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.upload-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* ===== ФОРМИ (РОЗСИЛКА) ===== */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.form-textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--hint-color);
+    border-radius: 8px;
+    font-size: 14px;
+    min-height: 100px;
+    resize: vertical;
+    background: var(--bg-color);
+    color: var(--text-color);
+    transition: border-color 0.3s ease;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--button-color);
+}
