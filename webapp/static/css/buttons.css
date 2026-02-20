@@ -1,0 +1,161 @@
+/* =============================================
+   BUTTONS.CSS - Всі кнопки та дії
+   Base buttons, Action buttons, Specific buttons
+   ============================================= */
+
+/* Action Buttons Container */
+.action-buttons { 
+    display: flex; 
+    gap: 8px; 
+    margin-bottom: 16px; 
+    flex-wrap: wrap; 
+}
+
+/* Base Button */
+.btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s;
+    color: white;
+    min-width: 120px;
+}
+
+.btn:active { 
+    transform: scale(0.95); 
+}
+
+/* Button Variants */
+.btn-primary { 
+    background: var(--button-color); 
+}
+
+.btn-success { 
+    background: #34c759; 
+}
+
+.btn-danger { 
+    background: #ff3b30; 
+}
+
+.btn-warning { 
+    background: #ff9500; 
+}
+
+/* Specific Buttons */
+.save-btn { 
+    flex: 1; 
+    padding: 12px; 
+    background: #34c759; 
+    color: white; 
+    border: none; 
+    border-radius: 12px; 
+    font-size: 14px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+}
+
+.save-btn:active { 
+    transform: scale(0.95); 
+}
+
+.clear-btn { 
+    flex: 1; 
+    padding: 12px; 
+    background: #ff3b30; 
+    color: white; 
+    border: none; 
+    border-radius: 12px; 
+    font-size: 14px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+}
+
+.clear-btn:active { 
+    transform: scale(0.95); 
+}
+
+.download-btn { 
+    flex: 1; 
+    padding: 12px; 
+    background: var(--button-color); 
+    color: white; 
+    border: none; 
+    border-radius: 12px; 
+    font-size: 14px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: transform 0.2s, background-color 0.3s ease; 
+}
+
+.download-btn:active { 
+    transform: scale(0.95); 
+}
+
+.download-all-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #34c759 0%, #30b350 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 16px;
+    box-shadow: 0 3px 10px rgba(52,199,89,0.3);
+    transition: transform 0.2s;
+}
+
+.download-all-btn:active { 
+    transform: scale(0.97); 
+}
+
+.delete-archive-btn { 
+    flex: 1; 
+    padding: 12px; 
+    background: #ff3b30; 
+    color: white; 
+    border: none; 
+    border-radius: 12px; 
+    font-size: 14px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+}
+
+.delete-archive-btn:active { 
+    transform: scale(0.95); 
+}
+
+.add-btn { 
+    width: 100%; 
+    padding: 16px; 
+    background: var(--button-color); 
+    color: var(--button-text-color); 
+    border: none; 
+    border-radius: 12px; 
+    font-size: 16px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    margin-top: 12px;
+    transition: transform 0.2s, background-color 0.3s ease;
+}
+
+.add-btn:active { 
+    transform: scale(0.95); 
+}
+
+.delete-btn { 
+    background: #ff3b30; 
+}
+
+.cancel-btn { 
+    background: var(--hint-color) !important; 
+}
