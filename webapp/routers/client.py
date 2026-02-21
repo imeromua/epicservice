@@ -261,16 +261,22 @@ async def filter_products(req: FilterProductsRequest):
                     "current_list_department": current_department
                 })
             
-            print(f"✅ Filter returned {len(result_products)} products (total={total_count})")
+            # Розраховуємо has_more
+            has_more = (req.offset + len(result_products)) < total_count
+            
+            print(f"✅ Filter returned {len(result_products)} products (total={total_count}, has_more={has_more})")
             
             return JSONResponse(content={
                 "products": result_products,
+                "has_more": has_more,  # ❗️ Додано на верхній рівень
+                "total": total_count,  # ❗️ Додано на верхній рівень
+                "offset": req.offset,
+                "limit": req.limit,
                 "statistics": {
                     "total_articles": stats.total_articles or 0,
                     "total_sum": float(stats.total_sum or 0.0),
                     "total_quantity": float(stats.total_quantity or 0.0),
-                    "current_count": len(result_products),
-                    "has_more": (req.offset + len(result_products)) < total_count
+                    "current_count": len(result_products)
                 }
             }, status_code=200)
             
