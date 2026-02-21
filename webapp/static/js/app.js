@@ -170,11 +170,11 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 console.log(`🔍 Fetching: offset=${SearchModule.currentOffset}, query="${SearchModule.currentQuery}"`);
                 
+                // ✅ Використовуємо дефолтний limit з API (50)
                 const data = await API.client.searchProducts(
                     SearchModule.currentQuery, 
                     userId, 
-                    SearchModule.currentOffset, 
-                    20
+                    SearchModule.currentOffset
                 );
                 
                 const newProducts = data.products || [];
