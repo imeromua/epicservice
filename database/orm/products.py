@@ -369,6 +369,10 @@ async def orm_subtract_collected(dataframe: pd.DataFrame) -> dict:
 # --- Функції пошуку та отримання товарів ---
 
 async def orm_find_products(search_query: str) -> list[Product]:
+    """
+    Пошук товарів за артикулом або назвою з нечітким збігом.
+    Повертає всі знайдені товари без обмеження кількості (для пагінації на рівні API).
+    """
     async with async_session() as session:
         like_query = f"%{search_query}%"
         stmt = select(Product).where(
@@ -405,7 +409,8 @@ async def orm_find_products(search_query: str) -> list[Product]:
                 scored_products.append((product, final_score))
 
         scored_products.sort(key=lambda x: x[1], reverse=True)
-        return [product for product, score in scored_products[:15]]
+        # ВИДАЛИВ [:15] - тепер повертаємо ВСІ знайдені товари для пагінації
+        return [product for product, score in scored_products]
 
 
 async def orm_get_product_by_id(session, product_id: int, for_update: bool = False) -> Product | None:
