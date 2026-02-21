@@ -233,10 +233,18 @@ async def delete_photo(photo_id: int, user_id: int):
             if not photo:
                 raise HTTPException(status_code=404, detail="Photo not found")
 
-            file_path = Path(__file__).resolve().parent.parent / "static" / photo.file_path
-            if file_path.exists():
-                file_path.unlink()
+            # Видаляємо фізичний файл
+            # photo.file_path вже містить "uploads/photos/filename.jpg"
+            webapp_root = Path(__file__).resolve().parent.parent
+            full_file_path = webapp_root / "static" / photo.file_path
+            
+            if full_file_path.exists():
+                full_file_path.unlink()
+                print(f"✅ Фото видалено: {full_file_path}")
+            else:
+                print(f"⚠️ Файл не знайдено: {full_file_path}")
 
+            # Видаляємо запис з БД
             await session.delete(photo)
             await session.commit()
 
@@ -245,4 +253,5 @@ async def delete_photo(photo_id: int, user_id: int):
         raise
     except Exception as e:
         print(f"❌ ERROR in delete_photo: {e}")
+        traceback.print_exc()
         return JSONResponse(content={"success": False, "message": str(e)}, status_code=500)
