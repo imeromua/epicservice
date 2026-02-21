@@ -901,11 +901,14 @@ async def danger_clear_database(user_id: int = Query(...)):
     try:
         logger.critical("⚠️ DANGER ZONE: User %s initiated CLEAR DATABASE operation", user_id)
         
-        # Видаляємо всі товари
+        # Видаляємо з CASCADE для підтаблиць
         async with async_session() as session:
             result = await session.execute(text("SELECT COUNT(*) FROM products"))
             count = result.scalar()
             
+            # Видаляємо product_photos спочатку (foreign key)
+            await session.execute(text("DELETE FROM product_photos"))
+            # Потім products
             await session.execute(text("DELETE FROM products"))
             await session.commit()
             
@@ -947,9 +950,9 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
                     os.remove(filepath)
                     deleted_files += 1
         
-        # Видаляємо записи з БД
+        # Видаляємо записи з БД (правильна назва таблиці!)
         async with async_session() as session:
-            await session.execute(text("DELETE FROM photos"))
+            await session.execute(text("DELETE FROM product_photos"))
             await session.commit()
         
         logger.critical("✅ All photos deleted: %d files removed by admin %s", deleted_files, user_id)
@@ -981,7 +984,7 @@ async def danger_reset_moderation(user_id: int = Query(...)):
         
         async with async_session() as session:
             result = await session.execute(
-                text("UPDATE photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL")
+                text("UPDATE product_photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL")
             )
             await session.commit()
             
@@ -1065,9 +1068,8 @@ async def danger_full_wipe(user_id: int = Query(...)):
             # Products
             result_products = await session.execute(text("SELECT COUNT(*) FROM products"))
             deleted_products = result_products.scalar()
-            await session.execute(text("DELETE FROM products"))
             
-            # Photos (і файли)
+            # Photos (спочатку файли)
             photos_dir = "uploads/photos"
             if os.path.exists(photos_dir):
                 for filename in os.listdir(photos_dir):
@@ -1076,7 +1078,9 @@ async def danger_full_wipe(user_id: int = Query(...)):
                         os.remove(filepath)
                         deleted_photos += 1
             
-            await session.execute(text("DELETE FROM photos"))
+            # БД: product_photos спочатку, потім products
+            await session.execute(text("DELETE FROM product_photos"))
+            await session.execute(text("DELETE FROM products"))
             await session.commit()
         
         # 2. Архіви
