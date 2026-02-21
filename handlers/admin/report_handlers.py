@@ -21,7 +21,6 @@ from database.orm import (orm_get_all_collected_items_sync,
                           orm_get_all_temp_list_items_sync,
                           orm_get_users_with_active_lists,
                           orm_subtract_collected)
-from handlers.admin.core import _show_admin_panel
 from handlers.admin.lock_common import handle_lock_notify_common, handle_lock_force_save_common
 from keyboards.inline import get_admin_lock_kb
 from lexicon.lexicon import LEXICON
@@ -121,10 +120,9 @@ async def proceed_with_stock_export(callback: CallbackQuery, bot: Bot, state: FS
             finally:
                 if os.path.exists(report_path):
                     os.remove(report_path)
+            await bot.send_message(callback.from_user.id, "✅ Звіт сформовано.")
     except Exception as e:
         logger.error("Помилка при експорті залишків: %s", e, exc_info=True)
-    finally:
-        await _show_admin_panel(callback, state, bot)
 
 
 async def proceed_with_collected_export(callback: CallbackQuery, bot: Bot, state: FSMContext):
@@ -158,11 +156,10 @@ async def proceed_with_collected_export(callback: CallbackQuery, bot: Bot, state
             finally:
                 if os.path.exists(report_path):
                     os.remove(report_path)
+            await bot.send_message(callback.from_user.id, "✅ Звіт сформовано.")
     except Exception as e:
         logger.error("Помилка створення зведеного звіту: %s", e, exc_info=True)
         await bot.send_message(callback.from_user.id, LEXICON.UNEXPECTED_ERROR)
-    finally:
-        await _show_admin_panel(callback, state, bot)
 
 
 @router.callback_query(F.data == "admin:export_stock")
@@ -285,4 +282,3 @@ async def process_subtract_file(message: Message, state: FSMContext, bot: Bot):
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
-        await _show_admin_panel(message, state, bot)
