@@ -43,7 +43,7 @@ const API = (function() {
     return {
         // КЛІЄНТСЬКА ЧАСТИНА (клієнтські запити)
         client: {
-            searchProducts: (query, userId, offset = 0, limit = 20) => 
+            searchProducts: (query, userId, offset = 0, limit = 50) => 
                 request('/search', { 
                     method: 'POST', 
                     body: { query, user_id: userId, offset, limit } 
