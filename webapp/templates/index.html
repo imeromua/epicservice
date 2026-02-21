@@ -639,9 +639,6 @@
   }
 </script>
 
-<!-- ✅ FIXED: Correct path to app.js -->
-<script src="/static/js/app.js?v=3"></script>
-
 <script>
 const tg = window.Telegram.WebApp; 
 tg.expand();
@@ -712,12 +709,7 @@ function refreshCurrentTab() {
     switch(currentTab) {
         case 'search':
             const query = document.getElementById('searchInput').value.trim();
-            if (query.length >= 2) {
-                // ✅ Use SearchModule from app.js
-                if (window.App && window.App.SearchModule) {
-                    window.App.SearchModule.loadMore(true);
-                }
-            }
+            if (query.length >= 2) search(query);
             break;
         case 'list':
             loadList();
@@ -776,6 +768,7 @@ function switchTab(tab) {
 }
 function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
 function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
+document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; cachedProducts = []; return; } searchTimeout = setTimeout(() => search(query), 500); });
 
 function renderProduct(p) {
     const isLocked = p.is_different_department;
@@ -799,7 +792,7 @@ function renderProduct(p) {
         <div class=\"product-details\">
             <div class=\"product-detail-row\"><span class=\"product-detail-label\">🏢 Відділ:</span><span class=\"product-detail-value\">${p.department}</span></div>
             <div class=\"product-detail-row\"><span class=\"product-detail-label\">📂 Група:</span><span class=\"product-detail-value\">${p.group}</span></div>
-            <div class=\"product-detail-row\"><span class=\"product-detail-label\">⏳ Без руху (міс):</span><span class=\"product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}\">${p.months_without_movement}</span></div>
+            <div class=\"product-detail-row\"><span class=\"product-detail-label\">⌛ Без руху (міс):</span><span class=\"product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}\">${p.months_without_movement}</span></div>
             <div class=\"product-detail-row\"><span class=\"product-detail-label\">💰 Сума залишку:</span><span class=\"product-detail-value highlight\">${p.balance_sum.toFixed(2)} грн</span></div>
             <div class=\"product-detail-row\"><span class=\"product-detail-label\">📦 Доступно:</span><span class=\"product-detail-value success\">${p.available}</span></div>
             ${p.user_reserved > 0 ? `<div class=\"product-detail-row\"><span class=\"product-detail-label\">🛒 В резерві:</span><span class=\"product-detail-value warning\">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
@@ -808,7 +801,7 @@ function renderProduct(p) {
 }
 
 function showLockedAlert(dept) {
-    tg.showAlert(`🔒 Цей товар з іншого відділу.\\n\\nПоточний список для відділу ${dept}.\\nЗбережіть або очистіть список щоб почати новий.`);
+    tg.showAlert(`🔒 Цей товар з іншого відділу.\n\nПоточний список для відділу ${dept}.\nЗбережіть або очистіть список щоб почати новий.`);
 }
 
 function updateSearchResults() {
@@ -821,6 +814,30 @@ function updateSearchResults() {
     }
     
     results.innerHTML = visibleProducts.map(p => renderProduct(p)).join('');
+}
+
+async function search(query) { 
+    const results = document.getElementById('searchResults'); 
+    results.innerHTML = '<div class="loader">🔍 Пошук...</div>'; 
+    try { 
+        const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) }); 
+        const data = await response.json(); 
+        if (!data.products || data.products.length === 0) { 
+            results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; 
+            cachedProducts = [];
+            return; 
+        }
+
+        // Завантаження фото для кожного товару
+    for (let product of data.products) {
+        product.photos = await loadProductPhotos(product.article);
+        }
+        cachedProducts = data.products.filter(p => p.available > 0);
+        updateSearchResults();
+    } catch (error) { 
+        results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; 
+        cachedProducts = [];
+    } 
 }
 
 function openAddModal(product) { selectedProduct = product; currentQuantity = 1; document.getElementById('modalTitle').textContent = product.article; document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`; document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`; document.getElementById('qtyDisplay').textContent = 1; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; document.getElementById('customQtyInput').value = ''; document.getElementById('addModal').classList.add('active'); }
@@ -868,7 +885,7 @@ async function confirmUpdate() { try { const r = await fetch('/api/update', { me
 async function confirmDelete() { if (!confirm('Видалити товар зі списку?')) return; try { const r = await fetch('/api/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
 async function saveList() { try { const r = await fetch(`/api/save/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.HapticFeedback.notificationOccurred('success'); if (d.cleared) { loadList(); updateDepartmentInfo(null, 0); } document.getElementById('successModal').classList.add('active'); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
 async function clearList() { if (!confirm('Очистити весь список?')) return; try { const r = await fetch(`/api/clear/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); updateDepartmentInfo(null, 0); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
-async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⏳ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); updateDepartmentInfo(null, 0); return; } const deptR = await fetch(`/api/list/department/${userId}`); const deptD = await deptR.json(); updateDepartmentInfo(deptD.department, d.count); let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--hint-color)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); updateDepartmentInfo(null, 0); } }
+async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⌛ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); updateDepartmentInfo(null, 0); return; } const deptR = await fetch(`/api/list/department/${userId}`); const deptD = await deptR.json(); updateDepartmentInfo(deptD.department, d.count); let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--hint-color)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); updateDepartmentInfo(null, 0); } }
 
 async function loadStatistics() {
     try {
@@ -1121,7 +1138,7 @@ async function uploadFile() {
     const notifyChecked = document.getElementById('notifyUsers').checked;
     
     document.getElementById('uploadBtn').disabled = true;
-    document.getElementById('uploadBtn').textContent = '⏳ Завантаження...';
+    document.getElementById('uploadBtn').textContent = '⌛ Завантаження...';
     
     try {
         const response = await fetch(`/api/admin/import?user_id=${userId}&notify_users=${notifyChecked}`, {
@@ -1384,7 +1401,7 @@ async function sendBroadcast() {
         return;
     }
     
-    if (!confirm(`Розіслати повідомлення всім користувачам?\\n\\nТекст: "${message}"`)) return;
+    if (!confirm(`Розіслати повідомлення всім користувачам?\n\nТекст: "${message}"`)) return;
     
     try {
         const response = await fetch(`/api/admin/broadcast?user_id=${userId}`, {
@@ -1427,8 +1444,8 @@ async function sendBroadcast() {
 // ==================== DANGER ZONE ====================
 
 async function clearDatabase() {
-    if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\\n\\nЦе видалить ВСІ товари з бази даних!\\n\\nПродовжити?')) return;
-    if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\\n\\nДані НЕ можна буде відновити!\\n\\nТочно видалити всі товари?')) return;
+    if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ товари з бази даних!\n\nПродовжити?')) return;
+    if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nДані НЕ можна буде відновити!\n\nТочно видалити всі товари?')) return;
     
     try {
         const response = await fetch(`/api/admin/danger/clear-database?user_id=${userId}`, {
@@ -1437,7 +1454,7 @@ async function clearDatabase() {
         const data = await response.json();
         
         if (data.success) {
-            tg.showAlert(`✅ База даних очищена!\\n\\nВидалено товарів: ${data.deleted_count}`);
+            tg.showAlert(`✅ База даних очищена!\n\nВидалено товарів: ${data.deleted_count}`);
             loadAdminStats();
         } else {
             tg.showAlert('❌ ' + (data.message || 'Помилка'));
@@ -1448,8 +1465,8 @@ async function clearDatabase() {
 }
 
 async function deleteAllPhotos() {
-    if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\\n\\nЦе видалить ВСІ фото з сервера!\\n\\nПродовжити?')) return;
-    if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\\n\\nФото НЕ можна буде відновити!\\n\\nТочно видалити всі фото?')) return;
+    if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ фото з сервера!\n\nПродовжити?')) return;
+    if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nФото НЕ можна буде відновити!\n\nТочно видалити всі фото?')) return;
     
     try {
         const response = await fetch(`/api/admin/danger/delete-all-photos?user_id=${userId}`, {
@@ -1458,7 +1475,7 @@ async function deleteAllPhotos() {
         const data = await response.json();
         
         if (data.success) {
-            tg.showAlert(`✅ Всі фото видалено!\\n\\nВидалено файлів: ${data.deleted_count}`);
+            tg.showAlert(`✅ Всі фото видалено!\n\nВидалено файлів: ${data.deleted_count}`);
         } else {
             tg.showAlert('❌ ' + (data.message || 'Помилка'));
         }
@@ -1468,7 +1485,7 @@ async function deleteAllPhotos() {
 }
 
 async function resetModeration() {
-    if (!confirm('⚠️ Скинути статус модерації для всіх фото?\\n\\nВсі фото стануть "pending" (очікують модерації).\\n\\nПродовжити?')) return;
+    if (!confirm('⚠️ Скинути статус модерації для всіх фото?\n\nВсі фото стануть "pending" (очікують модерації).\n\nПродовжити?')) return;
     
     try {
         const response = await fetch(`/api/admin/danger/reset-moderation?user_id=${userId}`, {
@@ -1477,7 +1494,7 @@ async function resetModeration() {
         const data = await response.json();
         
         if (data.success) {
-            tg.showAlert(`✅ Статус модерації скинуто!\\n\\nОброблено фото: ${data.reset_count}`);
+            tg.showAlert(`✅ Статус модерації скинуто!\n\nОброблено фото: ${data.reset_count}`);
         } else {
             tg.showAlert('❌ ' + (data.message || 'Помилка'));
         }
@@ -1487,8 +1504,8 @@ async function resetModeration() {
 }
 
 async function deleteAllArchives() {
-    if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\\n\\nЦе видалить ВСІ архіви користувачів!\\n\\nПродовжити?')) return;
-    if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\\n\\nАрхіви НЕ можна буде відновити!\\n\\nТочно видалити?')) return;
+    if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ архіви користувачів!\n\nПродовжити?')) return;
+    if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nАрхіви НЕ можна буде відновити!\n\nТочно видалити?')) return;
     
     try {
         const response = await fetch(`/api/admin/danger/delete-all-archives?user_id=${userId}`, {
@@ -1497,7 +1514,7 @@ async function deleteAllArchives() {
         const data = await response.json();
         
         if (data.success) {
-            tg.showAlert(`✅ Всі архіви видалено!\\n\\nВидалено файлів: ${data.deleted_count}`);
+            tg.showAlert(`✅ Всі архіви видалено!\n\nВидалено файлів: ${data.deleted_count}`);
         } else {
             tg.showAlert('❌ ' + (data.message || 'Помилка'));
         }
@@ -1507,8 +1524,8 @@ async function deleteAllArchives() {
 }
 
 async function fullWipe() {
-    if (!confirm('🚨🚨🚨 КРИТИЧНА ОПЕРАЦІЯ! 🚨🚨🚨\\n\\nЦе видалить:\\n• ВСІ товари з БД\\n• ВСІ фото\\n• ВСІ архіви\\n• ВСІ дані модерації\\n\\nПродовжити?')) return;
-    if (!confirm('🚨 ОСТАННЄ ПОПЕРЕДЖЕННЯ! 🚨\\n\\nВСЕ буде незворотно видалено!\\n\\nВи ТОЧНО впевнені?')) return;
+    if (!confirm('🚨🚨🚨 КРИТИЧНА ОПЕРАЦІЯ! 🚨🚨🚨\n\nЦе видалить:\n• ВСІ товари з БД\n• ВСІ фото\n• ВСІ архіви\n• ВСІ дані модерації\n\nПродовжити?')) return;
+    if (!confirm('🚨 ОСТАННЄ ПОПЕРЕДЖЕННЯ! 🚨\n\nВСЕ буде незворотно видалено!\n\nВи ТОЧНО впевнені?')) return;
     
     const verification = prompt('Введіть "DELETE ALL" для підтвердження:');
     if (verification !== 'DELETE ALL') {
@@ -1523,9 +1540,9 @@ async function fullWipe() {
         const data = await response.json();
         
         if (data.success) {
-            tg.showAlert(`✅ Повне очищення завершено!\\n\\n` +
-                `Видалено товарів: ${data.deleted_products}\\n` +
-                `Видалено фото: ${data.deleted_photos}\\n` +
+            tg.showAlert(`✅ Повне очищення завершено!\n\n` +
+                `Видалено товарів: ${data.deleted_products}\n` +
+                `Видалено фото: ${data.deleted_photos}\n` +
                 `Видалено архівів: ${data.deleted_archives}`);
             loadAdminStats();
         } else {
