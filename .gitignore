@@ -40,3 +40,4 @@ data.xlsx
 *.bak.*
 *.pwa-backup
 *.bak
+uploads/
