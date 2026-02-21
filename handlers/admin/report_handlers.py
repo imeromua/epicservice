@@ -38,6 +38,10 @@ class AdminReportStates(StatesGroup):
 
 
 def _create_stock_report_sync() -> Optional[str]:
+    """
+    Створює звіт про залишки на складі.
+    Формат: Відділ | Група | Артикул | Назва | Залишок (кількість) | Сума залишку (грн)
+    """
     try:
         products = orm_get_all_products_sync()
         temp_list_items = orm_get_all_temp_list_items_sync()
@@ -60,6 +64,7 @@ def _create_stock_report_sync() -> Optional[str]:
             report_data.append({
                 "Відділ": product.відділ,
                 "Група": product.група,
+                "Артикул": product.артикул,
                 "Назва": product.назва,
                 "Залишок (кількість)": int(available) if available == int(available) else available,
                 "Сума залишку (грн)": round(available_sum, 2)
