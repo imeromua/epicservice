@@ -983,8 +983,9 @@ async def danger_reset_moderation(user_id: int = Query(...)):
         logger.warning("⚠️ DANGER ZONE: User %s initiated RESET MODERATION operation", user_id)
         
         async with async_session() as session:
+            # Правильна назва колонки: status (не moderation_status!)
             result = await session.execute(
-                text("UPDATE product_photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL")
+                text("UPDATE product_photos SET status = 'pending', moderated_at = NULL, moderated_by = NULL")
             )
             await session.commit()
             
