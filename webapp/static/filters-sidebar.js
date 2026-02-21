@@ -203,6 +203,47 @@ async function applyFilters() {
     }
 }
 
+// ✅ НОВА ФУНКЦІЯ: Повторне застосування фільтрів без скидання стану
+async function reapplyFilters() {
+    if (!filterState.isActive) {
+        console.log('⚠️ Filters not active, skipping reapply');
+        return;
+    }
+    
+    try {
+        console.log('🔄 Reapplying filters...');
+        
+        const response = await fetch('/api/products/filter', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: userId,
+                departments: filterState.departments,
+                sort_by: filterState.sortBy,
+                offset: filterState.offset,
+                limit: filterState.limit
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.products) {
+            filteredProducts = data.products;
+            filterStats = data.statistics;
+            
+            // Оновлюємо статистику
+            updateFilterStats(data.statistics);
+            
+            // Оновлюємо відображення
+            displayFilteredProducts(data.products);
+            
+            console.log('✅ Filters reapplied');
+        }
+    } catch (error) {
+        console.error('❌ Error reapplying filters:', error);
+    }
+}
+
 function updateFilterStats(stats) {
     if (!stats) return;
     
@@ -358,8 +399,10 @@ if (typeof window !== 'undefined') {
     window.toggleDepartment = toggleDepartment;
     window.setSortBy = setSortBy;
     window.applyFilters = applyFilters;
+    window.reapplyFilters = reapplyFilters;  // ✅ Експортуємо нову функцію
     window.resetFilters = resetFilters;
     window.updateFiltersButtonVisibility = updateFiltersButtonVisibility;
+    window.filterState = filterState;  // ✅ Експортуємо стан для доступу з інших скриптів
 }
 
 console.log('🎛️ Filters sidebar component loaded');
