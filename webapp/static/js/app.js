@@ -120,46 +120,157 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ===== МОДУЛЬ ПОШУКУ =====
     const SearchModule = {
+        currentQuery: '',
+        currentOffset: 0,
+        hasMore: false,
+        isLoading: false,
+        allProducts: [],
+
         handleInput: Utils.debounce(async (e) => {
             const query = e.target.value.trim();
+            
+            // Скидаємо пагінацію при новому запиті
+            if (query !== SearchModule.currentQuery) {
+                SearchModule.currentQuery = query;
+                SearchModule.currentOffset = 0;
+                SearchModule.allProducts = [];
+                if (DOM.searchResults) DOM.searchResults.innerHTML = '';
+            }
+            
             if (query.length < 2) {
                 if (DOM.searchResults) DOM.searchResults.innerHTML = '<div style="text-align:center; padding:20px; color:var(--hint-color);">Введіть мінімум 2 символи для пошуку</div>';
+                SearchModule.removeScrollListener();
                 return;
             }
 
-            if (DOM.searchResults) DOM.searchResults.innerHTML = '<div class="loader" style="text-align:center; padding:20px;">⏳ Шукаємо...</div>';
-
-            try {
-                const data = await API.client.searchProducts(query, userId);
-                SearchModule.render(data.products || []);
-            } catch (error) {
-                if (DOM.searchResults) DOM.searchResults.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px;">❌ Помилка: ${error.message}</div>`;
-            }
+            await SearchModule.loadMore(true);
         }, 500),
 
-        render: (products) => {
+        loadMore: async (isNewSearch = false) => {
+            if (SearchModule.isLoading) return;
+            if (!isNewSearch && !SearchModule.hasMore) return;
+
+            SearchModule.isLoading = true;
+            
+            // Показуємо лоадер
+            if (isNewSearch && DOM.searchResults) {
+                DOM.searchResults.innerHTML = '<div class="loader" style="text-align:center; padding:20px;">⏳ Шукаємо...</div>';
+            } else {
+                SearchModule.showLoadingIndicator();
+            }
+
+            try {
+                const data = await API.client.searchProducts(
+                    SearchModule.currentQuery, 
+                    userId, 
+                    SearchModule.currentOffset, 
+                    20
+                );
+                
+                const newProducts = data.products || [];
+                SearchModule.hasMore = data.has_more || false;
+                SearchModule.currentOffset += newProducts.length;
+                
+                if (isNewSearch) {
+                    SearchModule.allProducts = newProducts;
+                } else {
+                    SearchModule.allProducts = [...SearchModule.allProducts, ...newProducts];
+                }
+                
+                SearchModule.render();
+                SearchModule.setupScrollListener();
+            } catch (error) {
+                if (DOM.searchResults) {
+                    const errorHtml = `<div style="text-align:center; color:#ef4444; padding:20px;">❌ Помилка: ${error.message}</div>`;
+                    if (isNewSearch) {
+                        DOM.searchResults.innerHTML = errorHtml;
+                    } else {
+                        SearchModule.hideLoadingIndicator();
+                        Utils.showAlert(`Помилка: ${error.message}`);
+                    }
+                }
+            } finally {
+                SearchModule.isLoading = false;
+                SearchModule.hideLoadingIndicator();
+            }
+        },
+
+        render: () => {
             if (!DOM.searchResults) return;
             
-            if (products.length === 0) {
+            if (SearchModule.allProducts.length === 0) {
                 DOM.searchResults.innerHTML = '<div style="text-align:center; padding:20px; color:var(--hint-color);">Нічого не знайдено 😔</div>';
                 return;
             }
 
             // Динамічний рендер карток
             let html = '<div class="products-grid" style="display:flex; flex-direction:column; gap:12px;">';
-            products.forEach(p => {
+            SearchModule.allProducts.forEach(p => {
                 html += `
                     <div class="product-card" style="background:var(--tg-theme-secondary-bg-color, #fff); padding:16px; border-radius:12px;">
-                        <div style="font-weight:600; margin-bottom:8px;">${p.назва || p.name}</div>
+                        <div style="font-weight:600; margin-bottom:8px;">${p.name}</div>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="color:var(--tg-theme-button-color, #3b82f6); font-weight:bold;">${Utils.formatCurrency(p.ціна || p.price)}</div>
+                            <div style="color:var(--tg-theme-button-color, #3b82f6); font-weight:bold;">${Utils.formatCurrency(p.price)}</div>
                             <button onclick="App.CartModule.add(${p.id})" style="background:var(--tg-theme-button-color, #3b82f6); color:var(--tg-theme-button-text-color, #fff); border:none; padding:8px 16px; border-radius:8px; cursor:pointer;">В кошик</button>
                         </div>
                     </div>
                 `;
             });
             html += '</div>';
+            
+            // Додаємо невидимий div для спостереження за скролом
+            if (SearchModule.hasMore) {
+                html += '<div id="searchScrollSentinel" style="height:1px;"></div>';
+            }
+            
             DOM.searchResults.innerHTML = html;
+        },
+
+        showLoadingIndicator: () => {
+            if (!DOM.searchResults) return;
+            const loader = document.createElement('div');
+            loader.id = 'searchLoadingMore';
+            loader.style.cssText = 'text-align:center; padding:20px; color:var(--hint-color);';
+            loader.innerHTML = '⏳ Завантаження...';
+            DOM.searchResults.appendChild(loader);
+        },
+
+        hideLoadingIndicator: () => {
+            const loader = document.getElementById('searchLoadingMore');
+            if (loader) loader.remove();
+        },
+
+        setupScrollListener: () => {
+            if (!SearchModule.hasMore) {
+                SearchModule.removeScrollListener();
+                return;
+            }
+
+            // Використовуємо Intersection Observer для ефективного відстеження
+            const sentinel = document.getElementById('searchScrollSentinel');
+            if (!sentinel) return;
+
+            if (SearchModule.observer) {
+                SearchModule.observer.disconnect();
+            }
+
+            SearchModule.observer = new IntersectionObserver(
+                (entries) => {
+                    if (entries[0].isIntersecting && !SearchModule.isLoading && SearchModule.hasMore) {
+                        SearchModule.loadMore(false);
+                    }
+                },
+                { threshold: 0.1, rootMargin: '100px' }
+            );
+
+            SearchModule.observer.observe(sentinel);
+        },
+
+        removeScrollListener: () => {
+            if (SearchModule.observer) {
+                SearchModule.observer.disconnect();
+                SearchModule.observer = null;
+            }
         }
     };
 
@@ -211,8 +322,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += `
                     <div class="cart-item" style="background:var(--tg-theme-secondary-bg-color, #fff); padding:16px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
                         <div style="flex:1; padding-right:12px;">
-                            <div style="font-weight:500; margin-bottom:4px;">${item.product?назва || item.product?.name || 'Невідомий товар'}</div>
-                            <div style="color:var(--hint-color); font-size:14px;">${Utils.formatCurrency(item.product?ціна || item.product?.price || 0)} x ${item.quantity} шт</div>
+                            <div style="font-weight:500; margin-bottom:4px;">${item.product?.name || 'Невідомий товар'}</div>
+                            <div style="color:var(--hint-color); font-size:14px;">${Utils.formatCurrency(item.product?.price || 0)} x ${item.quantity} шт</div>
                         </div>
                         <button onclick="App.CartModule.remove(${item.id})" style="background:#ef4444; color:#fff; border:none; width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center;">🗑️</button>
                     </div>

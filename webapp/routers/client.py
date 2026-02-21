@@ -43,6 +43,8 @@ bot = Bot(token=BOT_TOKEN)
 class SearchRequest(BaseModel):
     query: str
     user_id: int
+    offset: int = 0
+    limit: int = 20
 
 
 class AddToListRequest(BaseModel):
@@ -75,18 +77,23 @@ class FilterProductsRequest(BaseModel):
 @router.post("/search")
 async def search_products(req: SearchRequest):
     """
-    Пошук товарів за артикулом або назвою.
-    Повертає список товарів з детальною інформацією.
+    Пошук товарів за артикулом або назвою з підтримкою пагінації.
+    Повертає список товарів з детальною інформацією + має has_more для infinite scroll.
     """
     try:
-        print(f"🔍 Search request: query='{req.query}', user_id={req.user_id}")
+        print(f"🔍 Search request: query='{req.query}', user_id={req.user_id}, offset={req.offset}, limit={req.limit}")
         
-        products = await orm_find_products(req.query)
-        print(f"✅ orm_find_products returned {len(products) if products else 0} products")
+        all_products = await orm_find_products(req.query)
+        print(f"✅ orm_find_products returned {len(all_products) if all_products else 0} total products")
         
-        if not products:
+        if not all_products:
             print(f"⚠️ No products found")
-            return JSONResponse(content={"products": [], "message": "Нічого не знайдено"}, status_code=200)
+            return JSONResponse(content={"products": [], "has_more": False, "total": 0}, status_code=200)
+        
+        # Пагінація
+        total_count = len(all_products)
+        products = all_products[req.offset:req.offset + req.limit]
+        has_more = (req.offset + req.limit) < total_count
         
         # Отримуємо temp_list користувача для підрахунку резерву
         async with async_session() as session:
@@ -134,8 +141,14 @@ async def search_products(req: SearchRequest):
                 "current_list_department": current_department
             })
         
-        print(f"✅ Returning {len(result)} products (current_department={current_department})")
-        return JSONResponse(content={"products": result}, status_code=200)
+        print(f"✅ Returning {len(result)} products (offset={req.offset}, has_more={has_more}, total={total_count})")
+        return JSONResponse(content={
+            "products": result, 
+            "has_more": has_more,
+            "total": total_count,
+            "offset": req.offset,
+            "limit": req.limit
+        }, status_code=200)
         
     except SQLAlchemyError as e:
         print(f"❌ SQLAlchemy ERROR: {type(e).__name__}: {e}")
