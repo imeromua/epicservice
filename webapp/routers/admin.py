@@ -34,7 +34,7 @@ from database.orm import (
     orm_subtract_collected,
 )
 from database.orm.products import SmartColumnMapper
-from database.engine import session_maker
+from database.engine import async_session
 from database.models import Product, Photo
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
@@ -901,7 +901,7 @@ async def danger_clear_database(user_id: int = Query(...)):
         logger.critical("⚠️ DANGER ZONE: User %s initiated CLEAR DATABASE operation", user_id)
         
         # Видаляємо всі товари
-        async with session_maker() as session:
+        async with async_session() as session:
             result = await session.execute("SELECT COUNT(*) FROM products")
             count = result.scalar()
             
@@ -947,7 +947,7 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
                     deleted_files += 1
         
         # Видаляємо записи з БД
-        async with session_maker() as session:
+        async with async_session() as session:
             await session.execute("DELETE FROM photos")
             await session.commit()
         
@@ -978,7 +978,7 @@ async def danger_reset_moderation(user_id: int = Query(...)):
     try:
         logger.warning("⚠️ DANGER ZONE: User %s initiated RESET MODERATION operation", user_id)
         
-        async with session_maker() as session:
+        async with async_session() as session:
             result = await session.execute(
                 "UPDATE photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL"
             )
@@ -1060,7 +1060,7 @@ async def danger_full_wipe(user_id: int = Query(...)):
         deleted_archives = 0
         
         # 1. Очищаємо БД
-        async with session_maker() as session:
+        async with async_session() as session:
             # Products
             result_products = await session.execute("SELECT COUNT(*) FROM products")
             deleted_products = result_products.scalar()
