@@ -36,7 +36,7 @@ from database.orm import (
 )
 from database.orm.products import SmartColumnMapper
 from database.engine import async_session
-from database.models import Product
+from database.models import Product, ProductPhoto
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
 
@@ -932,7 +932,7 @@ async def danger_clear_database(user_id: int = Query(...)):
 async def danger_delete_all_photos(user_id: int = Query(...)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
-    Видаляє ВСІ фото з серверу та БД.
+    Видаляє ВСІ фото з серверу (за file_path з БД) та записи з БД.
     Незворотна операція!
     """
     verify_admin(user_id)
@@ -940,27 +940,45 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
     try:
         logger.critical("⚠️ DANGER ZONE: User %s initiated DELETE ALL PHOTOS operation", user_id)
         
-        photos_dir = "uploads/photos"
         deleted_files = 0
+        deleted_db_records = 0
         
-        if os.path.exists(photos_dir):
-            for filename in os.listdir(photos_dir):
-                filepath = os.path.join(photos_dir, filename)
-                if os.path.isfile(filepath):
-                    os.remove(filepath)
-                    deleted_files += 1
-        
-        # Видаляємо записи з БД (правильна назва таблиці!)
+        # Спочатку отримуємо всі file_path з БД
         async with async_session() as session:
-            await session.execute(text("DELETE FROM product_photos"))
+            result = await session.execute(
+                text("SELECT file_path FROM product_photos")
+            )
+            file_paths = [row[0] for row in result.fetchall()]
+            
+            logger.info(f"Found {len(file_paths)} photo records in database")
+            
+            # Видаляємо файли з сервера
+            for file_path in file_paths:
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        deleted_files += 1
+                        logger.debug(f"Deleted file: {file_path}")
+                    else:
+                        logger.warning(f"File not found: {file_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting file {file_path}: {e}")
+            
+            # Видаляємо записи з БД
+            delete_result = await session.execute(text("DELETE FROM product_photos"))
+            deleted_db_records = delete_result.rowcount
             await session.commit()
         
-        logger.critical("✅ All photos deleted: %d files removed by admin %s", deleted_files, user_id)
+        logger.critical(
+            "✅ All photos deleted by admin %s: %d files, %d DB records",
+            user_id, deleted_files, deleted_db_records
+        )
         
         return JSONResponse(content={
             "success": True,
             "message": "Всі фото видалено",
-            "deleted_count": deleted_files
+            "deleted_count": deleted_files,
+            "db_records_deleted": deleted_db_records
         })
     
     except Exception as e:
@@ -1049,7 +1067,7 @@ async def danger_full_wipe(user_id: int = Query(...)):
     🚨🚨🚨 НАЙКРИТИЧНІША ОПЕРАЦІЯ 🚨🚨🚨
     Повне очищення системи:
     - Всі товари з БД
-    - Всі фото
+    - Всі фото (файли + БД)
     - Всі архіви
     - Всі дані модерації
     
@@ -1061,30 +1079,36 @@ async def danger_full_wipe(user_id: int = Query(...)):
         logger.critical("🚨🚨🚨 DANGER ZONE: User %s initiated FULL WIPE operation!", user_id)
         
         deleted_products = 0
-        deleted_photos = 0
+        deleted_photo_files = 0
+        deleted_photo_records = 0
         deleted_archives = 0
         
-        # 1. Очищаємо БД
         async with async_session() as session:
-            # Products
+            # 1. Products count
             result_products = await session.execute(text("SELECT COUNT(*) FROM products"))
             deleted_products = result_products.scalar()
             
-            # Photos (спочатку файли)
-            photos_dir = "uploads/photos"
-            if os.path.exists(photos_dir):
-                for filename in os.listdir(photos_dir):
-                    filepath = os.path.join(photos_dir, filename)
-                    if os.path.isfile(filepath):
-                        os.remove(filepath)
-                        deleted_photos += 1
+            # 2. Photos (спочатку файли за file_path)
+            result_photos = await session.execute(
+                text("SELECT file_path FROM product_photos")
+            )
+            file_paths = [row[0] for row in result_photos.fetchall()]
             
-            # БД: product_photos спочатку, потім products
-            await session.execute(text("DELETE FROM product_photos"))
+            for file_path in file_paths:
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        deleted_photo_files += 1
+                except Exception as e:
+                    logger.error(f"Error deleting photo file {file_path}: {e}")
+            
+            # 3. БД: product_photos спочатку, потім products
+            delete_photos_result = await session.execute(text("DELETE FROM product_photos"))
+            deleted_photo_records = delete_photos_result.rowcount
             await session.execute(text("DELETE FROM products"))
             await session.commit()
         
-        # 2. Архіви
+        # 4. Архіви
         archives_dir = os.path.join(ARCHIVES_PATH, "active")
         if os.path.exists(archives_dir):
             for filename in os.listdir(archives_dir):
@@ -1094,15 +1118,16 @@ async def danger_full_wipe(user_id: int = Query(...)):
                     deleted_archives += 1
         
         logger.critical(
-            "✅ FULL WIPE completed by admin %s: Products=%d, Photos=%d, Archives=%d",
-            user_id, deleted_products, deleted_photos, deleted_archives
+            "✅ FULL WIPE completed by admin %s: Products=%d, Photo files=%d, Photo records=%d, Archives=%d",
+            user_id, deleted_products, deleted_photo_files, deleted_photo_records, deleted_archives
         )
         
         return JSONResponse(content={
             "success": True,
             "message": "Повне очищення завершено",
             "deleted_products": deleted_products,
-            "deleted_photos": deleted_photos,
+            "deleted_photos": deleted_photo_files,
+            "deleted_photo_records": deleted_photo_records,
             "deleted_archives": deleted_archives
         })
     
