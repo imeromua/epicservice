@@ -44,7 +44,7 @@ class SearchRequest(BaseModel):
     query: str
     user_id: int
     offset: int = 0
-    limit: int = 20
+    limit: int = 500
 
 
 class AddToListRequest(BaseModel):
@@ -69,7 +69,7 @@ class FilterProductsRequest(BaseModel):
     departments: List[str] = []  # ["10", "20", "310"]
     sort_by: str = "balance_sum"  # balance_sum, months_without_movement, quantity, article
     offset: int = 0
-    limit: int = 20
+    limit: int = 500
 
 
 # === Ендпоїнти ===
