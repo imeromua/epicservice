@@ -725,25 +725,27 @@ function renderProduct(p) {
     const lockedClass = isLocked ? ' locked' : '';
     const statusClass = isLocked ? ' locked' : '';
     const statusText = isLocked ? '🔒 Заблоковано' : '✅ Знайдено';
-    const clickHandler = isLocked ? `onclick="showLockedAlert(${p.current_list_department})"` : `onclick='openModalWithPhotos(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
+    const clickHandler = isLocked ? `onclick=\"showLockedAlert(${p.current_list_department})\"` : `onclick='openModalWithPhotos(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
     const hasPhotos = p.photos && p.photos.length > 0;
-    const photoIndicator = hasPhotos ? `<span class="photo-badge">📷 ${p.photos.length}</span>` : '';
+    const photoIndicator = hasPhotos ? `<span class=\"photo-badge photo-badge-inline\">📷 ${p.photos.length}</span>` : '';
     
-    return `<div class="product-card${lockedClass}" data-product-id="${p.id}" ${clickHandler}>
-        <div class="lock-overlay">🔒</div>
-        ${photoIndicator}
-        <div class="product-header">
-            <span class="product-article">🆔 ${p.article}</span>
-            <span class="product-status${statusClass}">${statusText}</span>
+    return `<div class=\"product-card${lockedClass}\" data-product-id=\"${p.id}\" ${clickHandler}>
+        <div class=\"lock-overlay\">🔒</div>
+        <div class=\"product-header\">
+            <span class=\"product-article\">🆔 ${p.article}</span>
+            <div class=\"product-status-row\">
+                ${photoIndicator}
+                <span class=\"product-status${statusClass}\">${statusText}</span>
+            </div>
         </div>
-        <div class="product-name">📝 ${p.name}</div>
-        <div class="product-details">
-            <div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">⌛ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>
-            ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
+        <div class=\"product-name\">📝 ${p.name}</div>
+        <div class=\"product-details\">
+            <div class=\"product-detail-row\"><span class=\"product-detail-label\">🏢 Відділ:</span><span class=\"product-detail-value\">${p.department}</span></div>
+            <div class=\"product-detail-row\"><span class=\"product-detail-label\">📂 Група:</span><span class=\"product-detail-value\">${p.group}</span></div>
+            <div class=\"product-detail-row\"><span class=\"product-detail-label\">⌛ Без руху (міс):</span><span class=\"product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}\">${p.months_without_movement}</span></div>
+            <div class=\"product-detail-row\"><span class=\"product-detail-label\">💰 Сума залишку:</span><span class=\"product-detail-value highlight\">${p.balance_sum.toFixed(2)} грн</span></div>
+            <div class=\"product-detail-row\"><span class=\"product-detail-label\">📦 Доступно:</span><span class=\"product-detail-value success\">${p.available}</span></div>
+            ${p.user_reserved > 0 ? `<div class=\"product-detail-row\"><span class=\"product-detail-label\">🛒 В резерві:</span><span class=\"product-detail-value warning\">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
         </div>
     </div>`;
 }

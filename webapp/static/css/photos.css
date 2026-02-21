@@ -20,6 +20,19 @@
 }
 .product-card:active .photo-badge { transform: scale(0.95); }
 
+/* Inline badge next to product status */
+.photo-badge.photo-badge-inline {
+    position: static;
+    top: auto;
+    right: auto;
+}
+
+.product-status-row {
+    display: flex;
+    align-items: center;
+    gap: 1mm;
+}
+
 /* Галерея в модальному вікні */
 .photo-gallery {
     margin: 16px 0;
