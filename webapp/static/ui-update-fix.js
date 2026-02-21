@@ -38,14 +38,14 @@ window.confirmAdd = async function() {
             updateDepartmentInfo(deptData.department, listData.count || 0);
             updateListBadge(listData.count || 0);
             
-            // ✅ ОНОВЛЮЄМО UI
+            // ✅ ОНОВЛЮЄМО UI З ЗБЕРЕЖЕННЯМ ФІЛЬТРІВ
             if (typeof window.filterState !== 'undefined' && window.filterState.isActive) {
-                // Якщо активні фільтри — використовуємо displayFilteredProducts
-                console.log('🎛️ Refreshing filtered results...');
-                if (typeof window.displayFilteredProducts === 'function') {
-                    window.displayFilteredProducts(cachedProducts);
+                // Якщо активні фільтри — використовуємо reapplyFilters
+                console.log('🎛️ Refreshing with filters...');
+                if (typeof window.reapplyFilters === 'function') {
+                    await window.reapplyFilters();
                 } else {
-                    // Fallback якщо функція ще не завантажена
+                    console.warn('⚠️ reapplyFilters not available, using fallback');
                     updateSearchResults();
                 }
             } else {
