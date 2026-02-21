@@ -11,10 +11,10 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
-                           InlineKeyboardMarkup, Message)
+                           InlineKeyboardMarkup, Message, WebAppInfo)
 from sqlalchemy.exc import SQLAlchemyError
 
-from config import ADMIN_IDS
+from config import ADMIN_IDS, WEBAPP_URL
 from database.orm import (orm_get_all_products_sync, orm_get_all_users_sync,
                           orm_get_users_with_active_lists, orm_smart_import)
 from database.orm.products import SmartColumnMapper
@@ -72,7 +72,7 @@ def _format_admin_report(result: dict) -> str:
 async def broadcast_import_update(bot: Bot, result: dict):
     """
     Розсилає повідомлення про оновлення бази всім користувачам.
-    Повідомлення надсилаються без клавіатур (тільки текст).
+    Повідомлення надсилаються ТІЛЬКИ з кнопкою "Відкрити Mini App".
     """
     loop = asyncio.get_running_loop()
     try:
@@ -104,11 +104,23 @@ async def broadcast_import_update(bot: Bot, result: dict):
             details_part + "\n" + departments_part + "\n".join(departments_lines)
         )
 
+        # Клавіатура ТІЛЬКИ з кнопкою Mini App
+        mini_app_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🌐 Відкрити EpicService", web_app=WebAppInfo(url=WEBAPP_URL))]
+            ]
+        )
+
         sent_count = 0
         for user_id in user_ids:
             try:
-                # Повідомлення без клавіатури - parse_mode HTML
-                await bot.send_message(user_id, message_text, parse_mode='HTML')
+                # Повідомлення з кнопкою Mini App
+                await bot.send_message(
+                    user_id, 
+                    message_text, 
+                    parse_mode='HTML',
+                    reply_markup=mini_app_kb
+                )
                 sent_count += 1
             except Exception as e:
                 logger.warning("Не вдалося надіслати сповіщення користувачу %s: %s", user_id, e)
