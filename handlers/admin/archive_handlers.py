@@ -11,7 +11,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
 
 from config import ADMIN_IDS, ARCHIVES_PATH
-from handlers.admin.core import _show_admin_panel
 from lexicon.lexicon import LEXICON
 from utils.archive_manager import ACTIVE_DIR, get_all_archives, get_user_archives
 
@@ -172,8 +171,9 @@ async def download_zip_handler(callback: CallbackQuery, state: FSMContext, bot: 
             document=FSInputFile(zip_path),
             caption=f"📦 Архів user {user_id} ({len(files)} файлів)"
         )
-
-        await _show_admin_panel(callback, state, bot)
+        
+        # Просто повідомляємо про успіх - БЕЗ КНОПОК
+        await callback.message.answer("✅ Архів успішно надіслано.")
 
     except Exception as e:
         logger.error(f"Помилка створення ZIP для user {callback.data}: {e}", exc_info=True)
