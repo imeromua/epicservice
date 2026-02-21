@@ -130,10 +130,17 @@ async function loadPhotoModeration() {
         // Горизонтальний список карток (кожен рядок окремий div для ellipsis)
         container.innerHTML = `
             <div class="moderation-horizontal-list">
-                ${data.photos.map(photo => `
-                    <div class="moderation-card" id="mod-${photo.id}" onclick="openModerationPopup(${photo.id}, '/static/${photo.file_path}', '${photo.article}', '${photo.product_name}', '${photo.uploaded_by}', '${photo.uploaded_at}', ${photo.file_size})">
+                ${data.photos.map(photo => {
+                    // Екранування спецсимволів для безпечної вставки в HTML onclick
+                    const escapedArticle = (photo.article || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedName = (photo.product_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedUser = (photo.uploaded_by || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedDate = (photo.uploaded_at || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    
+                    return `
+                    <div class="moderation-card" id="mod-${photo.id}" onclick="openModerationPopup(${photo.id}, '/static/${photo.file_path}', '${escapedArticle}', '${escapedName}', '${escapedUser}', '${escapedDate}', ${photo.file_size})">
                         <img src="/static/${photo.file_path}" 
-                             alt="Фото ${photo.article}"
+                             alt="Фото ${escapedArticle}"
                              class="moderation-card-thumb"
                              loading="lazy"
                              onerror="this.src=''; this.alt='✖'">
@@ -145,7 +152,8 @@ async function loadPhotoModeration() {
                             <div class="info-line">💾 ${(photo.file_size / 1024).toFixed(0)} KB</div>
                         </div>
                     </div>
-                `).join('')}
+                `;
+                }).join('')}
             </div>
         `;
 
