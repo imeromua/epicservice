@@ -160,6 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
+                console.log(`🔍 Fetching: offset=${SearchModule.currentOffset}, query="${SearchModule.currentQuery}"`);
+                
                 const data = await API.client.searchProducts(
                     SearchModule.currentQuery, 
                     userId, 
@@ -169,6 +171,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const newProducts = data.products || [];
                 SearchModule.hasMore = data.has_more || false;
+                
+                console.log(`✅ Got ${newProducts.length} products, hasMore=${SearchModule.hasMore}`);
+                
+                // ВАЖЛИВО: оновлюємо offset ПІСЛЯ успішного запиту
                 SearchModule.currentOffset += newProducts.length;
                 
                 if (isNewSearch) {
@@ -178,8 +184,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 SearchModule.render();
-                SearchModule.setupScrollListener();
+                
+                // Налаштовуємо listener тільки якщо є ще товари
+                if (SearchModule.hasMore) {
+                    SearchModule.setupScrollListener();
+                } else {
+                    SearchModule.removeScrollListener();
+                }
             } catch (error) {
+                console.error('❌ Search error:', error);
                 if (DOM.searchResults) {
                     const errorHtml = `<div style="text-align:center; color:#ef4444; padding:20px;">❌ Помилка: ${error.message}</div>`;
                     if (isNewSearch) {
@@ -224,6 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             DOM.searchResults.innerHTML = html;
+            
+            console.log(`📊 Rendered ${SearchModule.allProducts.length} products total, hasMore=${SearchModule.hasMore}`);
         },
 
         showLoadingIndicator: () => {
@@ -248,7 +263,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Використовуємо Intersection Observer для ефективного відстеження
             const sentinel = document.getElementById('searchScrollSentinel');
-            if (!sentinel) return;
+            if (!sentinel) {
+                console.warn('⚠️ Sentinel element not found');
+                return;
+            }
 
             if (SearchModule.observer) {
                 SearchModule.observer.disconnect();
@@ -257,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
             SearchModule.observer = new IntersectionObserver(
                 (entries) => {
                     if (entries[0].isIntersecting && !SearchModule.isLoading && SearchModule.hasMore) {
+                        console.log('👀 Sentinel visible, loading more...');
                         SearchModule.loadMore(false);
                     }
                 },
@@ -264,12 +283,14 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             SearchModule.observer.observe(sentinel);
+            console.log('👁️ Observer attached to sentinel');
         },
 
         removeScrollListener: () => {
             if (SearchModule.observer) {
                 SearchModule.observer.disconnect();
                 SearchModule.observer = null;
+                console.log('🚫 Observer removed');
             }
         }
     };
