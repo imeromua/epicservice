@@ -100,6 +100,12 @@
             color: var(--tg-theme-text-color, #000);
         }
 
+        .btn-danger {
+            background: #ff3b30;
+            color: white;
+            font-weight: 600;
+        }
+
         .user-list {
             max-height: 400px;
             overflow-y: auto;
@@ -241,6 +247,39 @@
             font-size: 12px;
             opacity: 0.6;
         }
+
+        /* Danger Zone */
+        .danger-zone {
+            background: var(--tg-theme-secondary-bg-color, #fff);
+            border: 2px solid #ff3b30;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .danger-zone-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .danger-zone-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ff3b30;
+        }
+
+        .danger-warning {
+            background: rgba(255, 59, 48, 0.1);
+            border-left: 3px solid #ff3b30;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #ff3b30;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -289,6 +328,22 @@
     <div class="section hidden" id="activeUsersSection">
         <div class="section-title">👥 Активні користувачі</div>
         <div class="user-list" id="activeUsersList"></div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="danger-zone">
+        <div class="danger-zone-header">
+            <span style="font-size: 24px;">⚠️</span>
+            <div class="danger-zone-title">Danger Zone</div>
+        </div>
+        <div class="danger-warning">
+            <strong>⚠️ Увага!</strong> Ці дії незворотні та можуть призвести до втрати даних. Переконайтеся, що ви розумієте наслідки перед виконанням будь-якої операції.
+        </div>
+        <button class="btn btn-danger" onclick="clearDatabase()">🗑️ Очистити БД (всі товари)</button>
+        <button class="btn btn-danger" onclick="deleteAllPhotos()">📸 Видалити всі фото</button>
+        <button class="btn btn-danger" onclick="resetModeration()">🔄 Скинути статус модерації</button>
+        <button class="btn btn-danger" onclick="deleteAllArchives()">📁 Видалити всі архіви</button>
+        <button class="btn btn-danger" onclick="fullWipe()" style="background: #d32f2f; margin-bottom: 0;">🚨 ПОВНЕ ОЧИЩЕННЯ (все)</button>
     </div>
 
     <div class="modal hidden" id="archivesModal">
@@ -471,6 +526,123 @@
             } catch (error) {
                 console.error('Error uploading file:', error);
                 tg.showAlert('❌ Помилка завантаження');
+            }
+        }
+
+        // ==================== DANGER ZONE ====================
+
+        async function clearDatabase() {
+            if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ товари з бази даних!\n\nПродовжити?')) return;
+            if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nДані НЕ можна буде відновити!\n\nТочно видалити всі товари?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/danger/clear-database?user_id=${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`✅ База даних очищена!\n\nВидалено товарів: ${data.deleted_count}`);
+                    await loadStatistics();
+                } else {
+                    tg.showAlert('❌ ' + (data.message || 'Помилка'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                tg.showAlert('❌ Помилка: ' + error.message);
+            }
+        }
+
+        async function deleteAllPhotos() {
+            if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ фото з сервера!\n\nПродовжити?')) return;
+            if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nФото НЕ можна буде відновити!\n\nТочно видалити всі фото?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/danger/delete-all-photos?user_id=${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`✅ Всі фото видалено!\n\nВидалено файлів: ${data.deleted_count}`);
+                } else {
+                    tg.showAlert('❌ ' + (data.message || 'Помилка'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                tg.showAlert('❌ Помилка: ' + error.message);
+            }
+        }
+
+        async function resetModeration() {
+            if (!confirm('⚠️ Скинути статус модерації для всіх фото?\n\nВсі фото стануть "pending" (очікують модерації).\n\nПродовжити?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/danger/reset-moderation?user_id=${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`✅ Статус модерації скинуто!\n\nОброблено фото: ${data.reset_count}`);
+                } else {
+                    tg.showAlert('❌ ' + (data.message || 'Помилка'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                tg.showAlert('❌ Помилка: ' + error.message);
+            }
+        }
+
+        async function deleteAllArchives() {
+            if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ архіви користувачів!\n\nПродовжити?')) return;
+            if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nАрхіви НЕ можна буде відновити!\n\nТочно видалити?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/danger/delete-all-archives?user_id=${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`✅ Всі архіви видалено!\n\nВидалено файлів: ${data.deleted_count}`);
+                } else {
+                    tg.showAlert('❌ ' + (data.message || 'Помилка'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                tg.showAlert('❌ Помилка: ' + error.message);
+            }
+        }
+
+        async function fullWipe() {
+            if (!confirm('🚨🚨🚨 КРИТИЧНА ОПЕРАЦІЯ! 🚨🚨🚨\n\nЦе видалить:\n• ВСІ товари з БД\n• ВСІ фото\n• ВСІ архіви\n• ВСІ дані модерації\n\nПродовжити?')) return;
+            if (!confirm('🚨 ОСТАННЄ ПОПЕРЕДЖЕННЯ! 🚨\n\nВСЕ буде незворотно видалено!\n\nВи ТОЧНО впевнені?')) return;
+            
+            const verification = prompt('Введіть "DELETE ALL" для підтвердження:');
+            if (verification !== 'DELETE ALL') {
+                tg.showAlert('❌ Скасовано');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/danger/full-wipe?user_id=${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`✅ Повне очищення завершено!\n\n` +
+                        `Видалено товарів: ${data.deleted_products}\n` +
+                        `Видалено фото: ${data.deleted_photos}\n` +
+                        `Видалено архівів: ${data.deleted_archives}`);
+                    await loadStatistics();
+                } else {
+                    tg.showAlert('❌ ' + (data.message || 'Помилка'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                tg.showAlert('❌ Помилка: ' + error.message);
             }
         }
 
