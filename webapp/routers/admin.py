@@ -7,6 +7,7 @@
 import asyncio
 import logging
 import os
+import shutil
 import tempfile
 import zipfile
 from datetime import datetime
@@ -33,6 +34,8 @@ from database.orm import (
     orm_subtract_collected,
 )
 from database.orm.products import SmartColumnMapper
+from database.engine import session_maker
+from database.models import Product, Photo
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
 
@@ -881,3 +884,225 @@ async def get_reserved_by_department(user_id: int = Query(...)):
     except Exception as e:
         logger.error("Помилка отримання резервів по відділах: %s", e, exc_info=True)
         return JSONResponse(content={"error": "Помилка отримання даних"}, status_code=500)
+
+
+# ==================== DANGER ZONE ENDPOINTS ====================
+
+@router.post("/danger/clear-database")
+async def danger_clear_database(user_id: int = Query(...)):
+    """
+    🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
+    Видаляє ВСІ товари з бази даних.
+    Незворотна операція!
+    """
+    verify_admin(user_id)
+    
+    try:
+        logger.critical("⚠️ DANGER ZONE: User %s initiated CLEAR DATABASE operation", user_id)
+        
+        # Видаляємо всі товари
+        async with session_maker() as session:
+            result = await session.execute("SELECT COUNT(*) FROM products")
+            count = result.scalar()
+            
+            await session.execute("DELETE FROM products")
+            await session.commit()
+            
+            logger.critical("✅ Database cleared: %d products deleted by admin %s", count, user_id)
+            
+            return JSONResponse(content={
+                "success": True,
+                "message": "База даних очищена",
+                "deleted_count": count
+            })
+    
+    except Exception as e:
+        logger.error("Помилка очищення БД: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": f"Помилка: {str(e)}"},
+            status_code=500
+        )
+
+
+@router.post("/danger/delete-all-photos")
+async def danger_delete_all_photos(user_id: int = Query(...)):
+    """
+    🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
+    Видаляє ВСІ фото з серверу та БД.
+    Незворотна операція!
+    """
+    verify_admin(user_id)
+    
+    try:
+        logger.critical("⚠️ DANGER ZONE: User %s initiated DELETE ALL PHOTOS operation", user_id)
+        
+        photos_dir = "uploads/photos"
+        deleted_files = 0
+        
+        if os.path.exists(photos_dir):
+            for filename in os.listdir(photos_dir):
+                filepath = os.path.join(photos_dir, filename)
+                if os.path.isfile(filepath):
+                    os.remove(filepath)
+                    deleted_files += 1
+        
+        # Видаляємо записи з БД
+        async with session_maker() as session:
+            await session.execute("DELETE FROM photos")
+            await session.commit()
+        
+        logger.critical("✅ All photos deleted: %d files removed by admin %s", deleted_files, user_id)
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Всі фото видалено",
+            "deleted_count": deleted_files
+        })
+    
+    except Exception as e:
+        logger.error("Помилка видалення фото: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": f"Помилка: {str(e)}"},
+            status_code=500
+        )
+
+
+@router.post("/danger/reset-moderation")
+async def danger_reset_moderation(user_id: int = Query(...)):
+    """
+    ⚠️ Скидає статус модерації для ВСІХ фото.
+    Всі фото стануть 'pending' (очікують модерації).
+    """
+    verify_admin(user_id)
+    
+    try:
+        logger.warning("⚠️ DANGER ZONE: User %s initiated RESET MODERATION operation", user_id)
+        
+        async with session_maker() as session:
+            result = await session.execute(
+                "UPDATE photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL"
+            )
+            await session.commit()
+            
+            logger.info("✅ Moderation reset: %d photos by admin %s", result.rowcount, user_id)
+            
+            return JSONResponse(content={
+                "success": True,
+                "message": "Статус модерації скинуто",
+                "reset_count": result.rowcount
+            })
+    
+    except Exception as e:
+        logger.error("Помилка скидання модерації: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": f"Помилка: {str(e)}"},
+            status_code=500
+        )
+
+
+@router.post("/danger/delete-all-archives")
+async def danger_delete_all_archives(user_id: int = Query(...)):
+    """
+    🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
+    Видаляє ВСІ архіви користувачів.
+    Незворотна операція!
+    """
+    verify_admin(user_id)
+    
+    try:
+        logger.critical("⚠️ DANGER ZONE: User %s initiated DELETE ALL ARCHIVES operation", user_id)
+        
+        archives_dir = os.path.join(ARCHIVES_PATH, "active")
+        deleted_files = 0
+        
+        if os.path.exists(archives_dir):
+            for filename in os.listdir(archives_dir):
+                if filename.endswith('.xlsx'):
+                    filepath = os.path.join(archives_dir, filename)
+                    os.remove(filepath)
+                    deleted_files += 1
+        
+        logger.critical("✅ All archives deleted: %d files removed by admin %s", deleted_files, user_id)
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Всі архіви видалено",
+            "deleted_count": deleted_files
+        })
+    
+    except Exception as e:
+        logger.error("Помилка видалення архівів: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": f"Помилка: {str(e)}"},
+            status_code=500
+        )
+
+
+@router.post("/danger/full-wipe")
+async def danger_full_wipe(user_id: int = Query(...)):
+    """
+    🚨🚨🚨 НАЙКРИТИЧНІША ОПЕРАЦІЯ 🚨🚨🚨
+    Повне очищення системи:
+    - Всі товари з БД
+    - Всі фото
+    - Всі архіви
+    - Всі дані модерації
+    
+    НЕЗВОРОТНА ОПЕРАЦІЯ!
+    """
+    verify_admin(user_id)
+    
+    try:
+        logger.critical("🚨🚨🚨 DANGER ZONE: User %s initiated FULL WIPE operation!", user_id)
+        
+        deleted_products = 0
+        deleted_photos = 0
+        deleted_archives = 0
+        
+        # 1. Очищаємо БД
+        async with session_maker() as session:
+            # Products
+            result_products = await session.execute("SELECT COUNT(*) FROM products")
+            deleted_products = result_products.scalar()
+            await session.execute("DELETE FROM products")
+            
+            # Photos (і файли)
+            photos_dir = "uploads/photos"
+            if os.path.exists(photos_dir):
+                for filename in os.listdir(photos_dir):
+                    filepath = os.path.join(photos_dir, filename)
+                    if os.path.isfile(filepath):
+                        os.remove(filepath)
+                        deleted_photos += 1
+            
+            await session.execute("DELETE FROM photos")
+            await session.commit()
+        
+        # 2. Архіви
+        archives_dir = os.path.join(ARCHIVES_PATH, "active")
+        if os.path.exists(archives_dir):
+            for filename in os.listdir(archives_dir):
+                if filename.endswith('.xlsx'):
+                    filepath = os.path.join(archives_dir, filename)
+                    os.remove(filepath)
+                    deleted_archives += 1
+        
+        logger.critical(
+            "✅ FULL WIPE completed by admin %s: Products=%d, Photos=%d, Archives=%d",
+            user_id, deleted_products, deleted_photos, deleted_archives
+        )
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Повне очищення завершено",
+            "deleted_products": deleted_products,
+            "deleted_photos": deleted_photos,
+            "deleted_archives": deleted_archives
+        })
+    
+    except Exception as e:
+        logger.error("Помилка повного очищення: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": f"Помилка: {str(e)}"},
+            status_code=500
+        )
