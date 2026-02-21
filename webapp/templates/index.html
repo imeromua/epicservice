@@ -33,6 +33,11 @@
     <!-- Filters Sidebar -->
     <link rel="stylesheet" href="/static/filters-sidebar.css">
     <script src="/static/filters-sidebar.js"></script>
+
+    <!-- Photo styles -->
+    <link rel="stylesheet" href="/static/css/photos.css">
+    <script src="/static/js/photos.js"></script>
+    
     <style>
         :root {
             --bg-color: var(--tg-theme-bg-color, #ffffff);
@@ -169,7 +174,8 @@
             margin-bottom: 12px; 
             cursor: pointer; 
             transition: transform 0.2s, background-color 0.3s ease; 
-            position: relative; 
+            position: relative;
+            overflow: visible; 
         }
         .product-card:active, .list-item:active { transform: scale(0.98); }
         .product-card.locked { 
@@ -486,7 +492,13 @@
             <div id="adminActiveUsers">
                 <div class="loader">Завантаження...</div>
             </div>
-            
+            <div class="admin-section-title">🖼️ Модерація фото</div>
+            <div id="photoModeration">
+                <div class="loader">Завантаження...</div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="loadPhotoModeration()">🔄 Оновити</button>
+            </div>
             <div class="admin-section-title">📥 Імпорт товарів</div>
             <div id="importAlert"></div>
             <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
@@ -529,6 +541,13 @@
     <div id="statsModal" class="modal"><div class="modal-content" id="statsModalContent"></div></div>
     <div id="adminArchivesModal" class="modal"><div class="modal-content" id="adminArchivesModalContent"></div></div>
     <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
+    <!-- Photo Gallery Modal -->
+    <div id="photoModal" class="modal">
+        <div class="modal-content">
+            <div id="photoGallery" class="photo-gallery"></div>
+            <div id="photoModalContent"></div>
+        </div>
+    </div>
 
 <!-- PWA Install Banner -->
 <div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
@@ -706,10 +725,13 @@ function renderProduct(p) {
     const lockedClass = isLocked ? ' locked' : '';
     const statusClass = isLocked ? ' locked' : '';
     const statusText = isLocked ? '🔒 Заблоковано' : '✅ Знайдено';
-    const clickHandler = isLocked ? `onclick="showLockedAlert(${p.current_list_department})"` : `onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
+    const clickHandler = isLocked ? `onclick="showLockedAlert(${p.current_list_department})"` : `onclick='openModalWithPhotos(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
+    const hasPhotos = p.photos && p.photos.length > 0;
+    const photoIndicator = hasPhotos ? `<span class="photo-badge">📷 ${p.photos.length}</span>` : '';
     
     return `<div class="product-card${lockedClass}" data-product-id="${p.id}" ${clickHandler}>
         <div class="lock-overlay">🔒</div>
+        ${photoIndicator}
         <div class="product-header">
             <span class="product-article">🆔 ${p.article}</span>
             <span class="product-status${statusClass}">${statusText}</span>
@@ -752,6 +774,11 @@ async function search(query) {
             results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; 
             cachedProducts = [];
             return; 
+        }
+
+        // Завантаження фото для кожного товару
+    for (let product of data.products) {
+        product.photos = await loadProductPhotos(product.article);
         }
         cachedProducts = data.products.filter(p => p.available > 0);
         updateSearchResults();
