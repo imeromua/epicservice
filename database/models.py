@@ -44,6 +44,27 @@ class Product(Base):
     активний: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
 
+class ProductPhoto(Base):
+    """Модель для зберігання фото товарів."""
+    __tablename__ = 'product_photos'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    артикул: Mapped[str] = mapped_column(String(20), ForeignKey('products.артикул'), index=True)
+    file_path: Mapped[str] = mapped_column(String(500))  # Шлях на сервері
+    file_size: Mapped[int] = mapped_column(Integer)  # Розмір після стискання (байти)
+    original_size: Mapped[int] = mapped_column(Integer)  # Оригінальний розмір
+    photo_order: Mapped[int] = mapped_column(Integer, default=0)  # Порядок (0, 1, 2)
+
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    uploaded_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
+
+    # Модерація
+    status: Mapped[str] = mapped_column(String(20), default='pending')  # pending, approved, rejected
+    moderated_by: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=True)
+    moderated_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    rejection_reason: Mapped[str] = mapped_column(String(500), nullable=True)
+
+
 class SavedList(Base):
     """Модель, що представляє збережений список товарів користувача."""
     __tablename__ = 'saved_lists'
