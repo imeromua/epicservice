@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 SearchModule.currentQuery = query;
                 SearchModule.currentOffset = 0;
                 SearchModule.allProducts = [];
+                SearchModule.removeScrollListener();
                 if (DOM.searchResults) DOM.searchResults.innerHTML = '';
             }
             
@@ -147,8 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 500),
 
         loadMore: async (isNewSearch = false) => {
-            if (SearchModule.isLoading) return;
-            if (!isNewSearch && !SearchModule.hasMore) return;
+            if (SearchModule.isLoading) {
+                console.log('⏸️ Already loading, skipping...');
+                return;
+            }
+            if (!isNewSearch && !SearchModule.hasMore) {
+                console.log('⛔ No more products, stopping');
+                return;
+            }
 
             SearchModule.isLoading = true;
             
@@ -172,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newProducts = data.products || [];
                 SearchModule.hasMore = data.has_more || false;
                 
-                console.log(`✅ Got ${newProducts.length} products, hasMore=${SearchModule.hasMore}`);
+                console.log(`✅ Got ${newProducts.length} products, hasMore=${SearchModule.hasMore}, total=${data.total}`);
                 
                 // ВАЖЛИВО: оновлюємо offset ПІСЛЯ успішного запиту
                 SearchModule.currentOffset += newProducts.length;
@@ -185,9 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 SearchModule.render();
                 
-                // Налаштовуємо listener тільки якщо є ще товари
+                // Налаштовуємо listener ПІСЛЯ рендеру з затримкою для DOM update
                 if (SearchModule.hasMore) {
-                    SearchModule.setupScrollListener();
+                    setTimeout(() => SearchModule.setupScrollListener(), 100);
                 } else {
                     SearchModule.removeScrollListener();
                 }
@@ -233,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Додаємо невидимий div для спостереження за скролом
             if (SearchModule.hasMore) {
-                html += '<div id="searchScrollSentinel" style="height:1px;"></div>';
+                html += '<div id="searchScrollSentinel" style="height:20px; background:transparent;"></div>';
             }
             
             DOM.searchResults.innerHTML = html;
@@ -243,6 +250,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showLoadingIndicator: () => {
             if (!DOM.searchResults) return;
+            // Видаляємо старий лоадер якщо є
+            const oldLoader = document.getElementById('searchLoadingMore');
+            if (oldLoader) oldLoader.remove();
+            
             const loader = document.createElement('div');
             loader.id = 'searchLoadingMore';
             loader.style.cssText = 'text-align:center; padding:20px; color:var(--hint-color);';
@@ -257,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setupScrollListener: () => {
             if (!SearchModule.hasMore) {
+                console.log('⛔ No hasMore, skipping observer setup');
                 SearchModule.removeScrollListener();
                 return;
             }
@@ -264,22 +276,29 @@ document.addEventListener('DOMContentLoaded', () => {
             // Використовуємо Intersection Observer для ефективного відстеження
             const sentinel = document.getElementById('searchScrollSentinel');
             if (!sentinel) {
-                console.warn('⚠️ Sentinel element not found');
+                console.warn('⚠️ Sentinel element not found!');
                 return;
             }
 
+            // Відключаємо старий observer якщо є
             if (SearchModule.observer) {
                 SearchModule.observer.disconnect();
             }
 
             SearchModule.observer = new IntersectionObserver(
                 (entries) => {
-                    if (entries[0].isIntersecting && !SearchModule.isLoading && SearchModule.hasMore) {
+                    const entry = entries[0];
+                    console.log(`👁️ Observer callback: isIntersecting=${entry.isIntersecting}, isLoading=${SearchModule.isLoading}, hasMore=${SearchModule.hasMore}`);
+                    
+                    if (entry.isIntersecting && !SearchModule.isLoading && SearchModule.hasMore) {
                         console.log('👀 Sentinel visible, loading more...');
                         SearchModule.loadMore(false);
                     }
                 },
-                { threshold: 0.1, rootMargin: '100px' }
+                { 
+                    threshold: 0.1, 
+                    rootMargin: '200px'  // Збільшив до 200px для раннього спрацювання
+                }
             );
 
             SearchModule.observer.observe(sentinel);
