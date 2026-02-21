@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import zipfile
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 import openpyxl
@@ -43,6 +44,9 @@ from utils.force_save_helper import force_save_user_list_web
 logger = logging.getLogger(__name__)
 router = APIRouter()
 bot = Bot(token=BOT_TOKEN)
+
+# Базова директорія webapp/ для побудови повних шляхів до фото
+_BASE_DIR = Path(__file__).resolve().parent.parent  # webapp/
 
 
 # === Middleware ===
@@ -933,6 +937,8 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ фото з серверу (за file_path з БД) та записи з БД.
+    file_path в БД: "uploads/photos/61605401/photo_0.jpg"
+    Повний шлях: webapp/static/ + file_path
     Незворотна операція!
     """
     verify_admin(user_id)
@@ -953,16 +959,19 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
             logger.info(f"Found {len(file_paths)} photo records in database")
             
             # Видаляємо файли з сервера
-            for file_path in file_paths:
+            # file_path приклад: "uploads/photos/61605401/photo_0.jpg"
+            # Повний шлях: /home/anubis/epicservice/webapp/static/uploads/photos/61605401/photo_0.jpg
+            for relative_path in file_paths:
                 try:
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
+                    full_path = _BASE_DIR / "static" / relative_path
+                    if full_path.exists():
+                        full_path.unlink()
                         deleted_files += 1
-                        logger.debug(f"Deleted file: {file_path}")
+                        logger.debug(f"Deleted file: {full_path}")
                     else:
-                        logger.warning(f"File not found: {file_path}")
+                        logger.warning(f"File not found: {full_path}")
                 except Exception as e:
-                    logger.error(f"Error deleting file {file_path}: {e}")
+                    logger.error(f"Error deleting file {full_path}: {e}")
             
             # Видаляємо записи з БД
             delete_result = await session.execute(text("DELETE FROM product_photos"))
@@ -977,8 +986,8 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
         return JSONResponse(content={
             "success": True,
             "message": "Всі фото видалено",
-            "deleted_count": deleted_files,
-            "db_records_deleted": deleted_db_records
+            "deleted_files": deleted_files,
+            "deleted_db_records": deleted_db_records
         })
     
     except Exception as e:
@@ -1088,19 +1097,20 @@ async def danger_full_wipe(user_id: int = Query(...)):
             result_products = await session.execute(text("SELECT COUNT(*) FROM products"))
             deleted_products = result_products.scalar()
             
-            # 2. Photos (спочатку файли за file_path)
+            # 2. Photos (спочатку файли за file_path з правильним шляхом)
             result_photos = await session.execute(
                 text("SELECT file_path FROM product_photos")
             )
             file_paths = [row[0] for row in result_photos.fetchall()]
             
-            for file_path in file_paths:
+            for relative_path in file_paths:
                 try:
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
+                    full_path = _BASE_DIR / "static" / relative_path
+                    if full_path.exists():
+                        full_path.unlink()
                         deleted_photo_files += 1
                 except Exception as e:
-                    logger.error(f"Error deleting photo file {file_path}: {e}")
+                    logger.error(f"Error deleting photo file {full_path}: {e}")
             
             # 3. БД: product_photos спочатку, потім products
             delete_photos_result = await session.execute(text("DELETE FROM product_photos"))
