@@ -401,6 +401,10 @@ function fullscreenPhoto(e) {
     if (fn) fn.call(img);
 }
 
+/**
+ * Відкрити file picker для вибору фото
+ * Android автоматично пропонує: Камера / Галерея / Файли
+ */
 async function openPhotoUpload(e) {
     e.stopPropagation();
     if (uploadingPhoto) {
@@ -408,75 +412,45 @@ async function openPhotoUpload(e) {
         return;
     }
     
-    // Меню вибору: Галерея / Камера
-    const choice = await new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.className = 'modal active';
-        modal.innerHTML = `
-            <div class="modal-content photo-source-modal">
-                <h3>Додати фото</h3>
-                <button class="btn btn-primary btn-large" onclick="window.photoSource='gallery'; this.closest('.modal').remove();">
-                    🖼️ Галерея
-                </button>
-                <button class="btn btn-primary btn-large" onclick="window.photoSource='camera'; this.closest('.modal').remove();">
-                    📷 Камера
-                </button>
-                <button class="btn btn-outline" onclick="this.closest('.modal').remove()">Скасувати</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        const checkInterval = setInterval(() => {
-            if (!document.body.contains(modal)) {
-                clearInterval(checkInterval);
-                resolve(window.photoSource || null);
-                delete window.photoSource;
-            }
-        }, 100);
-    });
-    
-    if (!choice) return;
-    
+    // Створюємо прихований file input
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
-    
-    if (choice === 'camera') {
-        // Для Android 16+ використовуємо 'environment' (задня камера)
-        input.capture = 'environment';
-        
-        // Telegram WebApp API має пріоритет якщо доступний
-        if (typeof tg !== 'undefined' && tg.requestPhoto) {
-            try {
-                // Використовуємо нативний Telegram API для камери
-                const photoData = await new Promise((resolve, reject) => {
-                    tg.requestPhoto({
-                        camera: true,
-                        success: (data) => resolve(data),
-                        failure: (error) => reject(error)
-                    });
-                });
-                
-                if (photoData && photoData.file) {
-                    await uploadPhoto(photoData.file);
-                    return;
-                }
-            } catch (error) {
-                console.warn('Telegram camera API failed, using fallback:', error);
-                // Fallback на стандартний input нижче
-            }
-        }
-    }
+    input.accept = 'image/*'; // Тільки зображення
+    input.style.display = 'none';
     
     input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
+        
+        // Валідація типу файлу
         if (!file.type.startsWith('image/')) {
-            if (typeof tg !== 'undefined') tg.showAlert('❌ Оберіть файл зображення');
+            if (typeof tg !== 'undefined') {
+                tg.showAlert('❌ Оберіть файл зображення (JPG, PNG, WebP)');
+            } else {
+                alert('❌ Оберіть файл зображення (JPG, PNG, WebP)');
+            }
             return;
         }
+        
+        // Валідація розміру (макс 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            if (typeof tg !== 'undefined') {
+                tg.showAlert('❌ Файл занадто великий. Максимум 10 MB');
+            } else {
+                alert('❌ Файл занадто великий. Максимум 10 MB');
+            }
+            return;
+        }
+        
         await uploadPhoto(file);
+        
+        // Видаляємо input після використання
+        input.remove();
     };
+    
+    // Додаємо input до DOM і клікаємо
+    document.body.appendChild(input);
     input.click();
 }
 
