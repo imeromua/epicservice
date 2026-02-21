@@ -100,8 +100,9 @@ function createFiltersSidebar() {
         updateFiltersButtonVisibility();
     }, 100);
     
-    // 🎯 INFINITE SCROLL для фільтрів
-    window.addEventListener('scroll', handleFiltersScroll);
+    // 🎯 INFINITE SCROLL для фільтрів з debounce
+    const debouncedFiltersScroll = Utils.debounce(handleFiltersScroll, 200);
+    window.addEventListener('scroll', debouncedFiltersScroll);
 }
 
 async function loadDepartments() {
@@ -322,7 +323,7 @@ function displayFilteredProducts(products, isNewFilter = false) {
     } else {
         // Fallback рендер
         const html = availableProducts.map(p => `
-            <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+            <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")}'>
                 <div class="product-header">
                     <span class="product-article">🆔 ${p.article}</span>
                     <span class="product-status">✅ Знайдено</span>
@@ -457,4 +458,4 @@ if (typeof window !== 'undefined') {
     window.filterState = filterState;
 }
 
-console.log('🎛️ Filters sidebar with infinite scroll loaded');
+console.log('🎛️ Filters sidebar with debounced infinite scroll loaded');
