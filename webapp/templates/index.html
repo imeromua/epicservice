@@ -34,9 +34,9 @@
     <link rel="stylesheet" href="/static/filters-sidebar.css">
     <script src="/static/filters-sidebar.js"></script>
 
-    <!-- Photo styles -->
-    <link rel="stylesheet" href="/static/css/photos.css">
-    <script src="/static/js/photos.js"></script>
+    <!-- Photo styles (v2 - cache bust) -->
+    <link rel="stylesheet" href="/static/css/photos.css?v=2">
+    <script src="/static/js/photos.js?v=2" defer></script>
     
     <style>
         :root {
@@ -917,6 +917,8 @@ async function loadAdminData() {
     console.log('👑 Loading admin data...');
     await loadAdminStats();
     await loadAdminActiveUsers();
+    // ✅ Завантажуємо модерацію фото
+    if (typeof loadPhotoModeration === 'function') loadPhotoModeration();
 }
 
 async function loadAdminStats() {
@@ -1136,10 +1138,6 @@ async function exportStock() {
     }
 }
 
-
-
-
-
 async function showAdminArchives() {
     try {
         const response = await fetch(`/api/admin/archives?user_id=${userId}`);
@@ -1166,7 +1164,6 @@ async function showAdminArchives() {
         tg.showAlert('❌ Помилка: ' + error.message);
     }
 }
-
 
 async function showAllUsers() {
     try {
@@ -1242,7 +1239,6 @@ async function showProductsInfo() {
                 html += `</div>`;
             }
             
-            // Було/Стало summary
             html += `<div style="padding: 14px; background: linear-gradient(135deg, rgba(255,152,0,0.15) 0%, rgba(255,204,0,0.15) 100%); border-radius: 10px; margin-bottom: 14px;">`;
             html += `<div style="text-align: center; font-size: 15px; font-weight: 600; margin-bottom: 10px;">📊 Було / Стало</div>`;
             html += `<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">`;
@@ -1251,7 +1247,6 @@ async function showProductsInfo() {
             html += `<div><div style="font-size: 22px; font-weight: 700; color: #0088cc;">${data.current_articles || 0}</div><div style="font-size: 11px; opacity: 0.7;">Залишилось</div></div>`;
             html += `</div></div>`;
             
-            // Детальна статистика
             html += `<div style="padding: 12px; background: var(--secondary-bg-color); border-radius: 8px; margin-bottom: 12px;">`;
             html += `<div style="font-weight: 600; margin-bottom: 8px;">💰 Суми:</div>`;
             html += `<div style="font-size: 13px; line-height: 1.6;">`;
