@@ -5,7 +5,7 @@ let filterState = {
     departments: [],
     sortBy: 'balance_sum',
     offset: 0,
-    limit: 50,  // ✅ Збільшено з 20 до 50
+    limit: 500,  // ✅ Збільшено з 50 до 500
     isActive: false,
     hasMore: false,
     isLoading: false,
@@ -323,7 +323,7 @@ function displayFilteredProducts(products, isNewFilter = false) {
     } else {
         // Fallback рендер
         const html = availableProducts.map(p => `
-            <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")}'>
+            <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
                 <div class="product-header">
                     <span class="product-article">🆔 ${p.article}</span>
                     <span class="product-status">✅ Знайдено</span>
@@ -371,7 +371,7 @@ function resetFilters() {
     // Ховаємо статистику
     document.getElementById('filterStatsBox').style.display = 'none';
     
-    // Очищаємо результати
+    // Очищуємо результати
     document.getElementById('searchResults').innerHTML = '';
     
     // Haptic feedback
