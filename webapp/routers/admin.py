@@ -35,7 +35,7 @@ from database.orm import (
 )
 from database.orm.products import SmartColumnMapper
 from database.engine import async_session
-from database.models import Product, Photo
+from database.models import Product
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
 
