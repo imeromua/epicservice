@@ -1,4 +1,3 @@
-# webapp/routers/admin.py
 """
 Адміністративний роутер для управління системою через веб-інтерфейс.
 Містить ендпоїнти для імпорту/експорту даних, управління користувачами та звітів.
@@ -986,7 +985,7 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
         return JSONResponse(content={
             "success": True,
             "message": "Всі фото видалено",
-            "deleted_files": deleted_files,
+            "deleted_count": deleted_files,
             "deleted_db_records": deleted_db_records
         })
     
