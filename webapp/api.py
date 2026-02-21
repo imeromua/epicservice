@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from webapp.routers import admin, client
+from webapp.routers import admin, client, photos
 
 # Створюємо FastAPI додаток
 app = FastAPI(
@@ -48,6 +48,12 @@ app.include_router(
     admin.router,
     prefix="/api/admin",
     tags=["admin"]
+)
+
+app.include_router(
+    photos.router,
+    prefix="/api",
+    tags=["photos"]
 )
 
 
