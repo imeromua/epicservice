@@ -18,10 +18,8 @@ from config import ADMIN_IDS, WEBAPP_URL
 from database.orm import (orm_get_all_products_sync, orm_get_all_users_sync,
                           orm_get_users_with_active_lists, orm_smart_import)
 from database.orm.products import SmartColumnMapper
-from handlers.admin.core import _show_admin_panel
 from handlers.admin.lock_common import handle_lock_notify_common, handle_lock_force_save_common
-from keyboards.inline import (get_admin_lock_kb, get_admin_main_kb,
-                              get_notify_confirmation_kb)
+from keyboards.inline import get_admin_lock_kb, get_notify_confirmation_kb
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list
 
@@ -233,11 +231,11 @@ async def process_import_file(message: Message, state: FSMContext, bot: Bot):
     except SQLAlchemyError as e:
         logger.critical("Помилка БД під час імпорту: %s", e, exc_info=True)
         await message.answer(LEXICON.IMPORT_SYNC_ERROR.format(error=str(e)))
-        await _show_admin_panel(message, state, bot)
+        await state.clear()
     except Exception as e:
         logger.error("Критична помилка при обробці файлу імпорту: %s", e, exc_info=True)
         await message.answer(LEXICON.IMPORT_CRITICAL_READ_ERROR.format(error=str(e)))
-        await _show_admin_panel(message, state, bot)
+        await state.clear()
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
@@ -246,9 +244,12 @@ async def process_import_file(message: Message, state: FSMContext, bot: Bot):
 @router.callback_query(AdminImportStates.notify_confirmation, F.data == "notify_confirm:yes")
 async def handle_notify_yes(callback: CallbackQuery, state: FSMContext, bot: Bot):
     try:
-        await callback.message.edit_text(LEXICON.BROADCAST_STARTING)
         data = await state.get_data()
-        await state.set_state(None)
+        await state.clear()
+        
+        # Просто повідомляємо що розсилка запущена - БЕЗ КНОПОК
+        await callback.message.edit_text("✅ " + LEXICON.BROADCAST_STARTING)
+        
         if result := data.get('import_result'):
             task = asyncio.create_task(broadcast_import_update(bot, result))
             # Логуємо помилки фонової задачі, щоб не втрачати їх
@@ -257,7 +258,6 @@ async def handle_notify_yes(callback: CallbackQuery, state: FSMContext, bot: Bot
                     "Помилка фонової розсилки: %s", t.exception(), exc_info=t.exception()
                 )
             )
-        await _show_admin_panel(callback, state, bot)
     finally:
         await callback.answer()
 
@@ -265,8 +265,8 @@ async def handle_notify_yes(callback: CallbackQuery, state: FSMContext, bot: Bot
 @router.callback_query(AdminImportStates.notify_confirmation, F.data == "notify_confirm:no")
 async def handle_notify_no(callback: CallbackQuery, state: FSMContext, bot: Bot):
     try:
-        await callback.message.edit_text(LEXICON.BROADCAST_SKIPPED)
-        await state.set_state(None)
-        await _show_admin_panel(callback, state, bot)
+        await state.clear()
+        # Просто повідомляємо - БЕЗ КНОПОК
+        await callback.message.edit_text("✅ " + LEXICON.BROADCAST_SKIPPED)
     finally:
         await callback.answer()
