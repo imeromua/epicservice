@@ -440,8 +440,32 @@ async function openPhotoUpload(e) {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    
     if (choice === 'camera') {
-        input.capture = 'camera'; // Краща сумісність з Android
+        // Для Android 16+ використовуємо 'environment' (задня камера)
+        input.capture = 'environment';
+        
+        // Telegram WebApp API має пріоритет якщо доступний
+        if (typeof tg !== 'undefined' && tg.requestPhoto) {
+            try {
+                // Використовуємо нативний Telegram API для камери
+                const photoData = await new Promise((resolve, reject) => {
+                    tg.requestPhoto({
+                        camera: true,
+                        success: (data) => resolve(data),
+                        failure: (error) => reject(error)
+                    });
+                });
+                
+                if (photoData && photoData.file) {
+                    await uploadPhoto(photoData.file);
+                    return;
+                }
+            } catch (error) {
+                console.warn('Telegram camera API failed, using fallback:', error);
+                // Fallback на стандартний input нижче
+            }
+        }
     }
     
     input.onchange = async (event) => {
