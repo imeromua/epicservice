@@ -104,9 +104,13 @@ async def search_products(req: SearchRequest):
             except (ValueError, TypeError):
                 total_quantity = 0.0
             
-            available = total_quantity - product.відкладено
+            # Отримуємо резерв користувача
+	    user_reserved_qty = user_reserved.get(product.id, 0)
+
+            # Доступна кількість = загальна - загальний резерв - резерв користувача
             
-            user_reserved_qty = user_reserved.get(product.id, 0)
+            available = total_quantity - product.відкладено - user_reserved_qty
+
             user_reserved_sum = user_reserved_qty * float(product.ціна)
             
             # Перевіряємо чи товар з іншого відділу
@@ -215,9 +219,12 @@ async def filter_products(req: FilterProductsRequest):
                 except (ValueError, TypeError):
                     total_quantity = 0.0
                 
-                available = total_quantity - product.відкладено
-                
+                # Отримуємо резерв користувача
                 user_reserved_qty = user_reserved.get(product.id, 0)
+
+                # Доступна кількість = загальна - загальний резерв - резерв користувача
+                available = total_quantity - product.відкладено - user_reserved_qty
+
                 user_reserved_sum = user_reserved_qty * float(product.ціна)
                 
                 # Перевіряємо чи товар з іншого відділу
