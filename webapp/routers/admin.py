@@ -15,13 +15,14 @@ from typing import List, Optional
 import openpyxl
 import pandas as pd
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.background import BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
-from config import ADMIN_IDS, ARCHIVES_PATH, BOT_TOKEN
+from config import ADMIN_IDS, ARCHIVES_PATH, BOT_TOKEN, WEBAPP_URL
 from database.orm import (
     orm_get_all_collected_items_sync,
     orm_get_all_products_sync,
@@ -32,7 +33,6 @@ from database.orm import (
     orm_subtract_collected,
 )
 from database.orm.products import SmartColumnMapper
-from keyboards.inline import get_admin_main_kb
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
 
@@ -146,7 +146,10 @@ def _create_stock_report_sync() -> Optional[str]:
 
 
 async def broadcast_import_update(result: dict):
-    """Розсилає повідомлення всім користувачам про оновлення бази товарів."""
+    """
+    Розсилає повідомлення всім користувачам про оновлення бази товарів.
+    Повідомлення надсилаються ТІЛЬКИ з кнопкою "Відкрити Mini App".
+    """
     loop = asyncio.get_running_loop()
     try:
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -177,11 +180,22 @@ async def broadcast_import_update(result: dict):
             details_part + departments_part + "".join(departments_lines)
         )
 
+        # Клавіатура ТІЛЬКИ з кнопкою Mini App
+        mini_app_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🌐 Відкрити EpicService", web_app=WebAppInfo(url=WEBAPP_URL))]
+            ]
+        )
+
         sent_count = 0
         for user_id in user_ids:
             try:
-                kb = get_admin_main_kb()
-                await bot.send_message(user_id, message_text, reply_markup=kb, parse_mode='HTML')
+                await bot.send_message(
+                    user_id, 
+                    message_text, 
+                    reply_markup=mini_app_kb,
+                    parse_mode='HTML'
+                )
                 sent_count += 1
             except Exception as e:
                 logger.warning("Не вдалося надіслати сповіщення користувачу %s: %s", user_id, e)
