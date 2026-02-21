@@ -190,13 +190,10 @@
     font-size: 13px;
     color: var(--tg-theme-button-color, var(--button-color));
     font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
-.moderation-card-info small,
-.moderation-card-info br + * {
-    display: block;
+
+/* Кожен рядок окремо з ellipsis */
+.moderation-card-info .info-line {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
