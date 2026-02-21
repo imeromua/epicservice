@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.background import BackgroundTasks
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import ADMIN_IDS, ARCHIVES_PATH, BOT_TOKEN, WEBAPP_URL
@@ -902,10 +903,10 @@ async def danger_clear_database(user_id: int = Query(...)):
         
         # Видаляємо всі товари
         async with async_session() as session:
-            result = await session.execute("SELECT COUNT(*) FROM products")
+            result = await session.execute(text("SELECT COUNT(*) FROM products"))
             count = result.scalar()
             
-            await session.execute("DELETE FROM products")
+            await session.execute(text("DELETE FROM products"))
             await session.commit()
             
             logger.critical("✅ Database cleared: %d products deleted by admin %s", count, user_id)
@@ -948,7 +949,7 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
         
         # Видаляємо записи з БД
         async with async_session() as session:
-            await session.execute("DELETE FROM photos")
+            await session.execute(text("DELETE FROM photos"))
             await session.commit()
         
         logger.critical("✅ All photos deleted: %d files removed by admin %s", deleted_files, user_id)
@@ -980,7 +981,7 @@ async def danger_reset_moderation(user_id: int = Query(...)):
         
         async with async_session() as session:
             result = await session.execute(
-                "UPDATE photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL"
+                text("UPDATE photos SET moderation_status = 'pending', moderated_at = NULL, moderated_by = NULL")
             )
             await session.commit()
             
@@ -1062,9 +1063,9 @@ async def danger_full_wipe(user_id: int = Query(...)):
         # 1. Очищаємо БД
         async with async_session() as session:
             # Products
-            result_products = await session.execute("SELECT COUNT(*) FROM products")
+            result_products = await session.execute(text("SELECT COUNT(*) FROM products"))
             deleted_products = result_products.scalar()
-            await session.execute("DELETE FROM products")
+            await session.execute(text("DELETE FROM products"))
             
             # Photos (і файли)
             photos_dir = "uploads/photos"
@@ -1075,7 +1076,7 @@ async def danger_full_wipe(user_id: int = Query(...)):
                         os.remove(filepath)
                         deleted_photos += 1
             
-            await session.execute("DELETE FROM photos")
+            await session.execute(text("DELETE FROM photos"))
             await session.commit()
         
         # 2. Архіви
