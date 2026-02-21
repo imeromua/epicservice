@@ -462,6 +462,31 @@ async def import_products(
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
+@router.get("/products/info")
+async def get_products_info(user_id: int = Query(...)):
+    """
+    Повертає зведену інформацію про товари для адмін-панелі.
+    Використовується для швидкого оновлення лічильників.
+    """
+    verify_admin(user_id)
+    
+    try:
+        # Отримуємо всі товари з бази
+        products = orm_get_all_products_sync()
+        
+        total_count = len(products)
+        # Сумуємо значення колонки сума_залишку (за замовчуванням 0.0, якщо None)
+        total_sum = sum(float(p.сума_залишку or 0.0) for p in products)
+        
+        return {
+            "success": True,
+            "total_count": total_count,
+            "total_sum": round(total_sum, 2),
+            "status": "cleared" if total_count == 0 else "active"
+        }
+    except Exception as e:
+        logger.error(f"Помилка отримання інфо про товари: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.get("/export/stock")
 async def export_stock_report(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
