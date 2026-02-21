@@ -127,7 +127,7 @@ async function loadPhotoModeration() {
             return;
         }
 
-        // Горизонтальний список карток
+        // Горизонтальний список карток (кожен рядок окремий div для ellipsis)
         container.innerHTML = `
             <div class="moderation-horizontal-list">
                 ${data.photos.map(photo => `
@@ -137,11 +137,11 @@ async function loadPhotoModeration() {
                              class="moderation-card-thumb"
                              onerror="this.src=''; this.alt='✖'">
                         <div class="moderation-card-info">
-                            <strong>${photo.article}</strong><br>
-                            <small>${photo.product_name}</small><br>
-                            👤 ${photo.uploaded_by}<br>
-                            📅 ${photo.uploaded_at}<br>
-                            💾 ${(photo.file_size / 1024).toFixed(0)} KB
+                            <div class="info-line"><strong>${photo.article}</strong></div>
+                            <div class="info-line">${photo.product_name}</div>
+                            <div class="info-line">👤 ${photo.uploaded_by}</div>
+                            <div class="info-line">📅 ${photo.uploaded_at}</div>
+                            <div class="info-line">💾 ${(photo.file_size / 1024).toFixed(0)} KB</div>
                         </div>
                     </div>
                 `).join('')}
