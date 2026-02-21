@@ -4,6 +4,7 @@
 
 let currentPhotoIndex = 0;
 let uploadingPhoto = false;
+let currentModerationPhoto = null;
 
 // ============================================================
 // Автозавантаження модерації при відкритті адмін-табу
@@ -126,26 +127,21 @@ async function loadPhotoModeration() {
             return;
         }
 
-        // Мініатюри з фіксованою висотою контейнера
+        // Горизонтальний список карток
         container.innerHTML = `
-            <div class="moderation-grid">
+            <div class="moderation-horizontal-list">
                 ${data.photos.map(photo => `
-                    <div class="moderation-thumb" id="mod-${photo.id}">
+                    <div class="moderation-card" id="mod-${photo.id}" onclick="openModerationPopup(${photo.id}, '/static/${photo.file_path}', '${photo.article}', '${photo.product_name}', '${photo.uploaded_by}', '${photo.uploaded_at}', ${photo.file_size})">
                         <img src="/static/${photo.file_path}" 
                              alt="Фото ${photo.article}"
-                             class="thumb-image"
-                             onclick="showPhotoPreview('/static/${photo.file_path}', '${photo.article}', '${photo.product_name}')"
+                             class="moderation-card-thumb"
                              onerror="this.src=''; this.alt='✖'">
-                        <div class="thumb-info">
+                        <div class="moderation-card-info">
                             <strong>${photo.article}</strong><br>
                             <small>${photo.product_name}</small><br>
                             👤 ${photo.uploaded_by}<br>
                             📅 ${photo.uploaded_at}<br>
                             💾 ${(photo.file_size / 1024).toFixed(0)} KB
-                        </div>
-                        <div class="thumb-actions">
-                            <button class="btn btn-success btn-sm" onclick="moderatePhoto(${photo.id}, 'approved')">✅</button>
-                            <button class="btn btn-danger btn-sm" onclick="moderatePhoto(${photo.id}, 'rejected')">❌</button>
                         </div>
                     </div>
                 `).join('')}
@@ -159,38 +155,56 @@ async function loadPhotoModeration() {
 }
 
 /**
- * Показати прев'ю фото в модалці
+ * Відкрити попап з повним фото + кнопки дій
  */
-function showPhotoPreview(src, article, name) {
-    const modal = document.getElementById('photoModal');
+function openModerationPopup(photoId, src, article, name, uploadedBy, uploadedAt, fileSize) {
+    currentModerationPhoto = photoId;
+    
+    // Створюємо або оновлюємо попап
+    let modal = document.getElementById('moderationPopup');
     if (!modal) {
         const temp = document.createElement('div');
         temp.innerHTML = `
-            <div id="photoModal" class="modal photo-preview-modal">
-                <div class="modal-content photo-preview-content">
-                    <button class="close-btn" onclick="closePhotoPreview()">×</button>
-                    <h3 id="previewTitle"></h3>
-                    <img id="previewImage" src="" alt="Прев'ю">
+            <div id="moderationPopup" class="modal moderation-popup">
+                <div class="moderation-popup-content">
+                    <button class="close-btn" onclick="closeModerationPopup()">×</button>
+                    <div class="moderation-popup-photo">
+                        <img id="moderationPopupImage" src="" alt="Прев'ю">
+                    </div>
+                    <div class="moderation-popup-info" id="moderationPopupInfo"></div>
+                    <div class="moderation-popup-actions">
+                        <button class="btn btn-success btn-large" onclick="moderatePhotoFromPopup('approved')">✅ Схвалити</button>
+                        <button class="btn btn-danger btn-large" onclick="moderatePhotoFromPopup('rejected')">❌ Відхилити</button>
+                    </div>
                 </div>
             </div>
         `;
         document.body.appendChild(temp.firstElementChild);
+        modal = document.getElementById('moderationPopup');
     }
     
-    document.getElementById('previewTitle').textContent = `${article} — ${name}`;
-    document.getElementById('previewImage').src = src;
-    document.getElementById('photoModal').classList.add('active');
+    document.getElementById('moderationPopupImage').src = src;
+    document.getElementById('moderationPopupInfo').innerHTML = `
+        <strong>${article}</strong> — ${name}<br>
+        👤 ${uploadedBy} • 📅 ${uploadedAt}<br>
+        💾 ${(fileSize / 1024).toFixed(0)} KB
+    `;
+    
+    modal.classList.add('active');
 }
 
-function closePhotoPreview() {
-    const modal = document.getElementById('photoModal');
+function closeModerationPopup() {
+    const modal = document.getElementById('moderationPopup');
     if (modal) modal.classList.remove('active');
+    currentModerationPhoto = null;
 }
 
 /**
- * Схвалити або відхилити фото
+ * Модерація фото з попапу
  */
-async function moderatePhoto(photoId, status) {
+async function moderatePhotoFromPopup(status) {
+    if (!currentModerationPhoto) return;
+    
     try {
         const formData = new FormData();
         formData.append('status', status);
@@ -207,25 +221,24 @@ async function moderatePhoto(photoId, status) {
             ];
             
             const choice = await new Promise((resolve) => {
-                const modal = document.createElement('div');
-                modal.className = 'modal active';
-                modal.innerHTML = `
-                    <div class="modal-content" style="max-width:400px">
+                const reasonModal = document.createElement('div');
+                reasonModal.className = 'modal active';
+                reasonModal.innerHTML = `
+                    <div class="modal-content reason-modal-content">
                         <h3>Причина відхилення</h3>
                         <div class="reason-buttons">
                             ${reasons.map((r, i) => `
-                                <button class="btn btn-secondary" 
-                                        onclick="window.rejectReason='${r}'; this.closest('.modal').remove();"
-                                        style="margin:5px">${r}</button>
+                                <button class="btn btn-reason" 
+                                        onclick="window.rejectReason='${r}'; this.closest('.modal').remove();">${r}</button>
                             `).join('')}
                         </div>
                         <button class="btn btn-outline" onclick="this.closest('.modal').remove()">Скасувати</button>
                     </div>
                 `;
-                document.body.appendChild(modal);
+                document.body.appendChild(reasonModal);
                 
                 const checkInterval = setInterval(() => {
-                    if (!document.body.contains(modal)) {
+                    if (!document.body.contains(reasonModal)) {
                         clearInterval(checkInterval);
                         resolve(window.rejectReason || null);
                         delete window.rejectReason;
@@ -233,7 +246,7 @@ async function moderatePhoto(photoId, status) {
                 }, 100);
             });
             
-            if (!choice) return; // Скасовано
+            if (!choice) return;
             
             let reason = choice;
             if (choice === 'Інше...') {
@@ -244,7 +257,7 @@ async function moderatePhoto(photoId, status) {
             formData.append('reason', reason);
         }
 
-        const response = await fetch(`/api/photos/moderation/${photoId}`, {
+        const response = await fetch(`/api/photos/moderation/${currentModerationPhoto}`, {
             method: 'POST',
             body: formData
         });
@@ -252,8 +265,10 @@ async function moderatePhoto(photoId, status) {
         const data = await safeParseResponse(response);
 
         if (data.success) {
+            closeModerationPopup();
+            
             // Видаляємо картку з анімацією
-            const card = document.getElementById(`mod-${photoId}`);
+            const card = document.getElementById(`mod-${currentModerationPhoto}`);
             if (card) {
                 card.style.transition = 'opacity 0.3s, transform 0.3s';
                 card.style.opacity = '0';
@@ -262,7 +277,7 @@ async function moderatePhoto(photoId, status) {
                     card.remove();
                     // Показати порожню статистику якщо більше нічого немає
                     const container = document.getElementById('photoModeration');
-                    if (container && container.querySelectorAll('.moderation-thumb').length === 0) {
+                    if (container && container.querySelectorAll('.moderation-card').length === 0) {
                         container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>Немає фото на модерацію</div>';
                     }
                 }, 300);
@@ -394,15 +409,15 @@ async function openPhotoUpload(e) {
         const modal = document.createElement('div');
         modal.className = 'modal active';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width:300px">
+            <div class="modal-content photo-source-modal">
                 <h3>Додати фото</h3>
-                <button class="btn btn-primary" onclick="window.photoSource='gallery'; this.closest('.modal').remove();" style="margin:10px 0">
+                <button class="btn btn-primary btn-large" onclick="window.photoSource='gallery'; this.closest('.modal').remove();">
                     🖼️ Галерея
                 </button>
-                <button class="btn btn-primary" onclick="window.photoSource='camera'; this.closest('.modal').remove();" style="margin:10px 0">
+                <button class="btn btn-primary btn-large" onclick="window.photoSource='camera'; this.closest('.modal').remove();">
                     📷 Камера
                 </button>
-                <button class="btn btn-outline" onclick="this.closest('.modal').remove();">Скасувати</button>
+                <button class="btn btn-outline" onclick="this.closest('.modal').remove()">Скасувати</button>
             </div>
         `;
         document.body.appendChild(modal);
@@ -416,13 +431,13 @@ async function openPhotoUpload(e) {
         }, 100);
     });
     
-    if (!choice) return; // Скасовано
+    if (!choice) return;
     
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     if (choice === 'camera') {
-        input.capture = 'environment';
+        input.capture = 'camera'; // Краща сумісність з Android
     }
     
     input.onchange = async (event) => {
