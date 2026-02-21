@@ -5,7 +5,7 @@ let filterState = {
     departments: [],
     sortBy: 'balance_sum',
     offset: 0,
-    limit: 20,
+    limit: 50,  // ✅ Збільшено з 20 до 50
     isActive: false,
     hasMore: false,
     isLoading: false,
