@@ -30,6 +30,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // ============================================================
+// Утиліти
+// ============================================================
+
+/**
+ * Безпечний парсинг JSON відповіді з діагностикою
+ */
+async function safeParseResponse(response) {
+    const contentType = response.headers.get('content-type') || '';
+    const raw = await response.text();
+
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        const snippet = raw.slice(0, 300).replace(/\s+/g, ' ');
+        throw new Error(`Не JSON. HTTP ${response.status}. Content-Type: ${contentType}. Відповідь: ${snippet}`);
+    }
+}
+
+/**
+ * Стиснення фото перед upload (до 1920px, JPEG quality 0.85)
+ */
+async function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Розрахунок нових розмірів (макс 1920px по довгій стороні)
+                const maxSize = 1920;
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > height && width > maxSize) {
+                    height = Math.round((height * maxSize) / width);
+                    width = maxSize;
+                } else if (height > maxSize) {
+                    width = Math.round((width * maxSize) / height);
+                    height = maxSize;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) {
+                            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                        } else {
+                            reject(new Error('Не вдалося стиснути фото'));
+                        }
+                    },
+                    'image/jpeg',
+                    0.85
+                );
+            };
+            img.onerror = () => reject(new Error('Не вдалося завантажити зображення'));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Не вдалося прочитати файл'));
+        reader.readAsDataURL(file);
+    });
+}
+
+
+// ============================================================
 // Модерація
 // ============================================================
 
@@ -45,12 +114,7 @@ async function loadPhotoModeration() {
     try {
         const uid = typeof userId !== 'undefined' ? userId : 0;
         const response = await fetch(`/api/photos/moderation/pending?user_id=${uid}`);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await safeParseResponse(response);
 
         if (!data.success) {
             container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${data.message || 'Невідома'}</div>`;
@@ -62,29 +126,65 @@ async function loadPhotoModeration() {
             return;
         }
 
-        container.innerHTML = data.photos.map(photo => `
-            <div class="moderation-item" id="mod-${photo.id}">
-                <img src="/static/${photo.file_path}"
-                     alt="Фото ${photo.article}"
-                     class="moderation-photo"
-                     onerror="this.src=''; this.alt='✖ Фото не знайдено'">
-                <div class="moderation-details">
-                    <strong>${photo.article}</strong> &mdash; ${photo.product_name}<br>
-                    👤 ${photo.uploaded_by} &bull; 📅 ${photo.uploaded_at}<br>
-                    💾 ${(photo.file_size / 1024).toFixed(0)} KB
-                    (з ${(photo.original_size / 1024).toFixed(0)} KB)
-                </div>
-                <div class="moderation-actions">
-                    <button class="btn btn-success" onclick="moderatePhoto(${photo.id}, 'approved')">✅ Схвалити</button>
-                    <button class="btn btn-danger"  onclick="moderatePhoto(${photo.id}, 'rejected')">❌ Відхилити</button>
-                </div>
+        // Мініатюри з фіксованою висотою контейнера
+        container.innerHTML = `
+            <div class="moderation-grid">
+                ${data.photos.map(photo => `
+                    <div class="moderation-thumb" id="mod-${photo.id}">
+                        <img src="/static/${photo.file_path}" 
+                             alt="Фото ${photo.article}"
+                             class="thumb-image"
+                             onclick="showPhotoPreview('/static/${photo.file_path}', '${photo.article}', '${photo.product_name}')"
+                             onerror="this.src=''; this.alt='✖'">
+                        <div class="thumb-info">
+                            <strong>${photo.article}</strong><br>
+                            <small>${photo.product_name}</small><br>
+                            👤 ${photo.uploaded_by}<br>
+                            📅 ${photo.uploaded_at}<br>
+                            💾 ${(photo.file_size / 1024).toFixed(0)} KB
+                        </div>
+                        <div class="thumb-actions">
+                            <button class="btn btn-success btn-sm" onclick="moderatePhoto(${photo.id}, 'approved')">✅</button>
+                            <button class="btn btn-danger btn-sm" onclick="moderatePhoto(${photo.id}, 'rejected')">❌</button>
+                        </div>
+                    </div>
+                `).join('')}
             </div>
-        `).join('');
+        `;
 
     } catch (error) {
         container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${error.message}</div>`;
         console.error('❌ loadPhotoModeration error:', error);
     }
+}
+
+/**
+ * Показати прев'ю фото в модалці
+ */
+function showPhotoPreview(src, article, name) {
+    const modal = document.getElementById('photoModal');
+    if (!modal) {
+        const temp = document.createElement('div');
+        temp.innerHTML = `
+            <div id="photoModal" class="modal photo-preview-modal">
+                <div class="modal-content photo-preview-content">
+                    <button class="close-btn" onclick="closePhotoPreview()">×</button>
+                    <h3 id="previewTitle"></h3>
+                    <img id="previewImage" src="" alt="Прев'ю">
+                </div>
+            </div>
+        `;
+        document.body.appendChild(temp.firstElementChild);
+    }
+    
+    document.getElementById('previewTitle').textContent = `${article} — ${name}`;
+    document.getElementById('previewImage').src = src;
+    document.getElementById('photoModal').classList.add('active');
+}
+
+function closePhotoPreview() {
+    const modal = document.getElementById('photoModal');
+    if (modal) modal.classList.remove('active');
 }
 
 /**
@@ -97,8 +197,51 @@ async function moderatePhoto(photoId, status) {
         formData.append('user_id', typeof userId !== 'undefined' ? userId : 0);
 
         if (status === 'rejected') {
-            const reason = prompt('Причина відхилення (необов’язково):');
-            if (reason) formData.append('reason', reason);
+            const reasons = [
+                'Розмите',
+                'Дублікат',
+                'Погана якість',
+                'Не той товар',
+                'Не читається',
+                'Інше...'
+            ];
+            
+            const choice = await new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.className = 'modal active';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width:400px">
+                        <h3>Причина відхилення</h3>
+                        <div class="reason-buttons">
+                            ${reasons.map((r, i) => `
+                                <button class="btn btn-secondary" 
+                                        onclick="window.rejectReason='${r}'; this.closest('.modal').remove();"
+                                        style="margin:5px">${r}</button>
+                            `).join('')}
+                        </div>
+                        <button class="btn btn-outline" onclick="this.closest('.modal').remove()">Скасувати</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                
+                const checkInterval = setInterval(() => {
+                    if (!document.body.contains(modal)) {
+                        clearInterval(checkInterval);
+                        resolve(window.rejectReason || null);
+                        delete window.rejectReason;
+                    }
+                }, 100);
+            });
+            
+            if (!choice) return; // Скасовано
+            
+            let reason = choice;
+            if (choice === 'Інше...') {
+                reason = prompt('Вкажіть причину:');
+                if (!reason) return;
+            }
+            
+            formData.append('reason', reason);
         }
 
         const response = await fetch(`/api/photos/moderation/${photoId}`, {
@@ -106,7 +249,7 @@ async function moderatePhoto(photoId, status) {
             body: formData
         });
 
-        const data = await response.json();
+        const data = await safeParseResponse(response);
 
         if (data.success) {
             // Видаляємо картку з анімацією
@@ -119,7 +262,7 @@ async function moderatePhoto(photoId, status) {
                     card.remove();
                     // Показати порожню статистику якщо більше нічого немає
                     const container = document.getElementById('photoModeration');
-                    if (container && container.querySelectorAll('.moderation-item').length === 0) {
+                    if (container && container.querySelectorAll('.moderation-thumb').length === 0) {
                         container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>Немає фото на модерацію</div>';
                     }
                 }, 300);
@@ -245,19 +388,48 @@ async function openPhotoUpload(e) {
         if (typeof tg !== 'undefined') tg.showAlert('⏳ Зачекайте, попереднє фото ще завантажується');
         return;
     }
+    
+    // Меню вибору: Галерея / Камера
+    const choice = await new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:300px">
+                <h3>Додати фото</h3>
+                <button class="btn btn-primary" onclick="window.photoSource='gallery'; this.closest('.modal').remove();" style="margin:10px 0">
+                    🖼️ Галерея
+                </button>
+                <button class="btn btn-primary" onclick="window.photoSource='camera'; this.closest('.modal').remove();" style="margin:10px 0">
+                    📷 Камера
+                </button>
+                <button class="btn btn-outline" onclick="this.closest('.modal').remove();">Скасувати</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        const checkInterval = setInterval(() => {
+            if (!document.body.contains(modal)) {
+                clearInterval(checkInterval);
+                resolve(window.photoSource || null);
+                delete window.photoSource;
+            }
+        }, 100);
+    });
+    
+    if (!choice) return; // Скасовано
+    
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.capture = 'environment';
+    if (choice === 'camera') {
+        input.capture = 'environment';
+    }
+    
     input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
         if (!file.type.startsWith('image/')) {
             if (typeof tg !== 'undefined') tg.showAlert('❌ Оберіть файл зображення');
-            return;
-        }
-        if (file.size > 10 * 1024 * 1024) {
-            if (typeof tg !== 'undefined') tg.showAlert('❌ Файл занадто великий (макс 10MB)');
             return;
         }
         await uploadPhoto(file);
@@ -279,13 +451,16 @@ async function uploadPhoto(file) {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Завантаження...'; }
 
     try {
+        // Стиснення фото перед upload
+        const compressed = await compressImage(file);
+        
         const formData = new FormData();
-        formData.append('photo', file);
+        formData.append('photo', compressed);
         formData.append('article', selectedProduct.article);
         formData.append('user_id', userId);
 
         const response = await fetch('/api/photos/upload', { method: 'POST', body: formData });
-        const data = await response.json();
+        const data = await safeParseResponse(response);
 
         if (data.success) {
             if (typeof tg !== 'undefined') {
@@ -300,6 +475,7 @@ async function uploadPhoto(file) {
         }
     } catch (error) {
         if (typeof tg !== 'undefined') tg.showAlert('❌ Помилка: ' + error.message);
+        console.error('❌ uploadPhoto error:', error);
     } finally {
         uploadingPhoto = false;
     }
@@ -308,7 +484,7 @@ async function uploadPhoto(file) {
 async function loadProductPhotos(article) {
     try {
         const response = await fetch(`/api/photos/product/${article}`);
-        const data = await response.json();
+        const data = await safeParseResponse(response);
         if (data.success) {
             return data.photos.map(p => p.file_path.split('/').pop());
         }
