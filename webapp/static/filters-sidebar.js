@@ -7,6 +7,9 @@ let filterState = {
     offset: 0,
     limit: 20,
     isActive: false,
+    hasMore: false,
+    isLoading: false,
+    totalAvailable: 0,
     availableDepartments: []
 };
 
@@ -96,6 +99,9 @@ function createFiltersSidebar() {
     setTimeout(() => {
         updateFiltersButtonVisibility();
     }, 100);
+    
+    // 🎯 INFINITE SCROLL для фільтрів
+    window.addEventListener('scroll', handleFiltersScroll);
 }
 
 async function loadDepartments() {
@@ -157,9 +163,36 @@ function setSortBy(sortBy) {
 }
 
 async function applyFilters() {
+    filterState.isActive = true;
+    filterState.offset = 0;
+    filteredProducts = [];
+    
+    await loadFilteredProducts(true);
+    
+    closeFiltersSidebar();
+}
+
+async function loadFilteredProducts(isNewFilter = false) {
+    if (filterState.isLoading) {
+        console.log('⏸️ Already loading filters, skipping...');
+        return;
+    }
+    if (!isNewFilter && !filterState.hasMore) {
+        console.log('⛔ No more filtered products');
+        return;
+    }
+    
+    filterState.isLoading = true;
+    
+    const resultsContainer = document.getElementById('searchResults');
+    if (isNewFilter && resultsContainer) {
+        resultsContainer.innerHTML = '<div class="loader" style="text-align:center; padding:20px;">⏳ Фільтруємо...</div>';
+    } else {
+        showFiltersLoadingIndicator();
+    }
+    
     try {
-        filterState.isActive = true;
-        filterState.offset = 0;
+        console.log(`🎛️ Filter request: offset=${filterState.offset}, limit=${filterState.limit}`);
         
         const response = await fetch('/api/products/filter', {
             method: 'POST',
@@ -176,72 +209,74 @@ async function applyFilters() {
         const data = await response.json();
         
         if (data.products) {
-            filteredProducts = data.products;
-            filterStats = data.statistics;
+            const newProducts = data.products || [];
+            filterState.totalAvailable = data.total || 0;
             
-            // Показуємо статистику
-            updateFilterStats(data.statistics);
+            console.log(`✅ Got ${newProducts.length} filtered products, total=${data.total}`);
             
-            // Оновлюємо результати пошуку
-            displayFilteredProducts(data.products);
+            // Перевіряємо чи є ще товари
+            filterState.hasMore = (filterState.offset + newProducts.length) < filterState.totalAvailable;
+            filterState.offset += newProducts.length;
             
-            // Закриваємо панель
-            closeFiltersSidebar();
+            if (isNewFilter) {
+                filteredProducts = newProducts;
+                filterStats = data.statistics;
+                updateFilterStats(data.statistics);
+            } else {
+                filteredProducts = [...filteredProducts, ...newProducts];
+            }
             
-            // Haptic feedback
-            if (window.Telegram?.WebApp?.HapticFeedback) {
+            displayFilteredProducts(filteredProducts, isNewFilter);
+            
+            if (isNewFilter && window.Telegram?.WebApp?.HapticFeedback) {
                 window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
             }
             
-            console.log('✅ Filters applied:', data.statistics);
+            console.log(`📊 Total loaded: ${filteredProducts.length}/${filterState.totalAvailable}, hasMore=${filterState.hasMore}`);
         }
     } catch (error) {
         console.error('❌ Error applying filters:', error);
         if (window.Telegram?.WebApp) {
             window.Telegram.WebApp.showAlert('❌ Помилка застосування фільтрів');
         }
+    } finally {
+        filterState.isLoading = false;
+        hideFiltersLoadingIndicator();
     }
 }
 
-// ✅ НОВА ФУНКЦІЯ: Повторне застосування фільтрів без скидання стану
-async function reapplyFilters() {
-    if (!filterState.isActive) {
-        console.log('⚠️ Filters not active, skipping reapply');
-        return;
-    }
+// 🎯 SCROLL LISTENER для infinite scroll фільтрів
+function handleFiltersScroll() {
+    // Працює тільки коли фільтри активні
+    if (!filterState.isActive || filterState.isLoading || !filterState.hasMore) return;
+    if (window.currentTab !== 'search') return;
     
-    try {
-        console.log('🔄 Reapplying filters...');
-        
-        const response = await fetch('/api/products/filter', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                user_id: userId,
-                departments: filterState.departments,
-                sort_by: filterState.sortBy,
-                offset: filterState.offset,
-                limit: filterState.limit
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.products) {
-            filteredProducts = data.products;
-            filterStats = data.statistics;
-            
-            // Оновлюємо статистику
-            updateFilterStats(data.statistics);
-            
-            // Оновлюємо відображення
-            displayFilteredProducts(data.products);
-            
-            console.log('✅ Filters reapplied');
-        }
-    } catch (error) {
-        console.error('❌ Error reapplying filters:', error);
+    const scrollPercentage = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+    
+    // Завантажуємо коли доскролили до 85%
+    if (scrollPercentage > 0.85) {
+        console.log('📜 Filters scroll 85% reached, loading more...');
+        loadFilteredProducts(false);
     }
+}
+
+function showFiltersLoadingIndicator() {
+    const resultsContainer = document.getElementById('searchResults');
+    if (!resultsContainer) return;
+    
+    const oldLoader = document.getElementById('filtersLoadingMore');
+    if (oldLoader) oldLoader.remove();
+    
+    const loader = document.createElement('div');
+    loader.id = 'filtersLoadingMore';
+    loader.style.cssText = 'text-align:center; padding:20px; color:var(--hint-color);';
+    loader.innerHTML = '⏳ Завантаження...';
+    resultsContainer.appendChild(loader);
+}
+
+function hideFiltersLoadingIndicator() {
+    const loader = document.getElementById('filtersLoadingMore');
+    if (loader) loader.remove();
 }
 
 function updateFilterStats(stats) {
@@ -253,7 +288,7 @@ function updateFilterStats(stats) {
     document.getElementById('filterStatsBox').style.display = 'block';
 }
 
-function displayFilteredProducts(products) {
+function displayFilteredProducts(products, isNewFilter = false) {
     const resultsContainer = document.getElementById('searchResults');
     
     if (!products || products.length === 0) {
@@ -276,10 +311,17 @@ function displayFilteredProducts(products) {
     
     // Використовуємо існуючу функцію renderProduct з index.html
     if (typeof window.renderProduct === 'function') {
-        resultsContainer.innerHTML = availableProducts.map(p => window.renderProduct(p)).join('');
+        if (isNewFilter) {
+            resultsContainer.innerHTML = availableProducts.map(p => window.renderProduct(p)).join('');
+        } else {
+            // Додаємо нові товари без перемальовування всього
+            const existingCount = resultsContainer.querySelectorAll('.product-card').length;
+            const newProductsHtml = availableProducts.slice(existingCount).map(p => window.renderProduct(p)).join('');
+            resultsContainer.insertAdjacentHTML('beforeend', newProductsHtml);
+        }
     } else {
         // Fallback рендер
-        resultsContainer.innerHTML = availableProducts.map(p => `
+        const html = availableProducts.map(p => `
             <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
                 <div class="product-header">
                     <span class="product-article">🆔 ${p.article}</span>
@@ -293,10 +335,18 @@ function displayFilteredProducts(products) {
                 </div>
             </div>
         `).join('');
+        
+        if (isNewFilter) {
+            resultsContainer.innerHTML = html;
+        } else {
+            resultsContainer.insertAdjacentHTML('beforeend', html);
+        }
     }
     
-    // Прокручуємо вгору
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Прокручуємо вгору тільки при новому фільтрі
+    if (isNewFilter) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 }
 
 function resetFilters() {
@@ -304,6 +354,10 @@ function resetFilters() {
     filterState.sortBy = 'balance_sum';
     filterState.offset = 0;
     filterState.isActive = false;
+    filterState.hasMore = false;
+    filterState.totalAvailable = 0;
+    
+    filteredProducts = [];
     
     // Скидаємо всі чекбокси
     document.querySelectorAll('#departmentCheckboxes input[type="checkbox"]').forEach(cb => {
@@ -360,7 +414,6 @@ function closeFiltersSidebar() {
     }
 }
 
-
 // Показ/ховаємо floating button в залежності від табу
 function updateFiltersButtonVisibility() {
     const floatingBtn = document.getElementById('filtersFloatingBtn');
@@ -399,10 +452,9 @@ if (typeof window !== 'undefined') {
     window.toggleDepartment = toggleDepartment;
     window.setSortBy = setSortBy;
     window.applyFilters = applyFilters;
-    window.reapplyFilters = reapplyFilters;  // ✅ Експортуємо нову функцію
     window.resetFilters = resetFilters;
     window.updateFiltersButtonVisibility = updateFiltersButtonVisibility;
-    window.filterState = filterState;  // ✅ Експортуємо стан для доступу з інших скриптів
+    window.filterState = filterState;
 }
 
-console.log('🎛️ Filters sidebar component loaded');
+console.log('🎛️ Filters sidebar with infinite scroll loaded');

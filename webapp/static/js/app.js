@@ -116,6 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (DOM.clearCartBtn) {
             DOM.clearCartBtn.addEventListener('click', CartModule.clear);
         }
+        
+        // 🎯 INFINITE SCROLL для пошуку
+        window.addEventListener('scroll', SearchModule.handleScroll);
     }
 
     // ===== МОДУЛЬ ПОШУКУ =====
@@ -134,13 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 SearchModule.currentQuery = query;
                 SearchModule.currentOffset = 0;
                 SearchModule.allProducts = [];
-                SearchModule.removeScrollListener();
                 if (DOM.searchResults) DOM.searchResults.innerHTML = '';
             }
             
             if (query.length < 2) {
                 if (DOM.searchResults) DOM.searchResults.innerHTML = '<div style="text-align:center; padding:20px; color:var(--hint-color);">Введіть мінімум 2 символи для пошуку</div>';
-                SearchModule.removeScrollListener();
                 return;
             }
 
@@ -191,13 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 SearchModule.render();
-                
-                // Налаштовуємо listener ПІСЛЯ рендеру з затримкою для DOM update
-                if (SearchModule.hasMore) {
-                    setTimeout(() => SearchModule.setupScrollListener(), 100);
-                } else {
-                    SearchModule.removeScrollListener();
-                }
             } catch (error) {
                 console.error('❌ Search error:', error);
                 if (DOM.searchResults) {
@@ -238,19 +232,28 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             html += '</div>';
             
-            // Додаємо невидимий div для спостереження за скролом
-            if (SearchModule.hasMore) {
-                html += '<div id="searchScrollSentinel" style="height:20px; background:transparent;"></div>';
-            }
-            
             DOM.searchResults.innerHTML = html;
             
             console.log(`📊 Rendered ${SearchModule.allProducts.length} products total, hasMore=${SearchModule.hasMore}`);
         },
 
+        // 🎯 НОВИЙ SCROLL LISTENER замість IntersectionObserver
+        handleScroll: Utils.debounce(() => {
+            // Працює тільки на вкладці пошуку
+            if (currentTab !== 'search') return;
+            if (!SearchModule.hasMore || SearchModule.isLoading) return;
+            
+            const scrollPercentage = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+            
+            // Завантажуємо коли доскролили до 85% сторінки
+            if (scrollPercentage > 0.85) {
+                console.log('📜 Scroll 85% reached, loading more...');
+                SearchModule.loadMore(false);
+            }
+        }, 200),
+
         showLoadingIndicator: () => {
             if (!DOM.searchResults) return;
-            // Видаляємо старий лоадер якщо є
             const oldLoader = document.getElementById('searchLoadingMore');
             if (oldLoader) oldLoader.remove();
             
@@ -264,53 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
         hideLoadingIndicator: () => {
             const loader = document.getElementById('searchLoadingMore');
             if (loader) loader.remove();
-        },
-
-        setupScrollListener: () => {
-            if (!SearchModule.hasMore) {
-                console.log('⛔ No hasMore, skipping observer setup');
-                SearchModule.removeScrollListener();
-                return;
-            }
-
-            // Використовуємо Intersection Observer для ефективного відстеження
-            const sentinel = document.getElementById('searchScrollSentinel');
-            if (!sentinel) {
-                console.warn('⚠️ Sentinel element not found!');
-                return;
-            }
-
-            // Відключаємо старий observer якщо є
-            if (SearchModule.observer) {
-                SearchModule.observer.disconnect();
-            }
-
-            SearchModule.observer = new IntersectionObserver(
-                (entries) => {
-                    const entry = entries[0];
-                    console.log(`👁️ Observer callback: isIntersecting=${entry.isIntersecting}, isLoading=${SearchModule.isLoading}, hasMore=${SearchModule.hasMore}`);
-                    
-                    if (entry.isIntersecting && !SearchModule.isLoading && SearchModule.hasMore) {
-                        console.log('👀 Sentinel visible, loading more...');
-                        SearchModule.loadMore(false);
-                    }
-                },
-                { 
-                    threshold: 0.1, 
-                    rootMargin: '200px'  // Збільшив до 200px для раннього спрацювання
-                }
-            );
-
-            SearchModule.observer.observe(sentinel);
-            console.log('👁️ Observer attached to sentinel');
-        },
-
-        removeScrollListener: () => {
-            if (SearchModule.observer) {
-                SearchModule.observer.disconnect();
-                SearchModule.observer = null;
-                console.log('🚫 Observer removed');
-            }
         }
     };
 
@@ -333,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await API.client.addToList(userId, productId, quantity);
                 Utils.haptic.success();
                 Utils.showAlert('✅ Додано до списку');
-                if (currentTab === 'cart') CartModule.load(); // Оновлюємо UI, якщо ми вже в кошику
+                if (currentTab === 'cart') CartModule.load();
             } catch (error) {
                 Utils.haptic.error();
                 Utils.showAlert(`❌ Помилка: ${error.message}`);
