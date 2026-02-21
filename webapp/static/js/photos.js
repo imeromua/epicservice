@@ -135,6 +135,7 @@ async function loadPhotoModeration() {
                         <img src="/static/${photo.file_path}" 
                              alt="Фото ${photo.article}"
                              class="moderation-card-thumb"
+                             loading="lazy"
                              onerror="this.src=''; this.alt='✖'">
                         <div class="moderation-card-info">
                             <div class="info-line"><strong>${photo.article}</strong></div>
@@ -169,7 +170,7 @@ function openModerationPopup(photoId, src, article, name, uploadedBy, uploadedAt
                 <div class="moderation-popup-content">
                     <button class="close-btn" onclick="closeModerationPopup()">×</button>
                     <div class="moderation-popup-photo">
-                        <img id="moderationPopupImage" src="" alt="Прев'ю">
+                        <img id="moderationPopupImage" src="" alt="Прев'ю" loading="lazy">
                     </div>
                     <div class="moderation-popup-info" id="moderationPopupInfo"></div>
                     <div class="moderation-popup-actions">
@@ -349,6 +350,7 @@ function createPhotoGallery(product) {
                  alt="Фото товару"
                  class="product-photo"
                  id="currentPhoto"
+                 loading="lazy"
                  onclick="fullscreenPhoto(event)">
             <div class="photo-nav">
                 ${hasMultiple ? `<button class="photo-nav-btn" onclick="previousPhoto(event)">◄</button>` : ''}
