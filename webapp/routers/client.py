@@ -105,10 +105,9 @@ async def search_products(req: SearchRequest):
                 total_quantity = 0.0
             
             # Отримуємо резерв користувача
-	    user_reserved_qty = user_reserved.get(product.id, 0)
+            user_reserved_qty = user_reserved.get(product.id, 0)
 
             # Доступна кількість = загальна - загальний резерв - резерв користувача
-            
             available = total_quantity - product.відкладено - user_reserved_qty
 
             user_reserved_sum = user_reserved_qty * float(product.ціна)
