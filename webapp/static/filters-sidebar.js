@@ -220,17 +220,25 @@ function displayFilteredProducts(products) {
         return;
     }
     
+    // ✅ ФІЛЬТРУЄМО ТІЛЬКИ ДОСТУПНІ ТОВАРИ (available > 0)
+    const availableProducts = products.filter(p => p.available > 0);
+    
+    if (availableProducts.length === 0) {
+        resultsContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Всі товари зарезервовані або закінчились</div>';
+        return;
+    }
+    
     // Оновлюємо cachedProducts для сумісності з існуючим renderProduct
     if (typeof window.cachedProducts !== 'undefined') {
-        window.cachedProducts = products;
+        window.cachedProducts = availableProducts;
     }
     
     // Використовуємо існуючу функцію renderProduct з index.html
     if (typeof window.renderProduct === 'function') {
-        resultsContainer.innerHTML = products.map(p => window.renderProduct(p)).join('');
+        resultsContainer.innerHTML = availableProducts.map(p => window.renderProduct(p)).join('');
     } else {
         // Fallback рендер
-        resultsContainer.innerHTML = products.map(p => `
+        resultsContainer.innerHTML = availableProducts.map(p => `
             <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
                 <div class="product-header">
                     <span class="product-article">🆔 ${p.article}</span>
