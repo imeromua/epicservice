@@ -185,9 +185,13 @@ function openModerationPopup(photoId, src, article, name, uploadedBy, uploadedAt
     
     document.getElementById('moderationPopupImage').src = src;
     document.getElementById('moderationPopupInfo').innerHTML = `
-        <strong>${article}</strong> — ${name}<br>
-        👤 ${uploadedBy} • 📅 ${uploadedAt}<br>
-        💾 ${(fileSize / 1024).toFixed(0)} KB
+        <div style="font-size:15px; font-weight:700; margin-bottom:4px">${article}</div>
+        <div style="font-size:13px; opacity:0.85; margin-bottom:8px">${name}</div>
+        <div style="display:flex; gap:12px; font-size:12px; opacity:0.6; flex-wrap: wrap">
+            <span>👤 ${uploadedBy}</span>
+            <span>📅 ${uploadedAt}</span>
+            <span>💾 ${(fileSize / 1024).toFixed(0)} KB</span>
+        </div>
     `;
     
     modal.classList.add('active');
