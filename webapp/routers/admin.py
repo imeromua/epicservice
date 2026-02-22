@@ -263,7 +263,7 @@ async def get_active_users(user_id: int = Query(...)):
             if item.user_id not in user_data:
                 user_info = users_info.get(item.user_id, {})
                 display_name = (
-                    f"@{user_info.get('username')}" if user_info.get('username')
+                    user_info.get('username') if user_info.get('username')
                     else user_info.get('first_name', f"User {item.user_id}")
                 )
                 
@@ -741,7 +741,7 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
             # Формуємо display name
             user_info = users_info.get(uid, {})
             display_name = (
-                f"@{user_info.get('username')}" if user_info.get('username')
+                user_info.get('username') if user_info.get('username')
                 else user_info.get('first_name', f"User {uid}")
             )
             
