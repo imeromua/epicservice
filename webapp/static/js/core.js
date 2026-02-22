@@ -1,0 +1,61 @@
+// EpicService - Core Module
+// Global state and utilities
+
+let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
+var cachedProducts = [];
+let currentDepartment = null;
+let pullStartY = 0, pulling = false;
+let selectedFile = null;
+let cachedProductsInfo = null;
+
+// Show admin tab if user is admin
+if (isAdmin) {
+    const adminBtn = document.getElementById('adminTabBtn');
+    if (adminBtn) adminBtn.classList.remove('hidden');
+}
+
+// Update functions
+function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
+function updateSearchBoxVisibility() { const searchBox = document.getElementById('searchBoxContainer'); if (currentTab === 'search') { searchBox.style.display = 'block'; } else { searchBox.style.display = 'none'; } }
+
+function updateDepartmentInfo(department, count) {
+    currentDepartment = department;
+    const info = document.getElementById('departmentInfo');
+    if (department !== null && count > 0) {
+        document.getElementById('currentDepartment').textContent = department;
+        document.getElementById('itemCount').textContent = count;
+        info.classList.add('active');
+    } else {
+        info.classList.remove('active');
+    }
+    
+    if (cachedProducts.length > 0) {
+        cachedProducts.forEach(p => {
+            p.is_different_department = (department !== null && p.department !== department);
+            p.current_list_department = department;
+        });
+        updateSearchResults();
+    }
+}
+
+function switchTab(tab) { 
+    currentTab = tab; 
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
+    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminContent']}; 
+    const [idx, id] = tabs[tab]; 
+    document.querySelectorAll('.tab')[idx].classList.add('active'); 
+    document.getElementById(id).classList.add('active'); 
+    updateSearchBoxVisibility(); 
+    
+    if (typeof updateFiltersButtonVisibility === 'function') {
+        updateFiltersButtonVisibility();
+    }
+    
+    if (tab === 'list') loadList(); 
+    if (tab === 'archives') loadArchives(); 
+    if (tab === 'admin' && isAdmin) loadAdminData();
+}
+
+function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
+function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }

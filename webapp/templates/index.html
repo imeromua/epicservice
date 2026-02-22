@@ -210,7 +210,12 @@ const userId = tg.initDataUnsafe?.user?.id || 0;
 const ADMIN_IDS = {{ admin_ids | tojson }};
 const isAdmin = ADMIN_IDS.includes(userId);
 </script>
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/core.js"></script>
+    <script src="/static/js/search.js"></script>
+    <script src="/static/js/list.js"></script>
+    <script src="/static/js/archives.js"></script>
+    <script src="/static/js/admin.js"></script>
+    <script src="/static/js/init.js"></script>
 </script>
 </body>
 </html>
