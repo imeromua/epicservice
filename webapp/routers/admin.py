@@ -262,10 +262,18 @@ async def get_active_users(user_id: int = Query(...)):
         for item in temp_list_items:
             if item.user_id not in user_data:
                 user_info = users_info.get(item.user_id, {})
-                display_name = (
-                    user_info.get('username') if user_info.get('username')
-                    else user_info.get('first_name', f"User {item.user_id}")
-                )
+                # Формуємо комбо: Ім'я (@username)
+                first_name = user_info.get('first_name', '')
+                username = user_info.get('username', '')
+                
+                if first_name and username:
+                    display_name = f"{first_name} (@{username})"
+                elif first_name:
+                    display_name = first_name
+                elif username:
+                    display_name = f"@{username}"
+                else:
+                    display_name = f"User {item.user_id}"
                 
                 user_data[item.user_id] = {
                     "user_id": item.user_id,
@@ -740,10 +748,18 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
             
             # Формуємо display name
             user_info = users_info.get(uid, {})
-            display_name = (
-                user_info.get('username') if user_info.get('username')
-                else user_info.get('first_name', f"User {uid}")
-            )
+            # Формуємо комбо: Ім'я (@username)
+            first_name = user_info.get('first_name', '')
+            username = user_info.get('username', '')
+            
+            if first_name and username:
+                display_name = f"{first_name} (@{username})"
+            elif first_name:
+                display_name = first_name
+            elif username:
+                display_name = f"@{username}"
+            else:
+                display_name = f"User {uid}"
             
             users_data.append({
                 "user_id": uid,
