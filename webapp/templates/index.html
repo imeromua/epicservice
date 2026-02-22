@@ -775,7 +775,7 @@ function renderProduct(p) {
     const lockedClass = isLocked ? ' locked' : '';
     const statusClass = isLocked ? ' locked' : '';
     const statusText = isLocked ? '🔒 Заблоковано' : '✅ Знайдено';
-    const clickHandler = isLocked ? `onclick=\"showLockedAlert(${p.current_list_department})\"` : `onclick='openModalWithPhotos(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
+    const clickHandler = isLocked ? `onclick=\"showLockedAlert('${p.current_list_department}')\"` : `onclick='openModalWithPhotos(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
     const hasPhotos = p.photos && p.photos.length > 0;
     const photoIndicator = hasPhotos ? `<span class=\"photo-badge photo-badge-inline\">📷 ${p.photos.length}</span>` : '';
     
@@ -855,11 +855,24 @@ async function confirmAdd() {
             tg.showAlert(`✅ ${d.message}`); 
             closeModal(); 
             
+            const scrollPos = window.scrollY; // Зберігаємо позицію скролу
+            
+            // Оновлюємо основний кеш
             const productIndex = cachedProducts.findIndex(p => p.id === selectedProduct.id);
             if (productIndex !== -1) {
                 cachedProducts[productIndex].user_reserved += currentQuantity;
                 cachedProducts[productIndex].user_reserved_sum += currentQuantity * selectedProduct.price;
                 cachedProducts[productIndex].available -= currentQuantity;
+                
+                // Якщо є фільтри - оновлюємо також і їхній кеш, щоб відображалося миттєво
+                if (typeof window.filteredProducts !== 'undefined') {
+                    const fi = window.filteredProducts.findIndex(p => p.id === selectedProduct.id);
+                    if (fi !== -1) {
+                        window.filteredProducts[fi].available -= currentQuantity;
+                        window.filteredProducts[fi].user_reserved += currentQuantity;
+                        window.filteredProducts[fi].user_reserved_sum += currentQuantity * selectedProduct.price;
+                    }
+                }
             }
             
             const listResponse = await fetch(`/api/list/${userId}`);
@@ -868,8 +881,25 @@ async function confirmAdd() {
             const deptResponse = await fetch(`/api/list/department/${userId}`);
             const deptData = await deptResponse.json();
             
+            // Оновлюємо інтерфейс
             updateDepartmentInfo(deptData.department, listData.count || 0);
             updateListBadge(listData.count || 0);
+            
+            // Примусово оновлюємо DOM саме цього товару (щоб не втрачати фокус)
+            const card = document.querySelector(`.product-card[data-product-id="${selectedProduct.id}"]`);
+            if (card && productIndex !== -1) {
+                const p = cachedProducts[productIndex];
+                // Заміна вмісту картки без повного ререндеру списку
+                card.outerHTML = renderProduct(p);
+            } else if (typeof renderFilteredProducts === 'function' && window.filteredProducts) {
+                renderFilteredProducts(); // Перемалювати з урахуванням фільтрів, якщо є
+            } else {
+                updateSearchResults(); // Стандартна перемальовка
+            }
+
+            // Відновлюємо скрол
+            requestAnimationFrame(() => window.scrollTo(0, scrollPos));
+            
         } else { 
             tg.showAlert('❌ ' + d.message); 
         } 
