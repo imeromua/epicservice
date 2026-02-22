@@ -250,13 +250,26 @@ async def get_active_users(user_id: int = Query(...)):
         active_users_raw = await orm_get_users_with_active_lists()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
         
+        # Витягуємо username/first_name з БД
+        async with async_session() as session:
+            result = await session.execute(
+                text("SELECT id, username, first_name FROM users")
+            )
+            users_info = {row[0]: {"username": row[1], "first_name": row[2]} for row in result.fetchall()}
+        
         # Групуємо по користувачах
         user_data = {}
         for item in temp_list_items:
             if item.user_id not in user_data:
+                user_info = users_info.get(item.user_id, {})
+                display_name = (
+                    f"@{user_info.get('username')}" if user_info.get('username')
+                    else user_info.get('first_name', f"User {item.user_id}")
+                )
+                
                 user_data[item.user_id] = {
                     "user_id": item.user_id,
-                    "username": f"User {item.user_id}",
+                    "username": display_name,
                     "department": None,
                     "items_count": 0,
                     "total_sum": 0.0
@@ -684,6 +697,13 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
         loop = asyncio.get_running_loop()
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
         
+        # Витягуємо username/first_name з БД
+        async with async_session() as session:
+            result = await session.execute(
+                text("SELECT id, username, first_name FROM users")
+            )
+            users_info = {row[0]: {"username": row[1], "first_name": row[2]} for row in result.fetchall()}
+        
         users_data = []
         archives_dir = os.path.join(ARCHIVES_PATH, "active")
         
@@ -718,9 +738,16 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
                         except Exception as e:
                             logger.warning(f"Не вдалося прочитати {filename}: {e}")
             
+            # Формуємо display name
+            user_info = users_info.get(uid, {})
+            display_name = (
+                f"@{user_info.get('username')}" if user_info.get('username')
+                else user_info.get('first_name', f"User {uid}")
+            )
+            
             users_data.append({
                 "user_id": uid,
-                "username": f"User {uid}",
+                "username": display_name,
                 "archives_count": archives_count,
                 "total_amount": round(total_amount, 2),
                 "last_activity": last_activity
