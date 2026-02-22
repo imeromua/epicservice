@@ -170,8 +170,10 @@ async def filter_products(req: FilterProductsRequest):
         print(f"🎛️ Filter request: user_id={req.user_id}, departments={req.departments}, sort_by={req.sort_by}, offset={req.offset}, limit={req.limit}")
         
         async with async_session() as session:
-            # Базовий запит - виправлено приведення типу для PostgreSQL
-            query = select(Product).where(cast(Product.кількість, Float) > 0)
+            # Базовий запит - рахуємо тільки товари, де є ДОСТУПНИЙ залишок (кількість - відкладено > 0)
+            query = select(Product).where(
+                (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0
+            )
             
             # Фільтр по відділах (якщо вказано) - конвертуємо рядки в числа
             if req.departments:
@@ -209,14 +211,16 @@ async def filter_products(req: FilterProductsRequest):
             # Отримуємо відділ поточного списку
             current_department = await orm_get_temp_list_department(req.user_id)
             
-            # Статистика по фільтру - приведення типів для PostgreSQL
+            # Статистика по фільтру
             stats_query = select(
                 func.count(Product.id).label('total_articles'),
                 func.sum(Product.сума_залишку).label('total_sum'),
                 func.sum(cast(Product.кількість, Float)).label('total_quantity')
-            ).where(cast(Product.кількість, Float) > 0)
+            ).where(
+                (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0
+            )
             
-            # Фільтр по відділах для статистики - конвертуємо рядки в числа
+            # Фільтр по відділах для статистики
             if req.departments:
                 stats_query = stats_query.where(Product.відділ.in_(dept_integers))
             
@@ -297,12 +301,12 @@ async def get_departments():
     """
     try:
         async with async_session() as session:
-            # Виправлено приведення типу для PostgreSQL + виключаємо відділ 0
+            # Виключаємо відділ 0 та рахуємо тільки товари, де доступна кількість > 0
             query = select(
                 Product.відділ,
                 func.count(Product.id).label('count')
             ).where(
-                cast(Product.кількість, Float) > 0,
+                (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0,
                 Product.відділ != 0,  # виключаємо відділ 0
                 Product.відділ.isnot(None)  # виключаємо NULL
             ).group_by(Product.відділ).order_by(Product.відділ)
@@ -315,7 +319,7 @@ async def get_departments():
                 for dept in departments
             ]
             
-            print(f"📊 Returning {len(dept_list)} departments (filtered out dept 0)")
+            print(f"📊 Returning {len(dept_list)} departments (filtered out dept 0 and fully reserved items)")
             return JSONResponse(content={"departments": dept_list}, status_code=200)
             
     except Exception as e:
