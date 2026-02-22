@@ -1,7 +1,7 @@
 // 🔧 UI Update Fix
 // Патч для оновлення відображення після резервування товару
+// Зберігає позицію скролу та не скидає фільтри
 
-// Перевизначаємо confirmAdd з підтримкою оновлення UI
 window.confirmAdd = async function() {
     try {
         const r = await fetch('/api/add', {
@@ -20,7 +20,10 @@ window.confirmAdd = async function() {
             tg.showAlert(`✅ ${d.message}`);
             closeModal();
 
-            // Оновлюємо дані в cachedProducts
+            // 📌 1. Запам'ятовуємо позицію скролу
+            const currentScrollPos = window.scrollY;
+
+            // 2. Оновлюємо дані в cachedProducts локально
             const productIndex = cachedProducts.findIndex(p => p.id === selectedProduct.id);
             if (productIndex !== -1) {
                 cachedProducts[productIndex].user_reserved += currentQuantity;
@@ -28,45 +31,29 @@ window.confirmAdd = async function() {
                 cachedProducts[productIndex].available -= currentQuantity;
             }
 
-            // Оновлюємо бейдж і інфо про відділ
+            // 3. Оновлюємо бейдж і інфо про відділ з сервера
             const listResponse = await fetch(`/api/list/${userId}`);
             const listData = await listResponse.json();
 
             const deptResponse = await fetch(`/api/list/department/${userId}`);
             const deptData = await deptResponse.json();
 
+            // updateDepartmentInfo оновлює блокування відділів і викликає updateSearchResults()
+            // Це повністю перемалює поточні картки (пошук або фільтр) БЕЗ повторного запиту на сервер
             updateDepartmentInfo(deptData.department, listData.count || 0);
             updateListBadge(listData.count || 0);
 
-            // ✅ ОНОВЛЮЄМО UI ЗІ ЗБЕРЕЖЕННЯМ ФІЛЬТРІВ
-            if (typeof window.filterState !== 'undefined' && window.filterState.isActive) {
-                console.log('🎛️ Refreshing filtered results after add...');
-
-                try {
-                    // Якщо є спеціальна функція — використовуємо її
-                    if (typeof window.reapplyFilters === 'function') {
-                        await window.reapplyFilters();
-                    }
-                    // Інакше — напряму перезавантажуємо першу сторінку фільтра (зберігаємо сам фільтр)
-                    else if (typeof window.loadFilteredProducts === 'function') {
-                        window.filterState.offset = 0;
-                        await window.loadFilteredProducts(true);
-                    }
-                    // Fallback
-                    else {
-                        console.warn('⚠️ Filters API not available, using updateSearchResults fallback');
-                        updateSearchResults();
-                    }
-                } catch (e) {
-                    console.warn('⚠️ Failed to refresh filtered results, using fallback:', e);
-                    updateSearchResults();
-                }
-            } else {
-                console.log('🔍 Refreshing search results after add...');
-                updateSearchResults();
+            // Якщо раптом updateDepartmentInfo не викликав updateSearchResults
+            if (!cachedProducts || cachedProducts.length === 0) {
+                if (typeof updateSearchResults === 'function') updateSearchResults();
             }
 
-            console.log('✅ UI refreshed after adding product');
+            // 📌 4. Відновлюємо скрол миттєво після оновлення DOM
+            requestAnimationFrame(() => {
+                window.scrollTo(0, currentScrollPos);
+            });
+
+            console.log('✅ UI refreshed in-place, scroll preserved at:', currentScrollPos);
         } else {
             tg.showAlert('❌ ' + d.message);
         }
@@ -75,4 +62,4 @@ window.confirmAdd = async function() {
     }
 };
 
-console.log('🔧 UI update fix loaded');
+console.log('🔧 UI update fix loaded (with smooth scroll preservation)');
