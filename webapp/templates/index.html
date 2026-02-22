@@ -903,10 +903,117 @@ async function confirmAdd() {
 function openEditModal(item) { editingItem = item; editQuantity = item.quantity; document.getElementById('editModalTitle').textContent = item.article; document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`; document.getElementById('editQtyDisplay').textContent = editQuantity; document.getElementById('editModal').classList.add('active'); }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
 function changeEditQty(d) { editQuantity = Math.max(1, editQuantity + d); document.getElementById('editQtyDisplay').textContent = editQuantity; }
-async function confirmUpdate() { try { const r = await fetch('/api/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id, quantity: editQuantity}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
-async function confirmDelete() { if (!confirm('Видалити товар зі списку?')) return; try { const r = await fetch('/api/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); closeEditModal(); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function confirmUpdate() { 
+    const oldQuantity = editingItem.quantity;
+    try { 
+        const r = await fetch('/api/update', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({user_id: userId, product_id: editingItem.product_id, quantity: editQuantity}) 
+        }); 
+        const d = await r.json(); 
+        if (d.success) { 
+            tg.showAlert(`✅ ${d.message}`); 
+            closeEditModal();
+            
+            const productIndex = cachedProducts.findIndex(p => p.id === editingItem.product_id);
+            if (productIndex !== -1) {
+                const quantityDiff = editQuantity - oldQuantity;
+                cachedProducts[productIndex].user_reserved += quantityDiff;
+                cachedProducts[productIndex].user_reserved_sum += quantityDiff * editingItem.price;
+                cachedProducts[productIndex].available -= quantityDiff;
+                
+                const card = document.querySelector(`.product-card[data-product-id="${editingItem.product_id}"]`);
+                if (card) {
+                    if (cachedProducts[productIndex].available <= 0) {
+                        card.remove();
+                    } else {
+                        card.outerHTML = renderProduct(cachedProducts[productIndex]);
+                    }
+                } else if (!window.filterState || !window.filterState.isActive) {
+                    updateSearchResults();
+                }
+            }
+            
+            loadList(); 
+        } else { 
+            tg.showAlert('❌ ' + d.message); 
+        } 
+    } catch (e) { 
+        tg.showAlert('❌ ' + e.message); 
+    } 
+}
+async function confirmDelete() { 
+    if (!confirm('Видалити товар зі списку?')) return; 
+    try { 
+        const r = await fetch('/api/delete', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({user_id: userId, product_id: editingItem.product_id}) 
+        }); 
+        const d = await r.json(); 
+        if (d.success) { 
+            tg.showAlert(`✅ ${d.message}`); 
+            closeEditModal();
+            
+            const productIndex = cachedProducts.findIndex(p => p.id === editingItem.product_id);
+            if (productIndex !== -1) {
+                cachedProducts[productIndex].available += editingItem.quantity;
+                cachedProducts[productIndex].user_reserved -= editingItem.quantity;
+                cachedProducts[productIndex].user_reserved_sum -= editingItem.quantity * editingItem.price;
+                
+                const card = document.querySelector(`.product-card[data-product-id="${editingItem.product_id}"]`);
+                if (card) {
+                    card.outerHTML = renderProduct(cachedProducts[productIndex]);
+                } else if (!window.filterState || !window.filterState.isActive) {
+                    updateSearchResults();
+                }
+            }
+            
+            loadList(); 
+        } else { 
+            tg.showAlert('❌ ' + d.message); 
+        } 
+    } catch (e) { 
+        tg.showAlert('❌ ' + e.message); 
+    } 
+}
 async function saveList() { try { const r = await fetch(`/api/save/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.HapticFeedback.notificationOccurred('success'); if (d.cleared) { loadList(); updateDepartmentInfo(null, 0); } document.getElementById('successModal').classList.add('active'); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
-async function clearList() { if (!confirm('Очистити весь список?')) return; try { const r = await fetch(`/api/clear/${userId}`, { method: 'POST' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); updateDepartmentInfo(null, 0); loadList(); } else { tg.showAlert('❌ ' + d.message); } } catch (e) { tg.showAlert('❌ ' + e.message); } }
+async function clearList() { 
+    if (!confirm('Очистити весь список?')) return; 
+    try { 
+        const r = await fetch(`/api/clear/${userId}`, { method: 'POST' }); 
+        const d = await r.json(); 
+        if (d.success) { 
+            tg.showAlert(`✅ ${d.message}`); 
+            updateDepartmentInfo(null, 0);
+            
+            cachedProducts.forEach(p => {
+                p.available += (p.user_reserved || 0);
+                p.user_reserved = 0;
+                p.user_reserved_sum = 0;
+            });
+            
+            if (!window.filterState || !window.filterState.isActive) {
+                updateSearchResults();
+            } else {
+                document.querySelectorAll('.product-card').forEach(card => {
+                    const productId = parseInt(card.getAttribute('data-product-id'));
+                    const product = cachedProducts.find(p => p.id === productId);
+                    if (product) {
+                        card.outerHTML = renderProduct(product);
+                    }
+                });
+            }
+            
+            loadList(); 
+        } else { 
+            tg.showAlert('❌ ' + d.message); 
+        } 
+    } catch (e) { 
+        tg.showAlert('❌ ' + e.message); 
+    } 
+}
 async function loadList() { const el = document.getElementById('listContent'); el.innerHTML = '<div class="loader">⌛ Завантаження...</div>'; try { const r = await fetch(`/api/list/${userId}`); const d = await r.json(); if (!d.items || d.items.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Список порожній</div>'; document.getElementById('totalBox').style.display = 'none'; updateListBadge(0); updateDepartmentInfo(null, 0); return; } const deptR = await fetch(`/api/list/department/${userId}`); const deptD = await deptR.json(); updateDepartmentInfo(deptD.department, d.count); let html = '<div class="action-buttons"><button class="save-btn" onclick="saveList()">💾 Зберегти</button><button class="clear-btn" onclick="clearList()">🗑️ Очистити</button></div>'; html += d.items.map(item => `<div class="list-item" onclick='openEditModal(${JSON.stringify(item)})'><div class="list-header"><strong>${item.article}</strong><span>${item.total.toFixed(2)} грн</span></div><div>${item.name}</div><div style="margin-top:8px;color:var(--hint-color)">${item.quantity} шт. × ${item.price.toFixed(2)} грн</div></div>`).join(''); el.innerHTML = html; document.getElementById('totalSum').textContent = d.total.toFixed(2); document.getElementById('totalItems').textContent = d.count; document.getElementById('totalBox').style.display = 'flex'; updateListBadge(d.count); } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>'; updateListBadge(0); updateDepartmentInfo(null, 0); } }
 
 async function loadStatistics() {
