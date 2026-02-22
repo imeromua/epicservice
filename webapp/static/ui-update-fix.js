@@ -40,6 +40,11 @@ window.confirmAdd = async function() {
                     if (!targetProduct) targetProduct = filteredProducts[idx];
                 }
             }
+            
+            // Оновлюємо selectedProduct, щоб при наступному кліку були свіжі дані
+            if (targetProduct) {
+                selectedProduct = { ...targetProduct };
+            }
 
             // 2. Отримуємо нові дані списку з сервера (лише шапка)
             const listResponse = await fetch(`/api/list/${userId}`);
@@ -67,12 +72,12 @@ window.confirmAdd = async function() {
             }
 
             // 4. ТОЧКОВЕ ОНОВЛЕННЯ DOM (IN-PLACE)
-            // Знаходимо всі картки на екрані і оновлюємо їх без перезавантаження контейнера
+            // Знаходимо всі картки на екрані і оновлюємо їх
             const cards = document.querySelectorAll('.product-card');
             let foundAny = false;
 
             cards.forEach(card => {
-                // Витягуємо ID товару
+                // Витягуємо ID товару з onclick, бо data-атрибутів може не бути
                 let pid = card.dataset.productId;
                 if (!pid) {
                     const onclickStr = card.getAttribute('onclick') || '';
@@ -106,7 +111,9 @@ window.confirmAdd = async function() {
                     const tempDiv = document.createElement('div');
                     tempDiv.innerHTML = newHtml;
                     const newCard = tempDiv.firstElementChild;
+                    
                     if (newCard) {
+                        // Важливо: ми оновлюємо outerHTML або replaceWith, але зберігаємо onclick
                         card.replaceWith(newCard);
                     }
                 }
@@ -129,4 +136,4 @@ window.confirmAdd = async function() {
     }
 };
 
-console.log('🔧 UI update fix loaded (True In-Place DOM Strategy)');
+console.log('🔧 UI update fix loaded (True In-Place DOM Strategy v2)');
