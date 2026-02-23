@@ -61,10 +61,10 @@
             <input type="text" id="searchInput" class="search-input" placeholder="Введіть артикул або назву...">
         </div>
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('search')">🔍 Пошук</button>
-            <button class="tab" onclick="switchTab('list')">📋 Список<span class="tab-badge" id="listBadge" style="display:none">0</span></button>
-            <button class="tab" onclick="switchTab('archives')">📁 Архів</button>
-            <button class="tab hidden" id="adminTabBtn" onclick="switchTab('admin')">🛠️ Адмін</button>
+            <button class="tab active" onclick="switchTab('search')">&#128269; Пошук</button>
+            <button class="tab" onclick="switchTab('list')">&#128203; Список<span class="tab-badge" id="listBadge" style="display:none">0</span></button>
+            <button class="tab" onclick="switchTab('archives')">&#128193; Архів</button>
+            <button class="tab hidden" id="adminTabBtn" onclick="switchTab('admin')">&#128295;&#65039; Адмін</button>
         </div>
     </div>
 
@@ -151,7 +151,7 @@
         </div>
     </div>
 
-    <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
+    <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі &quot;Архів&quot;</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
     <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
     <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
     <div id="statsModal" class="modal"><div class="modal-content" id="statsModalContent"></div></div>
@@ -189,14 +189,14 @@
   window.addEventListener('online', () => {
     if (offlineIndicator) {
       offlineIndicator.classList.remove('show');
-      console.log('[✅] Z\'\u0454dnanna vidnovleno');
+      console.log('[✅] З\'\u0454днання відновлено');
     }
   });
   
   window.addEventListener('offline', () => {
     if (offlineIndicator) {
       offlineIndicator.classList.add('show');
-      console.log('[⚠️] Vtracheno z\'\u0454dnannya');
+      console.log('[⚠️] Втрачено з\'\u0454днання');
     }
   });
   
