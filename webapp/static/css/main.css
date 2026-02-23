@@ -30,9 +30,10 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     background: var(--bg-color); 
     color: var(--text-color); 
-    /* Відступ знизу, щоб контент не перекривався кнопками Telegram або PWA інсталятором */
+    /* Telegram сам управляє safe area всередині WebView */
+    padding-top: 0;
+    /* Відступ знизу, щоб контент не перекривався навігаційними кнопками Telegram */
     padding-bottom: 90px;
-    padding-top: env(safe-area-inset-top);
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-font-smoothing: antialiased;
 }
