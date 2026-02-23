@@ -1,7 +1,7 @@
 {
   "name": "Epic Service",
   "short_name": "EpicService",
-  "description": "Система обліку та замовлення запчастин",
+  "description": "Корпоративний застосунок складського обліку Х016. Облік товарів без руху, резервування та фотофіксація.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e293b",
@@ -80,7 +80,7 @@
       "name": "Відкрити в Telegram",
       "short_name": "Telegram",
       "description": "Відкрити повну версію в Telegram",
-      "url": "https://t.me/your_bot_name/app",
+      "url": "https://t.me/epic016_bot/app",
       "icons": [
         {
           "src": "/static/icons/icon-192x192.png",
@@ -89,9 +89,9 @@
       ]
     },
     {
-      "name": "Пошук запчастин",
+      "name": "Пошук товарів",
       "short_name": "Пошук",
-      "description": "Швидкий пошук запчастин",
+      "description": "Швидкий пошук товарів без руху",
       "url": "/?action=search",
       "icons": [
         {
