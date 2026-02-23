@@ -7,6 +7,35 @@
 
 ---
 
+## [2.1.0] - 2026-02-23
+
+### 🔧 Changed (Refactoring & Cleanup)
+
+#### PWA / Service Worker
+- 🔄 **SW Cache bump** — версія кешу піднята з `v1.0.1` до `v1.1.0`
+  (`CACHE_NAME` та `RUNTIME_CACHE` в `sw.js`) для гарантованого оновлення
+  на всіх клієнтах після рефакторингу ассетів
+
+#### Static Files Structure
+- 📁 **Переміщено до `static/js/`** — `pwa-redirect.js`, `pwa-install.js`, `filters-sidebar.js`
+- 🎨 **Переміщено до `static/css/`** — `pwa-styles.css`, `filters-sidebar.css`
+- 🔗 **Оновлено посилання** в `webapp/templates/index.html` — всі шляхи приведені
+  до єдиного стандарту (`/static/css/` та `/static/js/`)
+- 🗑️ **Видалено дублі** з кореня `static/` після переміщення
+
+#### Fixes (поточна сесія)
+- 🐛 **main.py** — виправлено відсутній `if __name__ == "__main__"` блок
+- 🐛 **index.html** — виправлено оновлення залишків/резервів при редагуванні,
+  видаленні та очищенні списку (кеш `cachedProducts` синхронізується миттєво)
+- 🐛 **filters** — фільтри більше не зникають після додавання товару до списку
+- 🐛 **sw.js precache** — додано основні CSS/JS ассети до `PRECACHE_URLS`
+
+### 🗑️ Removed
+- 🗑️ **`debug_archives.py`** — debug-скрипт видалено з кореня проекту
+- 🗑️ **`webapp/update-html.py`** — dev-утиліта видалена (не потрібна в production)
+
+---
+
 ## [2.0.0] - 2026-02-19
 
 ### ✨ Added (New Features)
