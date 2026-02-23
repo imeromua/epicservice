@@ -7,7 +7,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F4E6;</text></svg>">
     
     <!-- PWA Detection and Telegram Integration (MUST BE FIRST!) -->
-    <script src="/static/pwa-redirect.js"></script>
+    <script src="/static/js/pwa-redirect.js"></script>
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#3b82f6">
@@ -26,13 +26,13 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-192x192.png">
 
     <!-- PWA Styles -->
-    <link rel="stylesheet" href="/static/pwa-styles.css">
+    <link rel="stylesheet" href="/static/css/pwa-styles.css">
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <!-- Filters Sidebar -->
-    <link rel="stylesheet" href="/static/filters-sidebar.css">
-    <script src="/static/filters-sidebar.js"></script>
+    <link rel="stylesheet" href="/static/css/filters-sidebar.css">
+    <script src="/static/js/filters-sidebar.js"></script>
 
     <!-- Photo styles (v2 - cache bust) -->
     <link rel="stylesheet" href="/static/css/photos.css?v=2">
@@ -138,7 +138,7 @@
                     <div class="danger-zone-title">Danger Zone</div>
                 </div>
                 <div class="danger-warning">
-                    <strong>⚠️ Увага!</strong> Ці дії незворотні та можуть призвести до втрати даних. Переконайтеся, що ви розумієте наслідки перед виконанням будь-якої операції.
+                    <strong>⚠️ Увага!</strong> Ці дії незворотні та можуть призвести до втрати даних.
                 </div>
                 <div class="action-buttons" style="flex-direction: column;">
                     <button class="btn btn-danger" onclick="clearDatabase()">🗑️ Очистити БД (всі товари)</button>
@@ -180,7 +180,7 @@
 </div>
 
 <!-- PWA Scripts -->
-<script src="/static/pwa-install.js"></script>
+<script src="/static/js/pwa-install.js"></script>
 
 <!-- Offline/Online Detection -->
 <script>
@@ -189,14 +189,14 @@
   window.addEventListener('online', () => {
     if (offlineIndicator) {
       offlineIndicator.classList.remove('show');
-      console.log('[✅] З\'\u0454днання відновлено');
+      console.log('[✅] Z\'\u0454dnanna vidnovleno');
     }
   });
   
   window.addEventListener('offline', () => {
     if (offlineIndicator) {
       offlineIndicator.classList.add('show');
-      console.log('[⚠️] Втрачено з\'\u0454днання');
+      console.log('[⚠️] Vtracheno z\'\u0454dnannya');
     }
   });
   
