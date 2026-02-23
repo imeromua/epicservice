@@ -7,32 +7,57 @@
 
 ---
 
+## [2.2.0] - 2026-02-23
+
+### 🗑️ Removed — PWA повністю видалено
+
+#### Причина
+> Telegram Mini App потребує `window.Telegram.WebApp` для авторизації користувача. Без Telegram-контексту
+> `userId` завжди = 0, а додаток працював лише як редирект на `t.me/epic016_bot/webapp`.
+> PWA без авторизації = мертвий функціонал. Додаток повинен працювати тільки всередині Telegram.
+
+#### Видалені файли
+- 🗑️ `webapp/static/sw.js` — Service Worker
+- 🗑️ `webapp/static/manifest.json` — PWA manifest
+- 🗑️ `webapp/static/css/pwa-styles.css` — стилі банеру встановки, офлайн-індикатора, анімацій
+- 🗑️ `webapp/static/js/pwa-redirect.js` — редирект на Telegram
+- 🗑️ `webapp/static/js/pwa-install.js` — логіка встановки PWA
+
+#### Видалено з `index.html`
+- Скрипт `pwa-redirect.js` (з позначкою `MUST BE FIRST`)
+- PWA Meta Tags: `theme-color`, `mobile-web-app-capable`, `apple-mobile-web-app-*`
+- `<link rel="manifest">`
+- Apple touch icon та PNG icon лінки
+- `<link rel="stylesheet" href="pwa-styles.css">`
+- PWA Install Banner `div`
+- Offline Indicator `div`
+- `<script src="pwa-install.js">`
+- Offline/Online Detection `<script>` блок
+
+### 📈 Результат
+- `index.html` зменшився на ~60 рядків
+- Прибрано 5 файлів / ~500 рядків мертвого коду
+- Додаток запускається виключно в Telegram WebApp контексті
+
+---
+
 ## [2.1.0] - 2026-02-23
 
 ### 🔧 Changed (Refactoring & Cleanup)
 
 #### PWA / Service Worker
 - 🔄 **SW Cache bump** — версія кешу піднята з `v1.0.1` до `v1.1.0`
-  (`CACHE_NAME` та `RUNTIME_CACHE` в `sw.js`) для гарантованого оновлення
-  на всіх клієнтах після рефакторингу ассетів
 
 #### Static Files Structure
 - 📁 **Переміщено до `static/js/`** — `pwa-redirect.js`, `pwa-install.js`, `filters-sidebar.js`
 - 🎨 **Переміщено до `static/css/`** — `pwa-styles.css`, `filters-sidebar.css`
-- 🔗 **Оновлено посилання** в `webapp/templates/index.html` — всі шляхи приведені
-  до єдиного стандарту (`/static/css/` та `/static/js/`)
-- 🗑️ **Видалено дублі** з кореня `static/` після переміщення
+- 🔗 **Оновлено посилання** в `index.html`
+- 🗑️ **Видалено** `debug_archives.py`, `update-html.py`
 
-#### Fixes (поточна сесія)
-- 🐛 **main.py** — виправлено відсутній `if __name__ == "__main__"` блок
-- 🐛 **index.html** — виправлено оновлення залишків/резервів при редагуванні,
-  видаленні та очищенні списку (кеш `cachedProducts` синхронізується миттєво)
-- 🐛 **filters** — фільтри більше не зникають після додавання товару до списку
-- 🐛 **sw.js precache** — додано основні CSS/JS ассети до `PRECACHE_URLS`
-
-### 🗑️ Removed
-- 🗑️ **`debug_archives.py`** — debug-скрипт видалено з кореня проекту
-- 🗑️ **`webapp/update-html.py`** — dev-утиліта видалена (не потрібна в production)
+#### Fixes
+- 🐛 Виправлено транслітерацію в console.log офлайн/онлайн подіях
+- 🐛 Оновлено опис в `index.html` і `manifest.json` (відповідно до боту `@epic016_bot`)
+- 🐛 Виправлено placeholder `your_bot_name` → `epic016_bot` в manifest shortcuts
 
 ---
 
@@ -43,79 +68,48 @@
 #### PWA (Progressive Web App)
 - 📱 **PWA Support** - Mini App тепер можна встановити як нативний додаток
 - 📦 **Service Worker** - офлайн кешування статичних ресурсів
-- 🌐 **Manifest.json** - конфігурація PWA з іконками та splash screen
+- 🌐 **Manifest.json** - конфігурація PWA
 - 📢 **Install Banner** - автоматичний банер встановлення
 - 🔌 **Offline Indicator** - індикатор відсутності зв'язку
 - 🔄 **PWA Redirect** - логіка виявлення PWA режиму
 
 #### User Features
 - 🔄 **Pull-to-Refresh** - оновлення свайпом на всіх вкладках
-- 📊 **User Statistics** - персональна статистика з красивою карткою-градієнтом
+- 📊 **User Statistics** - персональна статистика
 - 📦 **ZIP Export** - завантаження всіх архівів одним файлом
 - 📁 **Archive Stats** - детальна статистика кожного архіву
 - ⚡ **Haptic Feedback** - вібраційний відгук на дії
 - 🌓 **Adaptive Theme** - автоматична темна/світла тема
 
 #### Admin Features
-- 📊 **Advanced Analytics** - детальна статистика з клікабельними картками
-- 💾 **Force Save** - примусове збереження списків користувачів
+- 📊 **Advanced Analytics** - детальна статистика
+- 💾 **Force Save** - примусове збереження списків
 - 📢 **Broadcast** - масова розсилка повідомлень
-- 📊 **Users Modal** - модальні вікна зі списками користувачів
-- 📈 **Reserved by Department** - візуалізація резервів по відділах
-- 📦 **ZIP All Archives** - завантаження всіх архівів всіх юзерів
-- 👾 **Drag & Drop** - перетягування Excel файлів для імпорту
+- 📊 **Users Modal** - модальні вікна зі списками
+- 📈 **Reserved by Department** - візуалізація резервів
+- 📦 **ZIP All Archives** - завантаження всіх архівів
+- 👾 **Drag & Drop** - імпорт Excel
 
 #### API Endpoints
-- `GET /api/statistics/{user_id}` - статистика користувача
-- `GET /api/archive/stats/{filename}` - статистика архіву
-- `GET /api/archives/download-all/{user_id}` - ZIP експорт для юзера
-- `GET /api/list/department/{user_id}` - поточний відділ
-- `GET /api/admin/users/all` - всі користувачі
-- `GET /api/admin/users/active` - активні списки
-- `GET /api/admin/products/info` - інфо про товари
-- `GET /api/admin/reserved/by-department` - резерви по відділах
-- `POST /api/admin/force-save/{user_id}` - примусове збереження
-- `POST /api/admin/broadcast` - розсилка
-- `GET /api/admin/archives/download-all` - ZIP всіх архівів
+- `GET /api/statistics/{user_id}`
+- `GET /api/archive/stats/{filename}`
+- `GET /api/archives/download-all/{user_id}`
+- `GET /api/list/department/{user_id}`
+- `GET /api/admin/users/all`
+- `GET /api/admin/users/active`
+- `GET /api/admin/products/info`
+- `GET /api/admin/reserved/by-department`
+- `POST /api/admin/force-save/{user_id}`
+- `POST /api/admin/broadcast`
+- `GET /api/admin/archives/download-all`
 
-#### Documentation
-- 📖 **README.md** - повна документація проекту
-- 🌐 **webapp/README.md** - документація frontend
-- 🔒 **PRIVACY_POLICY.md** - оновлена політика (PWA, офлайн)
-- 🔧 **TECHNICAL_GUIDE.md** - розширений технічний гайд
-- 📚 **USER_GUIDE.md** - оновлена інструкція користувача
-- ⚙️ **.env.example** - додано WEBAPP_URL та інші змінні
-- 🚀 **deploy/** - додано nginx.conf та epicservice.service
-- 📝 **CHANGELOG.md** - цей файл!
-
-### 🔧 Changed (Improvements)
-
-#### UI/UX
-- 🎨 **Centered Title** - заголовок тепер відцентрований
-- 📊 **Better Stats Card** - красива картка з градієнтом
-- 📋 **Improved List View** - покращений вигляд списку
-- 🔒 **Visual Locking** - покращена візуалізація блокування (grayscale + 🔒)
-- 📱 **Mobile Optimizations** - оптимізація для мобільних
-
-#### Performance
-- ⚡ **Faster Loading** - швидше завантаження через Service Worker
-- 📦 **Better Caching** - покращене кешування статичних ресурсів
-- 🔍 **Debounce Search** - 500ms debounce для пошуку
-
-#### Backend
-- 📊 **Statistics Queries** - нові SQL запити для статистики
-- 📦 **ZIP Generation** - генерація ZIP архівів
-- 🔒 **Better Error Handling** - покращена обробка помилок
+### 🔧 Changed
+- 🎨 Centered Title, Better Stats Card, Improved List View
+- ⚡ Faster Loading, Better Caching, Debounce Search 500ms
+- 📊 Statistics Queries, ZIP Generation, Better Error Handling
 
 ### 🔒 Security
-- 🔐 **Enhanced HTTPS** - TLS 1.3 тільки
-- 🛡️ **Security Headers** - HSTS, CSP, X-Frame-Options
-- 🔒 **PWA Security** - Service Worker тільки через HTTPS
-
-### 📝 Documentation
-- 📖 **Complete Rewrite** - повне переписання документації
-- 🔍 **Better Examples** - більше прикладів коду
-- 💡 **Troubleshooting** - розширений troubleshooting
+- TLS 1.3, HSTS, CSP, X-Frame-Options
 
 ---
 
@@ -124,36 +118,36 @@
 ### ✨ Added
 - 🤖 **Telegram Bot** - основний бот на aiogram 3.x
 - 🌐 **Mini App** - Telegram WebApp з Vanilla JS
-- 🔍 **Search** - пошук товарів за артикулом/назвою
-- 📋 **List Management** - створення та редагування списків
+- 🔍 **Search** - пошук товарів
+- 📋 **List Management** - списки
 - 🔒 **Department Locking** - блокування відділів
-- 💾 **Save to Excel** - збереження в Excel
-- 📁 **Archives** - історія збережених списків
-- 📈 **Reservations** - резервування товарів
-- 👑 **Admin Panel** - адміністративна панель
-- 📥 **Excel Import** - імпорт товарів
-- 📤 **Export Reports** - експорт звітів
-- 📊 **Basic Statistics** - базова статистика
-- 🗄️ **PostgreSQL** - реляційна база даних
+- 💾 **Save to Excel**
+- 📁 **Archives** - історія списків
+- 📈 **Reservations**
+- 👑 **Admin Panel**
+- 📥 **Excel Import**
+- 📤 **Export Reports**
+- 📊 **Basic Statistics**
+- 🗄️ **PostgreSQL**
 - 📦 **Redis** - FSM storage
-- 🔄 **Archive Rotation** - ротація файлів (10 файлів/user)
-- 🗑️ **Auto Cleanup** - автоочищення trash/ (14 днів)
+- 🔄 **Archive Rotation** (10 файлів/user)
+- 🗑️ **Auto Cleanup** trash/ (14 днів)
 
 ---
 
 ## 🔗 Посилання
 
-- **GitHub Repository**: https://github.com/imeromua/epicservice
-- **Documentation**: README.md, TECHNICAL_GUIDE.md, USER_GUIDE.md
+- **GitHub**: https://github.com/imeromua/epicservice
+- **Bot**: https://t.me/epic016_bot
 - **Contact**: imerom25@gmail.com | @my_life_ukr
 
 ---
 
 ## 📌 Легенда
 
-- ✨ **Added** - нові функції
-- 🔧 **Changed** - зміни в існуючому функціоналі
-- 🐛 **Fixed** - виправлені помилки
-- 🛡️ **Security** - зміни в безпеці
-- 🛑 **Deprecated** - застарілі функції
-- 🗑️ **Removed** - видалені функції
+- ✨ **Added** — нові функції
+- 🔧 **Changed** — зміни в існуючому
+- 🐛 **Fixed** — виправлені помилки
+- 🛡️ **Security** — зміни в безпеці
+- 🛑 **Deprecated** — застарілі
+- 🗑️ **Removed** — видалені
