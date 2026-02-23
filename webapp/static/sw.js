@@ -1,6 +1,6 @@
 // Service Worker для Epic Service PWA
-const CACHE_NAME = 'epicservice-v1.0.1';
-const RUNTIME_CACHE = 'epicservice-runtime-v1.0.1';
+const CACHE_NAME = 'epicservice-v1.1.0';
+const RUNTIME_CACHE = 'epicservice-runtime-v1.1.0';
 
 // Файли для кешування при встановленні
 const PRECACHE_URLS = [
