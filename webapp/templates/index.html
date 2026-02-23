@@ -27,6 +27,82 @@
     <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
+
+<!-- ======================================================
+     Заглушка: відображається коли відкрито в браузері, не в Telegram
+     ====================================================== -->
+<div id="not-telegram-overlay" style="
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0f172a;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+">
+    <!-- Logo -->
+    <div style="font-size: 72px; margin-bottom: 16px; filter: drop-shadow(0 4px 12px rgba(59,130,246,0.4));">📦</div>
+    <h1 style="color: #f1f5f9; font-size: 26px; font-weight: 700; margin: 0 0 6px;">EpicService</h1>
+    <p style="color: #64748b; font-size: 13px; margin: 0 0 36px; letter-spacing: 0.5px; text-transform: uppercase;">Корпоративний застосунок Х016</p>
+
+    <!-- Info card -->
+    <div style="
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 360px;
+        width: 100%;
+        margin-bottom: 28px;
+    ">
+        <div style="font-size: 32px; margin-bottom: 12px;">🔒</div>
+        <p style="color: #e2e8f0; font-size: 16px; font-weight: 600; margin: 0 0 10px; line-height: 1.4;">
+            Цей застосунок працює виключно всередині Telegram
+        </p>
+        <p style="color: #94a3b8; font-size: 14px; margin: 0; line-height: 1.6;">
+            Авторизація прив'язана до вашого Telegram-акаунту.
+            У браузері жодні функції недоступні — це не баг, це захист.
+        </p>
+    </div>
+
+    <!-- CTA Button -->
+    <a href="https://t.me/epic016_bot/webapp" style="
+        display: block;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        text-decoration: none;
+        padding: 16px 24px;
+        border-radius: 14px;
+        font-size: 17px;
+        font-weight: 700;
+        max-width: 360px;
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+        transition: opacity 0.2s;
+    " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        🚀 Відкрити в Telegram
+    </a>
+
+    <!-- Link hint -->
+    <p style="color: #475569; font-size: 12px; margin: 0 0 32px; font-family: monospace;">
+        t.me/epic016_bot/webapp
+    </p>
+
+    <!-- Footer note -->
+    <div style="display: flex; align-items: center; gap: 8px; color: #475569; font-size: 12px;">
+        <span>⛔️</span>
+        <span>Доступ тільки для співробітників Х016</span>
+    </div>
+</div>
+<!-- ====================================================== -->
+
     <div class="pull-indicator" id="pullIndicator">↓ Потягніть для оновлення</div>
     <div class="sticky-container">
         <div class="header">
@@ -153,6 +229,15 @@ tg.ready();
 const userId = tg.initDataUnsafe?.user?.id || 0;
 const ADMIN_IDS = {{ admin_ids | tojson }};
 const isAdmin = ADMIN_IDS.includes(userId);
+
+// Показуємо заглушку якщо запущено поза Telegram
+if (!tg.initData) {
+    const overlay = document.getElementById('not-telegram-overlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
 </script>
     <script src="/static/js/core.js"></script>
     <script src="/static/js/search.js"></script>
