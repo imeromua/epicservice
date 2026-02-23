@@ -67,8 +67,8 @@ async def favicon():
 
 @app.get("/sw.js", include_in_schema=False)
 async def service_worker():
-    """Віддає Service Worker для PWA з кореня"""
-    sw_path = os.path.join(os.path.dirname(__file__), "sw.js")
+    """Віддає Service Worker для PWA (актуальна версія з static/)"""
+    sw_path = os.path.join(os.path.dirname(__file__), "static", "sw.js")
     response = FileResponse(sw_path, media_type="application/javascript")
     # Забороняємо кешування Service Worker
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

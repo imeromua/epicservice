@@ -33,15 +33,15 @@
     <!-- Filters Sidebar -->
     <link rel="stylesheet" href="/static/filters-sidebar.css">
     <script src="/static/filters-sidebar.js"></script>
-    <script src="/static/ui-update-fix.js?v=3" defer></script>
 
     <!-- Photo styles (v2 - cache bust) -->
     <link rel="stylesheet" href="/static/css/photos.css?v=2">
     <script src="/static/js/photos.js?v=2" defer></script>
     
-        <!-- Core Styles (modular) -->
+    <!-- Core Styles (modular) -->
     <link rel="stylesheet" href="/static/css/variables.css">
     <link rel="stylesheet" href="/static/css/reset.css">
+    <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="/static/css/layout.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/admin.css">
@@ -189,14 +189,14 @@
   window.addEventListener('online', () => {
     if (offlineIndicator) {
       offlineIndicator.classList.remove('show');
-      console.log('[✅] З\'єднання відновлено');
+      console.log('[✅] З\'\u0454днання відновлено');
     }
   });
   
   window.addEventListener('offline', () => {
     if (offlineIndicator) {
       offlineIndicator.classList.add('show');
-      console.log('[⚠️] Втрачено з\'єднання');
+      console.log('[⚠️] Втрачено з\'\u0454днання');
     }
   });
   
@@ -221,6 +221,5 @@ const isAdmin = ADMIN_IDS.includes(userId);
     <script src="/static/js/archives.js"></script>
     <script src="/static/js/admin.js"></script>
     <script src="/static/js/init.js"></script>
-</script>
 </body>
 </html>
