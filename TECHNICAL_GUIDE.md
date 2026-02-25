@@ -1,7 +1,7 @@
 # 🛠️ Технічний посібник EpicService
 
-**Версія:** 2.0.0  
-**Останнє оновлення:** 19.02.2026
+**Версія:** 2.2.0  
+**Останнє оновлення:** 25.02.2026
 
 Цей документ надає поглиблений технічний огляд EpicService, призначений для розробників, DevOps-інженерів та системних адміністраторів.
 
@@ -13,7 +13,7 @@
 2. [Технологічний стек](#2-технологічний-стек)
 3. [Схема бази даних](#3-схема-бази-даних)
 4. [Backend (Telegram Bot)](#4-backend-telegram-bot)
-5. [WebApp (Mini App + PWA)](#5-webapp-mini-app--pwa)
+5. [WebApp (Mini App)](#5-webapp-mini-app)
 6. [Адмін-панель](#6-адмін-панель)
 7. [Ключові бізнес-процеси](#7-ключові-бізнес-процеси)
 8. [API документація](#8-api-документація)
@@ -37,30 +37,21 @@
          │
     ┌────┼────┐
     │         │
-┌───┴────┐ ┌─┴───────────────┐
-│ Bot API │ │ WebApp (PWA)     │
-│ aiogram │ │ FastAPI + HTML   │
-└───┬────┘ └─┬──────────────┘
+┌───┴────┐ ┌─┴──────────────────┐
+│ Bot API │ │ WebApp (Mini App) │
+│ aiogram │ │ FastAPI + HTML    │
+└───┬────┘ └─┬──────────────────┘
     │         │
-    └───┬────┤
-        │    │ Service Worker
-    ┌───┼────┤ (Offline Cache)
-    │   │    └───────────┐
-┌───┴───┼────────────────┐ │
-│ PostgreSQL         │ │
-│ (Основні дані)   │ │
-└─────────┬─────────┘ │
-          │            │
-     ┌────┼────┐       │
-     │ Redis    │       │
-     │ (FSM)    │       │
-     └─────────┘       │
-                        │
-     ┌─────────────────┴┐
-     │ LocalStorage     │
-     │ IndexedDB        │
-     │ (Клієнтський)  │
-     └──────────────────┘
+    └─────────┤
+              │
+┌─────────────┴───────────┐
+│ PostgreSQL (Основні дані)│
+└─────────┬───────────────┘
+          │
+     ┌────┼────┐
+     │ Redis    │
+     │ (FSM)    │
+     └─────────┘
 ```
 
 ### 1.2 Потік даних
@@ -72,8 +63,8 @@
 
 2. **Користувач → WebApp:**
    - Відкривається через `web_app` кнопку в боті
-   - PWA: можна встановити як додаток
-   - REST API клики до FastAPI
+   - Додаток працює у Telegram WebApp контексті (для авторизації та доступу до `initData`)
+   - REST API запити до FastAPI
 
 3. **Bot/WebApp → PostgreSQL:**
    - Async ORM (SQLAlchemy 2.0)
@@ -83,11 +74,6 @@
 4. **Bot → Redis:**
    - FSM states (стани користувачів)
    - Тимчасовий кеш
-
-5. **PWA → LocalStorage/Service Worker:**
-   - Кешування статичних ресурсів
-   - Офлайн-режим
-   - Налаштування UI
 
 ---
 
@@ -114,9 +100,7 @@
 |------------|---------------|
 | **JS Framework** | Vanilla JS (ES6+) |
 | **UI** | Telegram WebApp SDK |
-| **PWA** | Service Worker API |
 | **Стилі** | CSS Variables (темування) |
-| **Офлайн** | Cache API + IndexedDB |
 | **Templates** | Jinja2 |
 
 ### 2.3 DevOps
@@ -301,7 +285,7 @@ async def handle_webapp_data(message: Message):
 
 ---
 
-## 5. WebApp (Mini App + PWA)
+## 5. WebApp (Mini App)
 
 ### 5.1 Архітектура
 
@@ -314,44 +298,15 @@ webapp/
   templates/
     index.html           # SPA frontend
   static/
-    manifest.json        # PWA manifest
-    sw.js                # Service Worker
-    pwa-install.js       # Інсталяція PWA
-    pwa-redirect.js      # Редирект логіка
-    pwa-styles.css       # PWA стилі
-    admin.html           # Адмін-панель
-    icons/               # App icons
+    admin.html           # Адмін-сторінка
+    css/                 # Статичні стилі
+    js/                  # Статичні скрипти
+    icons/               # Іконки
 ```
 
-### 5.2 Service Worker
+### 5.2 Запуск поза Telegram
 
-**Стратегія:** Cache First + Network Fallback
-
-```javascript
-// sw.js
-const CACHE_NAME = 'epicservice-v2.0.0';
-
-const STATIC_ASSETS = [
-  '/',
-  '/static/manifest.json',
-  '/static/pwa-styles.css',
-  '/static/icons/icon-192x192.png'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
-  );
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
-});
-```
+Mini App залежить від Telegram WebApp контексту (`window.Telegram.WebApp`, `initData`). При відкритті у звичайному браузері відображається підказка/оверлей перейти до Telegram.
 
 ### 5.3 API Endpoints
 
@@ -380,7 +335,7 @@ self.addEventListener('fetch', event => {
 | GET | `/api/admin/statistics` | Загальна статистика |
 | POST | `/api/admin/import` | Імпорт Excel |
 | GET | `/api/admin/export/stock` | Експорт залишків |
-| POST | `/api/admin/force-save/{user_id}` | Примусове збереження |
+| POST | `/api/admin/force-save/{target_user_id}` | Примусове збереження |
 | POST | `/api/admin/broadcast` | Розсилка повідомлень |
 | GET | `/api/admin/users/all` | Всі користувачі |
 | GET | `/api/admin/users/active` | Активні списки |
@@ -877,8 +832,7 @@ pip install --upgrade -r requirements.txt
   - FSM storage
   - TTL для станів
 
-- **PWA:**
-  - Service Worker cache
+- **WebApp:**
   - Lazy loading
   - Debounce пошуку (500ms)
 
@@ -940,47 +894,13 @@ UPDATE products SET reserved = 0;
 SELECT user_id, COUNT(*) FROM temp_list GROUP BY user_id;
 ```
 
-### 13.4 PWA не кешується
+### 13.4 Mini App відкривається в браузері
 
-```javascript
-// Відкрити DevTools → Application → Service Workers
-// Перевірити статус Service Worker
+Якщо додаток відкрито поза Telegram:
 
-// Примусово оновити SW
-navigator.serviceWorker.getRegistrations().then(registrations => {
-  registrations.forEach(reg => reg.unregister());
-  location.reload();
-});
-```
-
-### 13.5 Архіви не видаляються
-
-```bash
-# Перевірити APScheduler
-grep -r "cleanup_job" bot.log
-
-# Примусово запустити cleanup
-python -c "from utils.archive_manager import cleanup_trash; cleanup_trash(days=14)"
-
-# Перевірити права доступу
-ls -la archives/trash/
-```
-
-### 13.6 Імпорт Excel падає
-
-```python
-# Перевірити формат файлу
-import openpyxl
-wb = openpyxl.load_workbook('file.xlsx')
-ws = wb.active
-print(ws['A1'].value)  # Має бути "Артикул" або синонім
-
-# Перевірити синоніми
-cat column_synonyms.json
-
-# Логи
-tail -f bot.log | grep "import"
-```
+1. Відкрийте його через кнопку **"🌐 Відкрити додаток"** у боті.
+2. Перевірте, що `WEBAPP_URL` в `.env` вказує на правильний домен.
+3. Переконайтеся, що сторінка не кешується сторонніми проксі/CDN агресивно.
 
 ---
 
@@ -992,5 +912,7 @@ tail -f bot.log | grep "import"
 
 ---
 
-**Версія документа:** 2.0.0  
-**Остання оновлення:** 19.02.2026
+**Версія документа:** 2.2.0  
+**Останнє оновлення:** 25.02.2026
+
+"Зроблено в Україні з ❤️"

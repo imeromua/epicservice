@@ -15,7 +15,7 @@
 EpicService — це комплексне рішення для управління замовленнями запчастин через Telegram, що складається з:
 
 - **🤖 Telegram Bot** — мінімалістичний інтерфейс з persistent клавіатурою
-- **🌐 Mini App (PWA)** — повнофункціональний веб-додаток з можливістю встановлення
+- **🌐 Mini App (Telegram WebApp)** — повнофункціональний веб-додаток, який працює всередині Telegram
 - **⚙️ Admin Panel** — потужна панель адміністратора з аналітикою
 - **🗄️ Backend API** — FastAPI з асинхронною роботою з БД
 
@@ -30,7 +30,6 @@ EpicService — це комплексне рішення для управлін
 - 📊 **Статистика** — персональна аналітика використання
 - 📁 **Архів** — історія всіх збережених списків
 - 📥 **ZIP експорт** — завантаження всіх архівів одним файлом
-- 📱 **PWA** — встановлення як нативний додаток
 - 🔄 **Pull-to-refresh** — оновлення свайпом вниз
 - 🌓 **Адаптивна тема** — автоматична темна/світла тема
 
@@ -72,10 +71,10 @@ epicservice/
 │   ├── templates/
 │   │   └── index.html       # Mini App frontend
 │   └── static/
-│       ├── manifest.json    # PWA manifest
-│       ├── sw.js            # Service Worker
-│       ├── pwa-*.js         # PWA scripts
-│       └── icons/           # App icons
+│       ├── admin.html       # Статична адмін-сторінка (frontend)
+│       ├── css/             # CSS файли
+│       ├── js/              # JS файли
+│       └── icons/           # Іконки
 ├── utils/
 │   ├── list_processor.py    # Створення Excel
 │   ├── archive_manager.py   # Ротація файлів
@@ -109,8 +108,6 @@ epicservice/
 ### Frontend:
 - **Vanilla JavaScript** — без фреймворків для максимальної швидкості
 - **Telegram WebApp SDK** — нативна інтеграція
-- **PWA** — Progressive Web App
-- **Service Worker** — офлайн кешування
 - **Adaptive CSS** — автотемування під Telegram
 
 ### DevOps:
@@ -301,25 +298,14 @@ server {
 ### 🌈 Адаптивна тема
 Автоматичне перемикання світлої/темної теми відповідно до налаштувань Telegram.
 
-### 📱 PWA (Progressive Web App)
-- Встановлення на домашній екран
-- Офлайн-режим через Service Worker
-- Нативна іконка та splash screen
-- Push-повідомлення (готово до інтеграції)
-
 ### 🔄 Pull-to-Refresh
 Оновлення будь-якої вкладки свайпом вниз.
 
 ### ⚡ Haptic Feedback
 Вібраційний відгук на дії користувача.
 
-### 🎯 Smart UX
-- Debounce при пошуку (500ms)
-- Блокування товарів з інших відділів
-- Візуальні індикатори (доступно/зарезервовано/заблоковано)
-- Центрований заголовок
-- Sticky header з пошуком
-- Persistent клавіатура в боті
+### 🧭 Запуск поза Telegram
+Якщо Mini App відкрито у звичайному браузері, відображається підказка/оверлей з інструкцією перейти у Telegram, бо авторизація та робота додатку залежать від Telegram WebApp контексту.
 
 ---
 
@@ -387,7 +373,7 @@ python -c "from utils.archive_manager import cleanup_trash; cleanup_trash(days=1
 
 ```bash
 curl http://localhost:8000/health
-# {"status":"ok","service":"epicservice","version":"2.0.0"}
+# {"status":"ok","service":"epicservice","version":"2.2.0"}
 ```
 
 ### Метрики
@@ -426,7 +412,6 @@ curl http://localhost:8000/health
 
 ## 🎯 Roadmap
 
-- [ ] Push-повідомлення через PWA
 - [ ] Експорт звітів у PDF
 - [ ] Інтеграція з 1С
 - [ ] Мобільний додаток (React Native)
@@ -443,5 +428,7 @@ curl http://localhost:8000/health
 
 ---
 
-**Версія:** 2.0.0  
-**Остання оновлення:** 19.02.2026
+**Версія:** 2.2.0  
+**Останнє оновлення:** 25.02.2026
+
+"Зроблено в Україні з ❤️"
