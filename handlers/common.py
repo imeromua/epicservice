@@ -10,7 +10,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, W
 from aiogram.types import ReplyKeyboardRemove
 
 from config import WEBAPP_URL
-from database.orm import orm_upsert_user
+from database.orm import orm_upsert_user, orm_get_user_by_id
 from lexicon.lexicon import LEXICON
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,7 @@ async def clean_previous_keyboard(state: FSMContext, bot: Bot, chat_id: int):
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     """
     Обробник команди /start.
-    Реєструє користувача та відкриває Mini App.
-    Тільки одна кнопка: "Відкрити EpicService".
+    Реєструє користувача, перевіряє RBAC статус та відкриває Mini App.
     """
     user = message.from_user
     try:
@@ -58,6 +57,26 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
         # Очищаємо FSM state
         await state.clear()
 
+        # Перевірка статусу користувача
+        db_user = await orm_get_user_by_id(user.id)
+
+        if not db_user or db_user.status == "pending":
+            await message.answer(
+                "⏳ Ваш запит на доступ очікує підтвердження адміністратором.\n"
+                "Ви отримаєте повідомлення, коли доступ буде надано."
+            )
+            return
+
+        if db_user.status == "blocked":
+            reason = db_user.blocked_reason or "не вказано"
+            await message.answer(
+                f"🚫 Ваш доступ заблоковано.\n"
+                f"Причина: {reason}\n\n"
+                f"Зверніться до адміністратора."
+            )
+            return
+
+        # status == "active" → показуємо WebApp кнопку
         # Прибираємо всі reply-клавіатури
         await message.answer(
             "👋",
