@@ -60,14 +60,14 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
         # Перевірка статусу користувача
         db_user = await orm_get_user_by_id(user.id)
 
-        if db_user and db_user.status == "pending":
+        if not db_user or db_user.status == "pending":
             await message.answer(
                 "⏳ Ваш запит на доступ очікує підтвердження адміністратором.\n"
                 "Ви отримаєте повідомлення, коли доступ буде надано."
             )
             return
 
-        if db_user and db_user.status == "blocked":
+        if db_user.status == "blocked":
             reason = db_user.blocked_reason or "не вказано"
             await message.answer(
                 f"🚫 Ваш доступ заблоковано.\n"
