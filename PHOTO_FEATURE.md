@@ -8,6 +8,12 @@
 
 **Важливо:** Фото використовуються тільки для візуалізації при додаванні товарів у список. Вони **не включаються** в звіти, статистику або експортовані файли.
 
+## Статус реалізації
+
+- Реалізація розвивається у гілці `feature/product-photos`.
+- У `main` ця функція може бути відсутня (до моменту merge).
+- Документ описує цільову поведінку, UI та технічні компоненти.
+
 ## Основні можливості
 
 ### Для користувачів
@@ -40,20 +46,21 @@
 
 ## Технічні деталі
 
-### Структура бази даних
+### Структура бази даних (концепт)
 
 ```sql
+-- Приклад схеми, назви полів/зв'язків можуть відрізнятися в коді
 CREATE TABLE product_photos (
     id SERIAL PRIMARY KEY,
-    артикул VARCHAR(20) REFERENCES products(артикул),
+    article VARCHAR(20) NOT NULL,
     file_path VARCHAR(500) NOT NULL,
     file_size INTEGER NOT NULL,
     original_size INTEGER NOT NULL,
     photo_order INTEGER DEFAULT 0,
-    uploaded_by BIGINT REFERENCES users(id),
+    uploaded_by BIGINT,
     uploaded_at TIMESTAMP DEFAULT NOW(),
     status VARCHAR(20) DEFAULT 'pending',
-    moderated_by BIGINT REFERENCES users(id),
+    moderated_by BIGINT,
     moderated_at TIMESTAMP,
     rejection_reason VARCHAR(500)
 );
@@ -101,25 +108,13 @@ POST /api/photos/moderation/{photo_id}
   - user_id: integer
 ```
 
-## Інтеграція (feature/product-photos)
-
-> Функція знаходиться у гілці `feature/product-photos`. Backend готовий на 100%. Очікує інтеграція в `index.html` і merge в main.
-
-### Що вже готово
-- ✅ Модель `ProductPhoto` в БД
-- ✅ Міграція Alembic
-- ✅ API роутер `webapp/routers/photos.py`
-- ✅ Стискання зображень `webapp/utils/image_processing.py`
-- ✅ CSS `webapp/static/css/photos.css`
-- ✅ JavaScript `webapp/static/js/photos.js`
-
-### Що потрібно для запуску
+## Що потрібно для запуску (в гілці feature)
 
 ```bash
-# 1. Встановити Pillow
+# 1. Встановити залежності
 pip install -r requirements.txt
 
-# 2. Застосувати міграцію
+# 2. Застосувати міграції
 alembic upgrade head
 
 # 3. Створити директорії
@@ -134,7 +129,7 @@ mkdir -p webapp/temp_files
 1. Відкрити модальне вікно додавання товару
 2. Натиснути "📷 Додати фото"
 3. Обрати фото з галереї або зробити нове
-4. Фото автоматично стиснеться і надіслеться на модерацію
+4. Фото автоматично стиснеться і надішлеться на модерацію
 
 ### Для адміністраторів
 
@@ -167,4 +162,4 @@ mkdir -p webapp/temp_files
 
 ---
 
-Зроблено в Україні з ❤️
+"Зроблено в Україні з ❤️"
