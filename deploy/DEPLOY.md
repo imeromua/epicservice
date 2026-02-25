@@ -134,3 +134,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 $ curl http://localhost:8000/health
 {"status":"ok","service":"epicservice","version":"2.0.0"}
 ```
+
+---
+
+"Зроблено в Україні з ❤️"

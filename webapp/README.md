@@ -1,6 +1,6 @@
 # 🌐 EpicService WebApp (Frontend)
 
-**Повнофункціональний Telegram Mini App з PWA підтримкою**
+**Повнофункціональний Telegram Mini App**
 
 ---
 
@@ -9,7 +9,6 @@
 - [Огляд](#огляд)
 - [Архітектура](#архітектура)
 - [Технології](#технології)
-- [PWA функціонал](#pwa-функціонал)
 - [Основні компоненти](#основні-компоненти)
 - [API інтеграція](#api-інтеграція)
 - [Адмін-панель](#адмін-панель)
@@ -20,7 +19,7 @@
 
 ## 🎯 Огляд
 
-WebApp — це клієнтська частина проекту EpicService, яка виконується як Telegram Mini App і може бути встановлена як PWA.
+WebApp — це клієнтська частина проекту EpicService, яка виконується як Telegram Mini App.
 
 ### Основні можливості:
 
@@ -55,11 +54,6 @@ webapp/
 ├── templates/
 │   └── index.html         # Основний SPA
 └── static/
-    ├── manifest.json      # PWA manifest
-    ├── sw.js              # Service Worker
-    ├── pwa-install.js     # PWA інсталяція
-    ├── pwa-redirect.js    # Редирект логіка
-    ├── pwa-styles.css     # PWA стилі
     ├── admin.html         # Адмін-панель (статична)
     └── icons/
         ├── icon-192x192.png
@@ -74,95 +68,12 @@ webapp/
 ### Frontend:
 - **Vanilla JavaScript** — без фреймворків для максимальної швидкості
 - **Telegram WebApp SDK** — `window.Telegram.WebApp`
-- **Service Worker API** — офлайн кешування
 - **CSS Variables** — динамічне темування
 
 ### Backend (API):
 - **FastAPI** — async Python web framework
 - **Jinja2** — template engine
 - **asyncpg** — async PostgreSQL driver
-
----
-
-## 📱 PWA функціонал
-
-### 1. **Service Worker** (`sw.js`)
-
-Кешує статичні ресурси для офлайн-роботи:
-
-```javascript
-const CACHE_NAME = 'epicservice-v1';
-const urlsToCache = [
-  '/',
-  '/static/manifest.json',
-  '/static/pwa-styles.css',
-  '/static/icons/icon-192x192.png'
-];
-```
-
-**Стратегія:** Cache First + Network Fallback
-
-### 2. **Manifest** (`manifest.json`)
-
-Опис PWA для встановлення:
-
-```json
-{
-  "name": "EpicService",
-  "short_name": "Epic",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
-  "icons": [
-    {
-      "src": "/static/icons/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/static/icons/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
-}
-```
-
-### 3. **Інсталяція** (`pwa-install.js`)
-
-Автоматичний банер "Встановити додаток":
-
-```javascript
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  showInstallBanner();
-});
-```
-
-### 4. **Редирект** (`pwa-redirect.js`)
-
-Виявляє чи запущено в PWA чи Telegram:
-
-```javascript
-const isPWA = window.matchMedia('(display-mode: standalone)').matches;
-const isTelegram = window.Telegram?.WebApp?.initData;
-
-if (isPWA && !isTelegram) {
-  // Редирект на Telegram
-}
-```
-
-### 5. **Offline індикатор**
-
-Автоматично показує банер при втраті зв'язку:
-
-```javascript
-window.addEventListener('offline', () => {
-  offlineIndicator.classList.add('show');
-});
-```
 
 ---
 
@@ -559,20 +470,6 @@ WantedBy=multi-user.target
 
 ---
 
-## 🔧 Debug
-
-```javascript
-// Логування в консолі
-console.log('App initialized:', { userId, isAdmin });
-console.log('🚀 PWA Ready!');
-console.log('📱 Display mode:', 
-  window.matchMedia('(display-mode: standalone)').matches ? 
-  'Standalone (PWA)' : 'Browser'
-);
-```
-
----
-
 ## 🛡️ Безпека
 
 - ✅ `user_id` валідація на кожному ендпоінті
@@ -585,60 +482,15 @@ console.log('📱 Display mode:',
 
 ## 📋 TODO / Roadmap
 
-- [ ] Push-повідомлення через PWA
-- [ ] Офлайн режим з синхронізацією
-- [ ] Dark mode перемикач (якщо Telegram не підтримує)
 - [ ] Графіки аналітики (Chart.js)
 - [ ] Багатомовність (i18n)
 - [ ] Інфінітний скрол для пошуку
 
 ---
 
-## 👨‍💻 Розробка
-
-### Структура коду:
-
-```javascript
-// index.html
-
-// 1. Глобальні змінні
-const tg = window.Telegram.WebApp;
-const userId = tg.initDataUnsafe?.user?.id || 0;
-const isAdmin = ADMIN_IDS.includes(userId);
-
-// 2. Ініціалізація
-tg.expand();
-tg.ready();
-
-// 3. Event listeners
-document.getElementById('searchInput').addEventListener('input', ...);
-
-// 4. API функції
-async function search(query) { ... }
-async function loadList() { ... }
-async function loadArchives() { ... }
-
-// 5. UI функції
-function renderProduct(p) { ... }
-function updateDepartmentInfo(dept, count) { ... }
-function switchTab(tab) { ... }
-
-// 6. Admin функції
-async function loadAdminData() { ... }
-async function uploadFile() { ... }
-async function sendBroadcast() { ... }
-```
-
-### Best Practices:
-
-1. **Async/Await** для всіх API викликів
-2. **try/catch** для обробки помилок
-3. **Debounce** для пошуку
-4. **Loading states** для кожної вкладки
-5. **Haptic feedback** на важливі дії
+**Версія:** 2.1.0  
+**Остання оновлення:** 25.02.2026
 
 ---
 
-**Версія:** 2.0.0  
-**Остання оновлення:** 19.02.2026  
-**Автор:** EpicService Team
+"Зроблено в Україні з ❤️"
