@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from webapp.routers import admin, client
+from webapp.routers import admin, client, photos
 
 # Створюємо FastAPI додаток
 app = FastAPI(
@@ -42,6 +42,12 @@ app.include_router(
     client.router,
     prefix="/api",
     tags=["client"]
+)
+
+app.include_router(
+    photos.router,
+    prefix="/api",
+    tags=["photos"]
 )
 
 app.include_router(
@@ -77,11 +83,14 @@ async def home(request: Request):
     # Читаємо список ID адмінів з .env
     admin_ids_str = os.getenv("WEBAPP_ADMIN_IDS", "")
     admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
-    
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "admin_ids": admin_ids
-    })
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "admin_ids": admin_ids,
+        },
+    )
 
 
 @app.get("/admin", response_class=HTMLResponse)
