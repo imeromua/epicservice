@@ -125,6 +125,20 @@ epicservice/
 
 ## 📋 Встановлення
 
+### 🐳 Швидкий старт (Docker)
+
+Найпростіший спосіб підняти проєкт локально — через Docker Compose:
+
+```bash
+cp .env.example .env
+# заповни значення в .env
+make up
+```
+
+Детальніше: [LOCAL_DEV.md](LOCAL_DEV.md)
+
+---
+
 ### 1. Клонування репозиторію
 
 ```bash
