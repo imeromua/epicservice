@@ -5,440 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EpicService</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F4E6;</text></svg>">
-    
-    <!-- PWA Detection and Telegram Integration (MUST BE FIRST!) -->
-    <script src="/static/pwa-redirect.js"></script>
 
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#3b82f6">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="EpicService">
-    <meta name="description" content="Система обліку та замовлення запчастин">
+    <meta name="description" content="Корпоративний застосунок складського обліку Х016. Облік товарів без руху, резервування залишків, збір замовлень та фотофіксація.">
 
-    <!-- Manifest -->
-    <link rel="manifest" href="/static/manifest.json">
-
-    <!-- Icons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-192x192.png">
-
-    <!-- PWA Styles -->
-    <link rel="stylesheet" href="/static/pwa-styles.css">
-    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        :root {
-            --bg-color: var(--tg-theme-bg-color, #ffffff);
-            --text-color: var(--tg-theme-text-color, #000000);
-            --hint-color: var(--tg-theme-hint-color, #999999);
-            --link-color: var(--tg-theme-link-color, #0088cc);
-            --button-color: var(--tg-theme-button-color, #0088cc);
-            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
-            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-            background: var(--bg-color); 
-            color: var(--text-color); 
-            padding-bottom: 80px;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        .sticky-container { 
-            position: sticky; 
-            top: 0; 
-            z-index: 100; 
-            background: var(--bg-color); 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: background-color 0.3s ease;
-        }
-        .pull-indicator {
-            text-align: center;
-            padding: 10px;
-            font-size: 24px;
-            opacity: 0;
-            transform: translateY(-100%);
-            transition: all 0.3s ease;
-            background: var(--bg-color);
-        }
-        .pull-indicator.active {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .header { padding: 16px 16px 8px 16px; }
-        h1 { 
-            color: var(--button-color); 
-            font-size: 24px; 
-            margin-bottom: 8px; 
-            transition: color 0.3s ease;
-            text-align: center;
-        }
-        #userInfo {
-            text-align: center;
-            font-size: 14px;
-            color: var(--hint-color);
-        }
-        .department-info { 
-            background: var(--button-color); 
-            opacity: 0.15;
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            margin-bottom: 8px; 
-            font-size: 13px; 
-            display: none;
-            transition: opacity 0.3s ease;
-        }
-        .department-info.active { display: block; opacity: 1; background: rgba(0,136,204,0.1); }
-        .search-box { position: relative; margin-bottom: 12px; padding: 0 16px; }
-        .search-input { 
-            width: 100%; 
-            padding: 12px 16px; 
-            border: 2px solid var(--button-color); 
-            border-radius: 12px; 
-            font-size: 16px; 
-            background: var(--bg-color); 
-            color: var(--text-color);
-            transition: all 0.3s ease;
-        }
-        .search-input:focus { outline: none; border-color: var(--link-color); }
-        .tabs { display: flex; gap: 4px; padding: 0 16px 8px 16px; border-bottom: 1px solid var(--hint-color); overflow-x: auto; }
-        .tab { 
-            position: relative; 
-            padding: 12px 16px; 
-            background: none; 
-            border: none; 
-            color: var(--hint-color); 
-            cursor: pointer; 
-            font-size: 14px; 
-            border-bottom: 2px solid transparent; 
-            transition: all 0.3s; 
-            white-space: nowrap; 
-        }
-        .tab.active { color: var(--button-color); border-bottom-color: var(--button-color); }
-        .tab.hidden { display: none; }
-        .tab-badge { position: absolute; top: 6px; right: 8px; background: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
-        .main-content { padding: 16px; }
-        .content { display: none; }
-        .content.active { display: block; }
-        .stats-card {
-            background: linear-gradient(135deg, var(--button-color) 0%, var(--link-color) 100%);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0,136,204,0.3);
-        }
-        .stats-title {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        .stat-item {
-            background: rgba(255,255,255,0.15);
-            border-radius: 12px;
-            padding: 12px;
-        }
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.9;
-        }
-        .product-card, .list-item, .archive-item, .admin-card { 
-            background: var(--secondary-bg-color); 
-            border-radius: 12px; 
-            padding: 16px; 
-            margin-bottom: 12px; 
-            cursor: pointer; 
-            transition: transform 0.2s, background-color 0.3s ease; 
-            position: relative; 
-        }
-        .product-card:active, .list-item:active { transform: scale(0.98); }
-        .product-card.locked { 
-            opacity: 0.5; 
-            cursor: not-allowed; 
-            background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--secondary-bg-color) 100%);
-            filter: grayscale(50%);
-        }
-        .product-card.locked:active { transform: none; }
-        .lock-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; opacity: 0.3; pointer-events: none; display: none; }
-        .product-card.locked .lock-overlay { display: block; }
-        .product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .product-article { font-weight: bold; color: var(--button-color); font-size: 16px; transition: color 0.3s ease; }
-        .product-card.locked .product-article { color: var(--hint-color); }
-        .product-status { background: #34c759; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
-        .product-status.locked { background: #ff3b30; }
-        .product-name { font-size: 14px; margin-bottom: 12px; color: var(--text-color); transition: color 0.3s ease; }
-        .product-card.locked .product-name { color: var(--hint-color); }
-        .product-details { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--hint-color); }
-        .product-detail-row { display: flex; justify-content: space-between; }
-        .product-detail-label { font-weight: 500; }
-        .product-detail-value { color: var(--text-color); transition: color 0.3s ease; }
-        .product-card.locked .product-detail-value { color: var(--hint-color); opacity: 0.6; }
-        .product-detail-value.highlight { color: var(--button-color); font-weight: bold; }
-        .product-detail-value.warning { color: #ff9500; font-weight: bold; }
-        .product-detail-value.success { color: #34c759; font-weight: bold; }
-        .list-header, .archive-header, .admin-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-        .action-buttons { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s;
-            color: white;
-            min-width: 120px;
-        }
-        .btn:active { transform: scale(0.95); }
-        .btn-primary { background: var(--button-color); }
-        .btn-success { background: #34c759; }
-        .btn-danger { background: #ff3b30; }
-        .btn-warning { background: #ff9500; }
-        .save-btn { flex: 1; padding: 12px; background: #34c759; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-        .save-btn:active { transform: scale(0.95); }
-        .clear-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-        .clear-btn:active { transform: scale(0.95); }
-        .download-btn { flex: 1; padding: 12px; background: var(--button-color); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s, background-color 0.3s ease; }
-        .download-btn:active { transform: scale(0.95); }
-        .download-all-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #34c759 0%, #30b350 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-bottom: 16px;
-            box-shadow: 0 3px 10px rgba(52,199,89,0.3);
-            transition: transform 0.2s;
-        }
-        .download-all-btn:active { transform: scale(0.97); }
-        .delete-archive-btn { flex: 1; padding: 12px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-        .delete-archive-btn:active { transform: scale(0.95); }
-        .empty-state { text-align: center; padding: 40px 20px; color: var(--hint-color); transition: color 0.3s ease; }
-        .empty-icon { font-size: 48px; margin-bottom: 16px; }
-        .loader { text-align: center; padding: 20px; color: var(--hint-color); transition: color 0.3s ease; }
-        .total-box { 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            right: 0; 
-            background: var(--bg-color); 
-            border-top: 1px solid var(--hint-color); 
-            padding: 16px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            z-index: 50;
-            transition: background-color 0.3s ease, border-color 0.3s ease;
-        }
-        .total-text { font-size: 18px; font-weight: bold; }
-        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.active { display: flex; }
-        .modal-content { 
-            background: var(--bg-color); 
-            border-radius: 16px; 
-            padding: 24px; 
-            max-width: 90%; 
-            max-height: 80%; 
-            overflow-y: auto;
-            transition: background-color 0.3s ease;
-        }
-        .quantity-selector { display: flex; align-items: center; gap: 16px; margin: 20px 0; justify-content: center; }
-        .qty-btn { 
-            width: 40px; 
-            height: 40px; 
-            border-radius: 50%; 
-            border: 2px solid var(--button-color); 
-            background: var(--button-color); 
-            color: white; 
-            font-size: 20px; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            transition: transform 0.2s, background-color 0.3s ease;
-        }
-        .qty-btn:active { transform: scale(0.9); }
-        .qty-display { font-size: 24px; font-weight: bold; min-width: 60px; text-align: center; }
-        .quick-actions { display: flex; gap: 8px; margin-bottom: 12px; }
-        .quick-btn { 
-            flex: 1; 
-            padding: 12px; 
-            background: var(--secondary-bg-color); 
-            color: var(--text-color); 
-            border: 2px solid var(--button-color); 
-            border-radius: 8px; 
-            font-size: 14px; 
-            cursor: pointer; 
-            transition: all 0.2s; 
-        }
-        .quick-btn:active { transform: scale(0.95); background: var(--button-color); color: white; }
-        .add-btn { 
-            width: 100%; 
-            padding: 16px; 
-            background: var(--button-color); 
-            color: var(--button-text-color); 
-            border: none; 
-            border-radius: 12px; 
-            font-size: 16px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            margin-top: 12px;
-            transition: transform 0.2s, background-color 0.3s ease;
-        }
-        .add-btn:active { transform: scale(0.95); }
-        .delete-btn { background: #ff3b30; }
-        .cancel-btn { background: var(--hint-color) !important; }
-        .custom-input { 
-            width: 100%; 
-            padding: 12px; 
-            border: 2px solid var(--button-color); 
-            border-radius: 8px; 
-            font-size: 18px; 
-            text-align: center; 
-            margin: 16px 0; 
-            background: var(--bg-color); 
-            color: var(--text-color);
-            transition: all 0.3s ease;
-        }
-        .archive-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-left: 8px; }
-        .archive-badge.main { background: #34c759; color: white; }
-        .archive-badge.surplus { background: #ff9500; color: white; }
-        .archive-stats { 
-            font-size: 12px; 
-            color: var(--hint-color); 
-            margin-top: 8px; 
-            padding: 8px; 
-            background: rgba(0,136,204,0.05); 
-            border-radius: 8px;
-            transition: color 0.3s ease;
-        }
-        .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .stat-row:last-child { margin-bottom: 0; }
-        .success-icon { font-size: 64px; text-align: center; margin-bottom: 12px; }
-        .success-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #34c759; }
-        .success-subtitle { text-align: center; font-size: 14px; color: var(--hint-color); margin-bottom: 24px; transition: color 0.3s ease; }
-        .archive-actions { display: flex; gap: 8px; margin-top: 8px; }
-        
-        /* Admin styles */
-        .admin-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .admin-stat-card {
-            background: linear-gradient(135deg, var(--button-color) 0%, #006699 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,136,204,0.2);
-        }
-        .admin-stat-card.success { background: linear-gradient(135deg, #34c759 0%, #30b350 100%); }
-        .admin-stat-card.warning { background: linear-gradient(135deg, #ff9500 0%, #e68a00 100%); }
-        .admin-stat-card.danger { background: linear-gradient(135deg, #ff3b30 0%, #e63027 100%); }
-        .admin-stat-icon { font-size: 32px; margin-bottom: 8px; }
-        .admin-stat-value { font-size: 28px; font-weight: bold; margin-bottom: 4px; }
-        .admin-stat-label { font-size: 12px; opacity: 0.9; }
-        .user-item {
-            background: var(--secondary-bg-color);
-            padding: 14px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .user-info { flex: 1; }
-        .user-name { font-weight: 600; margin-bottom: 4px; }
-        .user-details { font-size: 12px; color: var(--hint-color); }
-        .file-upload-area {
-            border: 2px dashed var(--hint-color);
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .file-upload-area:hover { border-color: var(--button-color); background: rgba(0,136,204,0.05); }
-        .upload-icon { font-size: 40px; margin-bottom: 12px; }
-        .admin-section-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 20px 0 12px 0;
-            color: var(--text-color);
-        }
-        .form-group { margin-bottom: 16px; }
-        .form-label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        .form-textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid var(--hint-color);
-            border-radius: 8px;
-            font-size: 14px;
-            min-height: 100px;
-            resize: vertical;
-            background: var(--bg-color);
-            color: var(--text-color);
-        }
-        .form-textarea:focus { outline: none; border-color: var(--button-color); }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .checkbox-group input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-        }
-        .alert {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-        }
-        .alert-success {
-            background: rgba(52,199,89,0.1);
-            color: #34c759;
-            border: 1px solid #34c759;
-        }
-        .alert-error {
-            background: rgba(255,59,48,0.1);
-            color: #ff3b30;
-            border: 1px solid #ff3b30;
-        }
-    </style>
+
+    <!-- Filters Sidebar -->
+    <link rel="stylesheet" href="/static/css/filters-sidebar.css">
+    <script src="/static/js/filters-sidebar.js"></script>
+
+    <!-- Photo styles (v2 - cache bust) -->
+    <link rel="stylesheet" href="/static/css/photos.css?v=2">
+    <script src="/static/js/photos.js?v=2" defer></script>
+
+    <!-- Core Styles (modular) -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/reset.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
+
+<!-- ======================================================
+     Заглушка: відображається коли відкрито в браузері, не в Telegram
+     ====================================================== -->
+<div id="not-telegram-overlay" style="
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0f172a;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+">
+    <!-- Logo -->
+    <div style="font-size: 72px; margin-bottom: 16px; filter: drop-shadow(0 4px 12px rgba(59,130,246,0.4));">📦</div>
+    <h1 style="color: #f1f5f9; font-size: 26px; font-weight: 700; margin: 0 0 6px;">EpicService</h1>
+    <p style="color: #64748b; font-size: 13px; margin: 0 0 36px; letter-spacing: 0.5px; text-transform: uppercase;">Корпоративний застосунок Х016</p>
+
+    <!-- Info card -->
+    <div style="
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 360px;
+        width: 100%;
+        margin-bottom: 28px;
+    ">
+        <div style="font-size: 32px; margin-bottom: 12px;">🔒</div>
+        <p style="color: #e2e8f0; font-size: 16px; font-weight: 600; margin: 0 0 10px; line-height: 1.4;">
+            Цей застосунок працює виключно всередині Telegram
+        </p>
+        <p style="color: #94a3b8; font-size: 14px; margin: 0; line-height: 1.6;">
+            Авторизація прив'язана до вашого Telegram-акаунту.
+            У браузері жодні функції недоступні — це не баг, це захист.
+        </p>
+    </div>
+
+    <!-- CTA Button -->
+    <a href="https://t.me/epic016_bot/webapp" style="
+        display: block;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        text-decoration: none;
+        padding: 16px 24px;
+        border-radius: 14px;
+        font-size: 17px;
+        font-weight: 700;
+        max-width: 360px;
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+        transition: opacity 0.2s;
+    " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        🚀 Відкрити в Telegram
+    </a>
+
+    <!-- Link hint -->
+    <p style="color: #475569; font-size: 12px; margin: 0 0 32px; font-family: monospace;">
+        t.me/epic016_bot/webapp
+    </p>
+
+    <!-- Footer note -->
+    <div style="display: flex; align-items: center; gap: 8px; color: #475569; font-size: 12px;">
+        <span>⛔️</span>
+        <span>Доступ тільки для співробітників Х016</span>
+    </div>
+</div>
+<!-- ====================================================== -->
+
     <div class="pull-indicator" id="pullIndicator">↓ Потягніть для оновлення</div>
     <div class="sticky-container">
         <div class="header">
@@ -471,32 +135,24 @@
             <div id="statisticsCard"></div>
             <div id="archivesContent"></div>
         </div>
-        
+
         <!-- Admin Tab -->
         <div id="adminContent" class="content">
             <div class="admin-stats-grid" id="adminStatsGrid">
                 <div class="loader">Завантаження...</div>
             </div>
 
-            <div class="admin-section-title">🧑‍💼 Керування користувачами</div>
-            <div id="userMgmtAlert"></div>
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="setUserMgmtFilter('pending')">⏳ Очікують</button>
-                <button class="btn" style="background:#8e8e93;" onclick="setUserMgmtFilter('active')">✅ Активні</button>
-                <button class="btn btn-warning" onclick="setUserMgmtFilter('blocked')">⛔️ Заблоковані</button>
-            </div>
-            <div class="search-box" style="padding:0; margin-bottom: 12px;">
-                <input type="text" id="userMgmtSearch" class="search-input" placeholder="Пошук (ім’я або @username)..." oninput="debouncedLoadUserManagement()">
-            </div>
-            <div id="userMgmtList">
-                <div class="loader">Завантаження...</div>
-            </div>
-            
             <div class="admin-section-title">👥 Користувачі з активними списками</div>
             <div id="adminActiveUsers">
                 <div class="loader">Завантаження...</div>
             </div>
-            
+            <div class="admin-section-title">🖼️ Модерація фото</div>
+            <div id="photoModeration">
+                <div class="loader">Завантаження...</div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="loadPhotoModeration()">🔄 Оновити</button>
+            </div>
             <div class="admin-section-title">📥 Імпорт товарів</div>
             <div id="importAlert"></div>
             <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
@@ -514,13 +170,13 @@
                 <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>📤 Імпортувати</button>
                 <button class="btn btn-danger" onclick="cancelUpload(true)">✖️ Скасувати</button>
             </div>
-            
+
             <div class="admin-section-title">📤 Експорт та операції</div>
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
             </div>
-            
+
             <div class="admin-section-title">📢 Розсилка повідомлень</div>
             <div id="broadcastAlert"></div>
             <div class="form-group">
@@ -530,379 +186,65 @@
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="sendBroadcast()">📤 Розіслати всім</button>
             </div>
+
+            <!-- Danger Zone -->
+            <div class="danger-zone">
+                <div class="danger-zone-header">
+                    <span style="font-size: 24px;">⚠️</span>
+                    <div class="danger-zone-title">Danger Zone</div>
+                </div>
+                <div class="danger-warning">
+                    <strong>⚠️ Увага!</strong> Ці дії незворотні та можуть призвести до втрати даних.
+                </div>
+                <div class="action-buttons" style="flex-direction: column;">
+                    <button class="btn btn-danger" onclick="clearDatabase()">🗑️ Очистити БД (всі товари)</button>
+                    <button class="btn btn-danger" onclick="deleteAllPhotos()">📸 Видалити всі фото</button>
+                    <button class="btn btn-danger" onclick="resetModeration()">🔄 Скинути статус модерації</button>
+                    <button class="btn btn-danger" onclick="deleteAllArchives()">📁 Видалити всі архіви</button>
+                    <button class="btn btn-danger" onclick="fullWipe()" style="background: #d32f2f;">🚨 ПОВНЕ ОЧИЩЕННЯ (все)</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі "Архів"</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
+    <div id="successModal" class="modal"><div class="modal-content"><div class="success-icon">✅</div><div class="success-title">Список збережено!</div><div class="success-subtitle">Файл доступний в розділі &quot;Архів&quot;</div><button class="add-btn" style="margin-top:0" onclick="goToArchives()">📁 Відкрити Архів</button><button class="add-btn cancel-btn" onclick="startNewSearch()">🔍 Новий пошук</button></div></div>
     <div id="addModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalPrice"></p><p id="modalAvailable"></p><div class="quick-actions" style="margin-top:16px"><button class="quick-btn" onclick="addAllAvailable()">➕ Додати все</button><button class="quick-btn" onclick="showCustomInput()">🔢 Інша кількість</button></div><div id="customInputBox" style="display:none"><input type="number" id="customQtyInput" class="custom-input" placeholder="Введіть кількість" min="1"><button class="add-btn" style="margin-top:0" onclick="applyCustomQty()">✅ Підтвердити</button></div><div id="normalSelector"><div class="quantity-selector"><button class="qty-btn" onclick="changeQty(-1)">−</button><div class="qty-display" id="qtyDisplay">1</div><button class="qty-btn" onclick="changeQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmAdd()">🛒 Додати до списку</button></div><button class="add-btn cancel-btn" onclick="closeModal()">Скасувати</button></div></div>
     <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
     <div id="statsModal" class="modal"><div class="modal-content" id="statsModalContent"></div></div>
     <div id="adminArchivesModal" class="modal"><div class="modal-content" id="adminArchivesModalContent"></div></div>
     <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
-
-<!-- PWA Install Banner -->
-<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
-  <div class="pwa-install-content">
-    <span>📱 Встановіть Epic Service на свій телефон!</span>
-    <button id="pwa-install-btn" class="btn btn-primary">Встановити</button>
-    <button onclick="document.getElementById('pwa-install-banner').style.display='none'" class="btn btn-secondary">Пізніше</button>
-  </div>
-</div>
-
-<!-- Offline Indicator -->
-<div id="offline-indicator" class="offline-indicator">
-  ⚠️ Немає з'єднання з інтернетом
-</div>
-
-<!-- PWA Scripts -->
-<script src="/static/pwa-install.js"></script>
-
-<!-- Offline/Online Detection -->
-<script>
-  const offlineIndicator = document.getElementById('offline-indicator');
-  
-  window.addEventListener('online', () => {
-    if (offlineIndicator) {
-      offlineIndicator.classList.remove('show');
-      console.log('[✅] З\'єднання відновлено');
-    }
-  });
-  
-  window.addEventListener('offline', () => {
-    if (offlineIndicator) {
-      offlineIndicator.classList.add('show');
-      console.log('[⚠️] Втрачено з\'єднання');
-    }
-  });
-  
-  if (!navigator.onLine && offlineIndicator) {
-    offlineIndicator.classList.add('show');
-  }
-</script>
+    <!-- Photo Gallery Modal -->
+    <div id="photoModal" class="modal">
+        <div class="modal-content">
+            <div id="photoGallery" class="photo-gallery"></div>
+            <div id="photoModalContent"></div>
+        </div>
+    </div>
 
 <script>
-const tg = window.Telegram.WebApp; 
+const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
 const userId = tg.initDataUnsafe?.user?.id || 0;
-// Читаємо ADMIN_IDS з шаблону (backend передає з .env)
 const ADMIN_IDS = {{ admin_ids | tojson }};
 const isAdmin = ADMIN_IDS.includes(userId);
 
-let currentQuantity = 1, editQuantity = 1, selectedProduct = null, editingItem = null, searchTimeout = null, currentTab = 'search';
-let cachedProducts = [];
-let currentDepartment = null;
-let pullStartY = 0, pulling = false;
-let selectedFile = null;
-
-// User management state
-let userMgmtFilter = 'pending';
-let userMgmtSearchTimeout = null;
-
-// Show admin tab if user is admin
-if (isAdmin) {
-    const adminBtn = document.getElementById('adminTabBtn');
-    if (adminBtn) adminBtn.classList.remove('hidden');
-}
-
-// Pull-to-refresh
-document.addEventListener('touchstart', e => {
-    if (window.scrollY === 0) {
-        pullStartY = e.touches[0].clientY;
-        pulling = true;
-    }
-}, {passive: true});
-
-document.addEventListener('touchmove', e => {
-    if (!pulling) return;
-    const pullDistance = e.touches[0].clientY - pullStartY;
-    const indicator = document.getElementById('pullIndicator');
-    
-    if (pullDistance > 0 && pullDistance < 80) {
-        indicator.style.opacity = pullDistance / 80;
-        indicator.style.transform = `translateY(${pullDistance - 50}px)`;
-    } else if (pullDistance >= 80) {
-        indicator.classList.add('active');
-        indicator.textContent = '↻ Відпустіть для оновлення';
-    }
-}, {passive: true});
-
-document.addEventListener('touchend', e => {
-    if (!pulling) return;
-    const pullDistance = e.changedTouches[0].clientY - pullStartY;
-    const indicator = document.getElementById('pullIndicator');
-    
-    if (pullDistance >= 80) {
-        indicator.textContent = '⟳ Оновлення...';
-        tg.HapticFeedback.impactOccurred('medium');
-        refreshCurrentTab();
-    }
-    
-    setTimeout(() => {
-        indicator.classList.remove('active');
-        indicator.style.opacity = 0;
-        indicator.style.transform = 'translateY(-100%)';
-        indicator.textContent = '↓ Потягніть для оновлення';
-    }, 500);
-    
-    pulling = false;
-}, {passive: true});
-
-function refreshCurrentTab() {
-    switch(currentTab) {
-        case 'search':
-            const query = document.getElementById('searchInput').value.trim();
-            if (query.length >= 2) search(query);
-            break;
-        case 'list':
-            loadList();
-            break;
-        case 'archives':
-            loadArchives();
-            break;
-        case 'admin':
-            if (isAdmin) loadAdminData();
-            break;
+// Показуємо заглушку якщо запущено поза Telegram
+if (!tg.initData) {
+    const overlay = document.getElementById('not-telegram-overlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
 }
-
-document.getElementById('userInfo').textContent = userId ? `Користувач: ${tg.initDataUnsafe.user.first_name}${isAdmin ? ' 👑' : ''}` : 'Тестовий режим';
-
-function setUserMgmtFilter(status) {
-    userMgmtFilter = status;
-    loadUserManagement();
-}
-
-function debouncedLoadUserManagement() {
-    clearTimeout(userMgmtSearchTimeout);
-    userMgmtSearchTimeout = setTimeout(() => loadUserManagement(), 400);
-}
-
-function _renderRoleSelect(u) {
-    const roles = ['user','moderator','admin'];
-    const options = roles.map(r => `<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('');
-    return `<select style="padding:8px; border-radius:8px; border:2px solid var(--hint-color); background:var(--bg-color); color:var(--text-color);" onchange="changeUserRole(${u.id}, this.value)">${options}</select>`;
-}
-
-function _renderUserActions(u) {
-    let buttons = '';
-    if (u.status === 'pending') {
-        buttons += `<button class="btn btn-success" style="flex:0 0 auto; padding:8px 12px; font-size:12px; min-width:auto;" onclick="approveUser(${u.id})">✅ Підтвердити</button>`;
-        buttons += `<button class="btn btn-danger" style="flex:0 0 auto; padding:8px 12px; font-size:12px; min-width:auto;" onclick="blockUser(${u.id})">⛔️ Блок</button>`;
-    } else if (u.status === 'active') {
-        buttons += `<button class="btn btn-danger" style="flex:0 0 auto; padding:8px 12px; font-size:12px; min-width:auto;" onclick="blockUser(${u.id})">⛔️ Блок</button>`;
-    } else if (u.status === 'blocked') {
-        buttons += `<button class="btn btn-success" style="flex:0 0 auto; padding:8px 12px; font-size:12px; min-width:auto;" onclick="unblockUser(${u.id})">✅ Розблок</button>`;
-    }
-
-    return `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end;">${_renderRoleSelect(u)}${buttons}</div>`;
-}
-
-async function loadUserManagement() {
-    if (!isAdmin) return;
-    const container = document.getElementById('userMgmtList');
-    if (!container) return;
-
-    const q = (document.getElementById('userMgmtSearch')?.value || '').trim();
-    container.innerHTML = '<div class="loader">⏳ Завантаження...</div>';
-
-    try {
-        const url = `/api/admin/user-management/users?user_id=${userId}&status=${encodeURIComponent(userMgmtFilter)}&q=${encodeURIComponent(q)}&limit=50&offset=0`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-
-        if (!data.users || data.users.length === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Немає користувачів</div>';
-            return;
-        }
-
-        container.innerHTML = data.users.map(u => `
-            <div class="user-item" style="cursor: default; align-items:flex-start; gap:12px;">
-                <div class="user-info">
-                    <div class="user-name">👤 ${u.display_name}</div>
-                    <div class="user-details">🆔 ${u.id} • статус: ${u.status} • роль: ${u.role}</div>
-                </div>
-                ${_renderUserActions(u)}
-            </div>
-        `).join('');
-
-    } catch (error) {
-        console.error('❌ Error loading user management:', error);
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка завантаження</div>';
-    }
-}
-
-async function approveUser(targetUserId) {
-    if (!confirm(`Підтвердити доступ користувачу ${targetUserId}?`)) return;
-    try {
-        const response = await fetch('/api/admin/user-management/approve', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
-        tg.showAlert('✅ ' + (data.message || 'Готово'));
-        loadUserManagement();
-    } catch (e) {
-        tg.showAlert('❌ ' + e.message);
-    }
-}
-
-async function blockUser(targetUserId) {
-    const reason = prompt('Причина блокування (необов\'язково):', '') || null;
-    if (!confirm(`Заблокувати користувача ${targetUserId}?`)) return;
-    try {
-        const response = await fetch('/api/admin/user-management/block', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId, reason: reason })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
-        tg.showAlert('✅ ' + (data.message || 'Готово'));
-        loadUserManagement();
-    } catch (e) {
-        tg.showAlert('❌ ' + e.message);
-    }
-}
-
-async function unblockUser(targetUserId) {
-    if (!confirm(`Розблокувати користувача ${targetUserId}?`)) return;
-    try {
-        const response = await fetch('/api/admin/user-management/unblock', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
-        tg.showAlert('✅ ' + (data.message || 'Готово'));
-        loadUserManagement();
-    } catch (e) {
-        tg.showAlert('❌ ' + e.message);
-    }
-}
-
-async function changeUserRole(targetUserId, role) {
-    if (!confirm(`Змінити роль користувачу ${targetUserId} на ${role}?`)) return;
-    try {
-        const response = await fetch('/api/admin/user-management/role', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId, role: role })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
-        tg.showAlert('✅ ' + (data.message || 'Готово'));
-        loadUserManagement();
-    } catch (e) {
-        tg.showAlert('❌ ' + e.message);
-    }
-}
-
-function updateDepartmentInfo(department, count) {
-    currentDepartment = department;
-    const info = document.getElementById('departmentInfo');
-    if (department !== null && count > 0) {
-        document.getElementById('currentDepartment').textContent = department;
-        document.getElementById('itemCount').textContent = count;
-        info.classList.add('active');
-    } else {
-        info.classList.remove('active');
-    }
-    
-    if (cachedProducts.length > 0) {
-        cachedProducts.forEach(p => {
-            p.is_different_department = (department !== null && p.department !== department);
-            p.current_list_department = department;
-        });
-        updateSearchResults();
-    }
-}
-
-function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
-function updateSearchBoxVisibility() { const searchBox = document.getElementById('searchBoxContainer'); if (currentTab === 'search') { searchBox.style.display = 'block'; } else { searchBox.style.display = 'none'; } }
-function switchTab(tab) { 
-    currentTab = tab; 
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
-    document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
-    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminContent']}; 
-    const [idx, id] = tabs[tab]; 
-    document.querySelectorAll('.tab')[idx].classList.add('active'); 
-    document.getElementById(id).classList.add('active'); 
-    updateSearchBoxVisibility(); 
-    if (tab === 'list') loadList(); 
-    if (tab === 'archives') loadArchives(); 
-    if (tab === 'admin' && isAdmin) loadAdminData();
-}
-function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
-function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
-document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(searchTimeout); const query = e.target.value.trim(); if (query.length < 2) { document.getElementById('searchResults').innerHTML = ''; cachedProducts = []; return; } searchTimeout = setTimeout(() => search(query), 500); });
-
-function renderProduct(p) {
-    const isLocked = p.is_different_department;
-    const lockedClass = isLocked ? ' locked' : '';
-    const statusClass = isLocked ? ' locked' : '';
-    const statusText = isLocked ? '🔒 Заблоковано' : '✅ Знайдено';
-    const clickHandler = isLocked ? `onclick="showLockedAlert(${p.current_list_department})"` : `onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
-    
-    return `<div class="product-card${lockedClass}" data-product-id="${p.id}" ${clickHandler}>
-        <div class="lock-overlay">🔒</div>
-        <div class="product-header">
-            <span class="product-article">🆔 ${p.article}</span>
-            <span class="product-status${statusClass}">${statusText}</span>
-        </div>
-        <div class="product-name">📝 ${p.name}</div>
-        <div class="product-details">
-            <div class="product-detail-row"><span class="product-detail-label">🏢 Відділ:</span><span class="product-detail-value">${p.department}</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">📂 Група:</span><span class="product-detail-value">${p.group}</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">⏳ Без руху (міс):</span><span class="product-detail-value ${p.months_without_movement > 3 ? 'warning' : ''}">${p.months_without_movement}</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">💰 Сума залишку:</span><span class="product-detail-value highlight">${p.balance_sum.toFixed(2)} грн</span></div>
-            <div class="product-detail-row"><span class="product-detail-label">📦 Доступно:</span><span class="product-detail-value success">${p.available}</span></div>
-            ${p.user_reserved > 0 ? `<div class="product-detail-row"><span class="product-detail-label">🛒 В резерві:</span><span class="product-detail-value warning">${p.user_reserved} (${p.user_reserved_sum.toFixed(2)} грн)</span></div>` : ''}
-        </div>
-    </div>`;
-}
-
-function showLockedAlert(dept) {
-    tg.showAlert(`🔒 Цей товар з іншого відділу.\\n\\nПоточний список для відділу ${dept}.\\nЗбережіть або очистіть список щоб почати новий.`);
-}
-
-function updateSearchResults() {
-    const results = document.getElementById('searchResults');
-    const visibleProducts = cachedProducts.filter(p => p.available > 0);
-    
-    if (visibleProducts.length === 0) {
-        results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено або все зарезервовано</div>';
-        return;
-    }
-    
-    results.innerHTML = visibleProducts.map(p => renderProduct(p)).join('');
-}
-
-async function search(query) { 
-    const results = document.getElementById('searchResults'); 
-    results.innerHTML = '<div class="loader">🔍 Пошук...</div>'; 
-    try { 
-        const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, user_id: userId}) }); 
-        const data = await response.json(); 
-        if (!data.products || data.products.length === 0) { 
-            results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Нічого не знайдено</div>'; 
-            cachedProducts = [];
-            return; 
-        }
-        cachedProducts = data.products.filter(p => p.available > 0);
-        updateSearchResults();
-    } catch (error) { 
-        results.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Помилка пошуку</div>'; 
-        cachedProducts = [];
-    } 
-}
-
-// ... (rest of original file unchanged, kept for brevity in this commit message)
 </script>
+    <script src="/static/js/core.js"></script>
+    <script src="/static/js/search.js"></script>
+    <script src="/static/js/list.js"></script>
+    <script src="/static/js/archives.js"></script>
+    <script src="/static/js/admin.js"></script>
+    <script src="/static/js/init.js"></script>
+    <script src="/static/js/swipe.js"></script>
 </body>
 </html>
