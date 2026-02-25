@@ -1,29 +1,22 @@
-# PWA Іконки для Epic Service
+# Іконки застосунку
+
+Ця директорія містить PNG-іконки, які можуть використовуватись у фронтенді (наприклад, favicon/preview). Якщо у репозиторії залишилися файли з назвами `icon-192x192.png`, `icon-512x512.png` тощо — це просто набір зображень, а не обов’язково активна PWA-конфігурація.
 
 ## Генерація іконок
 
-### Варіант 1: Використання онлайн сервісів
+### Варіант 1: Онлайн генератори
 
-1. **PWA Asset Generator** (https://progressier.com/pwa-icons-and-ios-splash-screen-generator)
-   - Завантажте ваший логотип (512x512px або більше)
-   - Згенеруйте всі необхідні розміри
-   - Завантажте ZIP архів
+- PWA Asset Generator: https://progressier.com/pwa-icons-and-ios-splash-screen-generator
+- RealFaviconGenerator: https://realfavicongenerator.net/
+- Favicon.io: https://favicon.io/
 
-2. **RealFaviconGenerator** (https://realfavicongenerator.net/)
-   - Підтримує PWA та генерує всі потрібні формати
-
-3. **Favicon.io** (https://favicon.io/)
-   - Простий генератор з тексту, emoji або зображення
-
-### Варіант 2: Використання Python (PIL/Pillow)
+### Варіант 2: Python (PIL/Pillow)
 
 ```python
 from PIL import Image
 
-# Завантажте ваше оригінальне зображення
 original = Image.open('logo.png')
 
-# Розміри для PWA
 sizes = [72, 96, 128, 144, 152, 192, 384, 512]
 
 for size in sizes:
@@ -31,51 +24,22 @@ for size in sizes:
     resized.save(f'icon-{size}x{size}.png', 'PNG')
 ```
 
-### Варіант 3: Використання ImageMagick
+### Варіант 3: ImageMagick
 
 ```bash
 # Установка: sudo apt install imagemagick
 
-# Генерація всіх розмірів
 for size in 72 96 128 144 152 192 384 512; do
   convert logo.png -resize ${size}x${size} icon-${size}x${size}.png
 done
 ```
 
-## Необхідні файли
-
-Створіть наступні файли в цій директорії:
-
-- `icon-72x72.png` - 72x72px
-- `icon-96x96.png` - 96x96px
-- `icon-128x128.png` - 128x128px
-- `icon-144x144.png` - 144x144px
-- `icon-152x152.png` - 152x152px
-- `icon-192x192.png` - 192x192px (основна)
-- `icon-384x384.png` - 384x384px
-- `icon-512x512.png` - 512x512px (висока якість)
-- `screenshot-wide.png` - 1280x720px (альбомний)
-- `screenshot-narrow.png` - 720x1280px (портретний)
-
 ## Рекомендації
 
-1. **Формат**: PNG з прозорістю
-2. **Колірна схема**: Відповідає theme_color з manifest.json (#3b82f6)
-3. **Простір**: Залишайте 15-20% padding навколо логотипу
-4. **Чіткість**: Використовуйте векторний оригінал (якщо можливо)
+- Формат: PNG (за потреби з прозорістю)
+- Padding: 15–20% навколо логотипу
+- Оригінал: бажано вектор (SVG) або PNG високої якості
 
-## Скріншоти
+---
 
-Скріншоти показуються в Google Play Store та при установці:
-
-- **Wide** (1280x720px): Горизонтальний вигляд додатку
-- **Narrow** (720x1280px): Вертикальний вигляд на телефоні
-
-Можна зробити скріншоти робочого інтерфейсу або створити мокапи.
-
-## Швидка генерація з emoji (для тестування)
-
-Якщо потрібно швидко почати тестування, використайте:
-- https://favicon.io/emoji-favicons/
-- Оберіть emoji (наприклад, 🔧 або ⚙️)
-- Завантажте та перейменуйте файли
+"Зроблено в Україні з ❤️"
