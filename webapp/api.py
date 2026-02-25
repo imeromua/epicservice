@@ -13,48 +13,37 @@ from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-# Додаємо шлях до кореневої папки проекту
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Додаємо шлях до коренньої папки проекту
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from webapp.routers import admin, client, photos
+from webapp.routers import admin, client, photos, user_management
 
 # Створюємо FastAPI додаток
 app = FastAPI(
     title="EpicService API",
     description="API для управління замовленнями та товарами",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 # Статичні файли
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
-    name="static"
+    name="static",
 )
 
 # Шаблони
-templates = Jinja2Templates(
-    directory=os.path.join(os.path.dirname(__file__), "templates")
-)
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 # Підключаємо роутери
-app.include_router(
-    client.router,
-    prefix="/api",
-    tags=["client"]
-)
+app.include_router(client.router, prefix="/api", tags=["client"])
+app.include_router(photos.router, prefix="/api", tags=["photos"])
 
-app.include_router(
-    photos.router,
-    prefix="/api",
-    tags=["photos"]
-)
+# User-management під /api/admin/user-management/*
+app.include_router(user_management.router, prefix="/api/admin", tags=["admin"])
 
-app.include_router(
-    admin.router,
-    prefix="/api/admin",
-    tags=["admin"]
-)
+# Базовий admin router
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 
 # === Загальні ендпоїнти ===
@@ -108,17 +97,8 @@ async def admin_panel(request: Request):
 @app.get("/health")
 async def health_check():
     """Перевірка стану API"""
-    return {
-        "status": "ok",
-        "service": "epicservice",
-        "version": "2.0.0"
-    }
+    return {"status": "ok", "service": "epicservice", "version": "2.0.0"}
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        app,
-        host="127.0.0.1",
-        port=8000,
-        reload=True  # Автоперезавантаження під час розробки
-    )
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
