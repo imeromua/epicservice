@@ -8,6 +8,8 @@ def _set_default_env(name: str, value: str) -> None:
 
 # Ensure required env vars exist so importing project modules doesn't fail in CI.
 _set_default_env("BOT_TOKEN", "TEST:TOKEN")
+
+# Use real Postgres in CI via service container. For local run, these defaults are harmless.
 _set_default_env("DB_HOST", "localhost")
 _set_default_env("DB_PORT", "5432")
 _set_default_env("DB_NAME", "epicservice")
