@@ -142,6 +142,21 @@
                 <div class="loader">Завантаження...</div>
             </div>
 
+            <!-- User Management Section -->
+            <div class="admin-section-title">🧑‍💼 Керування користувачами</div>
+            <div id="userMgmtAlert"></div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="setUserMgmtFilter('pending')">⏳ Очікують</button>
+                <button class="btn" style="background:#8e8e93;" onclick="setUserMgmtFilter('active')">✅ Активні</button>
+                <button class="btn btn-warning" onclick="setUserMgmtFilter('blocked')">⛔️ Заблоковані</button>
+            </div>
+            <div class="search-box" style="padding:0; margin-bottom: 12px;">
+                <input type="text" id="userMgmtSearch" class="search-input" placeholder="Пошук (ім'я або @username)..." oninput="debouncedLoadUserManagement()">
+            </div>
+            <div id="userMgmtList">
+                <div class="loader">Завантаження...</div>
+            </div>
+
             <div class="admin-section-title">👥 Користувачі з активними списками</div>
             <div id="adminActiveUsers">
                 <div class="loader">Завантаження...</div>
@@ -244,6 +259,7 @@ if (!tg.initData) {
     <script src="/static/js/list.js"></script>
     <script src="/static/js/archives.js"></script>
     <script src="/static/js/admin.js"></script>
+    <script src="/static/js/user-management.js"></script>
     <script src="/static/js/init.js"></script>
     <script src="/static/js/swipe.js"></script>
 </body>
