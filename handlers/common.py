@@ -6,11 +6,16 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+    WebAppInfo,
+)
 
 from config import ADMIN_IDS, WEBAPP_URL
-from database.orm import orm_upsert_user
+from database.orm import orm_get_user_by_id, orm_upsert_user
 from keyboards.inline import get_admin_main_kb
 from lexicon.lexicon import LEXICON
 
@@ -29,76 +34,89 @@ async def clean_previous_keyboard(state: FSMContext, bot: Bot, chat_id: int):
     if previous_message_id:
         try:
             await bot.edit_message_reply_markup(
-                chat_id=chat_id,
-                message_id=previous_message_id,
-                reply_markup=None
+                chat_id=chat_id, message_id=previous_message_id, reply_markup=None
             )
         except TelegramBadRequest as e:
-            # Типова ситуація: повідомлення вже видалено або не змінилось
-            logger.debug("clean_previous_keyboard: не вдалося видалити клавіатуру (msg_id=%s): %s",
-                         previous_message_id, e)
+            logger.debug(
+                "clean_previous_keyboard: не вдалося видалити клавіатуру (msg_id=%s): %s",
+                previous_message_id,
+                e,
+            )
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
-    """
-    Обробник команди /start.
-    Реєструє користувача та автоматично відкриває Mini App.
-    Без клавіатур та зайвих повідомлень.
-    """
+    """Обробник команди /start."""
     user = message.from_user
     try:
-        # Реєструємо користувача в БД
-        await orm_upsert_user(
-            user_id=user.id,
-            username=user.username,
-            first_name=user.first_name
-        )
+        await orm_upsert_user(user_id=user.id, username=user.username, first_name=user.first_name)
         logger.info("Команда /start від користувача %s.", user.id)
 
-        # Очищаємо FSM state
         await state.clear()
 
         # Прибираємо всі reply-клавіатури
-        await message.answer(
-            "👋",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        
-        # Надсилаємо inline-клавіатуру з Mini App (без кнопки адмінки)
+        await message.answer("👋", reply_markup=ReplyKeyboardRemove())
+
+        # Адмін із env завжди має доступ
+        if user.id in ADMIN_IDS:
+            user_status = "active"
+            blocked_reason = None
+        else:
+            db_user = await orm_get_user_by_id(user.id)
+            user_status = getattr(db_user, "status", "pending")
+            blocked_reason = getattr(db_user, "blocked_reason", None)
+
+        if user_status == "pending":
+            await message.answer(
+                "⏳ Ваш доступ *очікує погодження* адміністратором.\n"
+                "Спробуйте зайти пізніше.",
+                parse_mode="Markdown",
+            )
+            return
+
+        if user_status == "blocked":
+            text = "⛔️ Ваш доступ *заблоковано*."
+            if blocked_reason:
+                text += f"\nПричина: {blocked_reason}"
+            await message.answer(text, parse_mode="Markdown")
+            return
+
+        # Active: показуємо кнопку WebApp
         inline_kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🌐 Відкрити EpicService", web_app=WebAppInfo(url=WEBAPP_URL))]
+                [
+                    InlineKeyboardButton(
+                        text="🌐 Відкрити EpicService",
+                        web_app=WebAppInfo(url=WEBAPP_URL),
+                    )
+                ]
             ]
         )
-        
+
         await message.answer(
             "🚀 *Ласкаво просимо!*",
             reply_markup=inline_kb,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
 
     except Exception as e:
-        logger.error("Неочікувана помилка в cmd_start для %s: %s", user.id, e, exc_info=True)
+        logger.error(
+            "Неочікувана помилка в cmd_start для %s: %s", user.id, e, exc_info=True
+        )
         await message.answer(LEXICON.UNEXPECTED_ERROR)
 
 
 @router.message(F.text == "/admin")
 async def admin_command_handler(message: Message):
-    """
-    Обробник команди /admin для адміністраторів.
-    Показує inline-меню з адміністративними функціями.
-    """
+    """Обробник команди /admin для адміністраторів."""
     user_id = message.from_user.id
-    
-    # Перевірка чи юзер є адміном
+
     if user_id not in ADMIN_IDS:
         await message.answer("❌ У вас немає доступу до адміністративних функцій.")
         return
-    
-    # Показуємо inline-меню
+
     await message.answer(
         "⚙️ *Панель адміністратора*\n\nОберіть дію:",
         reply_markup=get_admin_main_kb(),
-        parse_mode="Markdown"
+        parse_mode="Markdown",
     )
