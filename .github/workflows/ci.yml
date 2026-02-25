@@ -39,7 +39,7 @@ jobs:
 
       - name: Run migrations
         env:
-          BOT_TOKEN: "TEST:TOKEN"
+          BOT_TOKEN: "123456:TESTTOKEN"
           DB_HOST: "127.0.0.1"
           DB_PORT: "5432"
           DB_NAME: "epicservice"
@@ -50,7 +50,7 @@ jobs:
 
       - name: Run tests
         env:
-          BOT_TOKEN: "TEST:TOKEN"
+          BOT_TOKEN: "123456:TESTTOKEN"
           DB_HOST: "127.0.0.1"
           DB_PORT: "5432"
           DB_NAME: "epicservice"

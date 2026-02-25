@@ -1,6 +1,9 @@
+import asyncio
 import os
 import sys
 from pathlib import Path
+
+import pytest
 
 
 def _add_repo_root_to_syspath() -> None:
@@ -16,10 +19,23 @@ def _set_default_env(name: str, value: str) -> None:
         os.environ[name] = value
 
 
+@pytest.fixture(scope="session")
+def event_loop():
+    """Single event loop for all tests.
+
+    Required because the app creates a module-level async SQLAlchemy engine/pool,
+    and asyncpg connections can't be shared across multiple event loops.
+    """
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
 _add_repo_root_to_syspath()
 
 # Ensure required env vars exist so importing project modules doesn't fail in CI.
-_set_default_env("BOT_TOKEN", "TEST:TOKEN")
+# aiogram validates token format at import-time in routers; use a syntactically valid token.
+_set_default_env("BOT_TOKEN", "123456:TESTTOKEN")
 
 # Use real Postgres in CI via service container. For local run, these defaults are harmless.
 _set_default_env("DB_HOST", "localhost")
