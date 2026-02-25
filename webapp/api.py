@@ -78,6 +78,8 @@ async def favicon():
 async def service_worker():
     """Віддає Service Worker (історичний ендпоїнт; файл лежить у static/)"""
     sw_path = os.path.join(os.path.dirname(__file__), "static", "sw.js")
+    if not os.path.isfile(sw_path):
+        return Response(status_code=204)
     response = FileResponse(sw_path, media_type="application/javascript")
     # Забороняємо кешування Service Worker
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
