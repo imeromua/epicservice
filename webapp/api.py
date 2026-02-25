@@ -18,11 +18,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from webapp.routers import admin, client, photos
 
+APP_VERSION = "2.2.0"
+
 # Створюємо FastAPI додаток
 app = FastAPI(
     title="EpicService API",
     description="API для управління замовленнями та товарами",
-    version="2.0.0"
+    version=APP_VERSION
 )
 
 # Статичні файли
@@ -67,7 +69,7 @@ async def favicon():
 
 @app.get("/sw.js", include_in_schema=False)
 async def service_worker():
-    """Віддає Service Worker для PWA (актуальна версія з static/)"""
+    """Віддає Service Worker (історичний ендпоїнт; файл лежить у static/)"""
     sw_path = os.path.join(os.path.dirname(__file__), "static", "sw.js")
     response = FileResponse(sw_path, media_type="application/javascript")
     # Забороняємо кешування Service Worker
@@ -83,7 +85,7 @@ async def home(request: Request):
     # Читаємо список ID адмінів з .env
     admin_ids_str = os.getenv("WEBAPP_ADMIN_IDS", "")
     admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
-    
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "admin_ids": admin_ids
@@ -108,7 +110,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "epicservice",
-        "version": "2.0.0"
+        "version": APP_VERSION
     }
 
 

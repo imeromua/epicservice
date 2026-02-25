@@ -1,0 +1,17 @@
+name: "Feature request"
+description: "Запропонувати покращення"
+title: "feat: <коротко>"
+labels: ["feature"]
+body:
+  - type: textarea
+    attributes:
+      label: "Проблема"
+      description: "Що болить/чого не вистачає"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Пропозиція"
+      description: "Як хочеш, щоб це працювало"
+    validations:
+      required: true

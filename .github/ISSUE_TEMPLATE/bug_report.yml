@@ -1,0 +1,23 @@
+name: "Bug report"
+description: "Повідомити про баг"
+title: "bug: <коротко>"
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes:
+      label: "Що сталося"
+      description: "Опиши проблему"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Як відтворити"
+      description: "Кроки для відтворення"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Логи/скріншоти"
+      description: "Додай все корисне"
+    validations:
+      required: false
