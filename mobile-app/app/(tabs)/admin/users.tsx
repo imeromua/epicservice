@@ -55,22 +55,12 @@ export default function UsersScreen() {
 
   const handleBlock = useCallback(
     async (targetId: number) => {
-      Alert.prompt?.('Причина блокування', '', async (reason) => {
-        try {
-          await blockUser(targetId, reason || 'Заблоковано адміном');
-          await loadUsers();
-        } catch {
-          Alert.alert('Помилка', 'Не вдалося заблокувати');
-        }
-      }) ??
-        (async () => {
-          try {
-            await blockUser(targetId, 'Заблоковано адміном');
-            await loadUsers();
-          } catch {
-            Alert.alert('Помилка', 'Не вдалося заблокувати');
-          }
-        })();
+      try {
+        await blockUser(targetId, 'Заблоковано адміном');
+        await loadUsers();
+      } catch {
+        Alert.alert('Помилка', 'Не вдалося заблокувати');
+      }
     },
     [blockUser, loadUsers],
   );
