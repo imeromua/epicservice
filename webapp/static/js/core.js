@@ -22,7 +22,7 @@ async function checkUserRole() {
     try {
         const resp = await fetch(`/api/user/role?user_id=${userId}`);
         const data = await resp.json();
-        userRole = data.role || 'user';
+        userRole = String(data.role || 'user').trim().toLowerCase();
         if (userRole === 'moderator' || userRole === 'admin') {
             const modBtn = document.getElementById('moderationTabBtn');
             if (modBtn) modBtn.classList.remove('hidden');

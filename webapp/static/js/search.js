@@ -56,6 +56,9 @@ function refreshCurrentTab() {
         case 'archives':
             loadArchives();
             break;
+        case 'moderation':
+            loadModeratorPhotoModeration();
+            break;
         case 'admin':
             if (isAdmin) loadAdminData();
             break;
@@ -90,9 +93,9 @@ function switchTab(tab) {
     currentTab = tab; 
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
-    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminContent']}; 
-    const [idx, id] = tabs[tab]; 
-    document.querySelectorAll('.tab')[idx].classList.add('active'); 
+    const tabs = {'search': ['searchTabBtn','searchTab'], 'list': ['listTabBtn','listTab'], 'archives': ['archivesTabBtn','archivesTab'], 'moderation': ['moderationTabBtn','moderationContent'], 'admin': ['adminTabBtn','adminContent']}; 
+    const [btnId, id] = tabs[tab]; 
+    document.getElementById(btnId).classList.add('active'); 
     document.getElementById(id).classList.add('active'); 
     updateSearchBoxVisibility(); 
     
@@ -103,6 +106,7 @@ function switchTab(tab) {
     
     if (tab === 'list') loadList(); 
     if (tab === 'archives') loadArchives(); 
+    if (tab === 'moderation') loadModeratorPhotoModeration();
     if (tab === 'admin' && isAdmin) loadAdminData();
 }
 function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
@@ -353,4 +357,3 @@ async function clearList() {
         tg.showAlert('❌ ' + e.message); 
     } 
 }
-
