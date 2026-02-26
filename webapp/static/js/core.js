@@ -62,10 +62,10 @@ function switchTab(tab) {
     currentTab = tab; 
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
-    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'moderation': [3,'moderationContent'], 'admin': [4,'adminContent']}; 
-    const [idx, id] = tabs[tab]; 
-    document.querySelectorAll('.tab')[idx].classList.add('active'); 
-    document.getElementById(id).classList.add('active'); 
+    const tabs = {'search': ['searchTabBtn','searchTab'], 'list': ['listTabBtn','listTab'], 'archives': ['archivesTabBtn','archivesTab'], 'moderation': ['moderationTabBtn','moderationContent'], 'admin': ['adminTabBtn','adminContent']}; 
+    const [btnId, contentId] = tabs[tab]; 
+    document.getElementById(btnId).classList.add('active'); 
+    document.getElementById(contentId).classList.add('active'); 
     updateSearchBoxVisibility(); 
     
     if (typeof updateFiltersButtonVisibility === 'function') {
@@ -74,7 +74,7 @@ function switchTab(tab) {
     
     if (tab === 'list') loadList(); 
     if (tab === 'archives') loadArchives(); 
-    if (tab === 'moderation' && (userRole === 'moderator' || userRole === 'admin' || isAdmin)) loadModeratorPhotoModeration();
+    if (tab === 'moderation') loadModeratorPhotoModeration();
     if (tab === 'admin' && isAdmin) loadAdminData();
 }
 
