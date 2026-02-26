@@ -570,10 +570,10 @@ async function loadModeratorPhotoModeration() {
         container.innerHTML = `
             <div class="moderation-horizontal-list">
                 ${data.photos.map(photo => {
-                    const escapedArticle = (photo.article || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    const escapedName = (photo.product_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    const escapedUser = (photo.uploaded_by || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    const escapedDate = (photo.uploaded_at || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedArticle = (photo.article || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedName = (photo.product_name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedUser = (photo.uploaded_by || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedDate = (photo.uploaded_at || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                     
                     return `
                     <div class="moderation-card" id="mod-${photo.id}" onclick="openModerationPopup(${photo.id}, '/static/${photo.file_path}', '${escapedArticle}', '${escapedName}', '${escapedUser}', '${escapedDate}', ${photo.file_size})">
