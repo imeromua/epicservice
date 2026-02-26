@@ -50,38 +50,38 @@ const API = (function() {
                 }),
                 
             getTempList: (userId) => 
-                request(`/list?user_id=${userId}`),
+                request(`/list/${userId}`),
                 
             addToList: (userId, productId, quantity) => 
-                request('/list/add', {
+                request('/add', {
                     method: 'POST',
                     body: { user_id: userId, product_id: productId, quantity }
                 }),
                 
-            updateQuantity: (userId, itemId, quantity) => 
-                request('/list/update', {
-                    method: 'PUT',
-                    body: { user_id: userId, item_id: itemId, quantity }
+            updateQuantity: (userId, productId, quantity) => 
+                request('/update', {
+                    method: 'POST',
+                    body: { user_id: userId, product_id: productId, quantity }
                 }),
                 
-            deleteFromList: (userId, itemId) => 
-                request(`/list/delete?user_id=${userId}&item_id=${itemId}`, {
-                    method: 'DELETE'
+            deleteFromList: (userId, productId) => 
+                request('/delete', {
+                    method: 'POST',
+                    body: { user_id: userId, product_id: productId }
                 }),
                 
             clearList: (userId) => 
-                request(`/list/clear?user_id=${userId}`, {
+                request(`/clear/${userId}`, {
                     method: 'POST'
                 }),
                 
-            checkoutList: (userId) => 
-                request('/list/checkout', {
-                    method: 'POST',
-                    body: { user_id: userId }
+            saveList: (userId) => 
+                request(`/save/${userId}`, {
+                    method: 'POST'
                 }),
 
             getArchives: (userId) => 
-                request(`/archives?user_id=${userId}`),
+                request(`/archives/${userId}`),
 
             deleteArchive: (filename, userId) => 
                 request(`/archive/delete/${encodeURIComponent(filename)}?user_id=${userId}`, {
@@ -102,10 +102,10 @@ const API = (function() {
                 request(`/admin/users?user_id=${userId}`),
 
             getActiveUsers: (userId) => 
-                request(`/admin/active_users?user_id=${userId}`),
+                request(`/admin/users/active?user_id=${userId}`),
 
             getReservesByDepartments: (userId) => 
-                request(`/admin/reserves/departments?user_id=${userId}`),
+                request(`/admin/reserved/by-department?user_id=${userId}`),
 
             sendBroadcast: (userId, message) => 
                 request('/admin/broadcast', {
@@ -119,7 +119,7 @@ const API = (function() {
                 
                 // Для FormData використовуємо нативний fetch, щоб браузер сам проставив правильний Content-Type з boundary
                 try {
-                    const response = await fetch(`${BASE_URL}/admin/upload?user_id=${userId}`, {
+                    const response = await fetch(`${BASE_URL}/admin/import?user_id=${userId}`, {
                         method: 'POST',
                         body: formData
                     });
@@ -127,7 +127,7 @@ const API = (function() {
                     if (!response.ok) throw new Error(data.detail || data.message || 'Помилка завантаження');
                     return data;
                 } catch (error) {
-                    console.error('[API Error] POST /admin/upload:', error.message);
+                    console.error('[API Error] POST /admin/import:', error.message);
                     throw error;
                 }
             }
