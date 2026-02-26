@@ -43,6 +43,7 @@ EpicService — це комплексне рішення для управлін
 - 🗄️ **Управління архівами** — доступ до всіх файлів
 - 🖼️ **Модерація фото** — схвалення/відхилення фото, черга `pending`, причина відхилення
 - 🗑️ **Керування фото** — видалення фото (в т.ч. масові адмін-операції)
+- 👥 **Управління користувачами** — RBAC: схвалення, блокування, ролі (pending → active → blocked)
 - 📈 **Візуалізація** — графіки резервів по відділах
 
 ---
@@ -58,12 +59,19 @@ epicservice/
 │   ├── engine.py            # Async engine
 │   └── orm.py               # ORM queries
 ├── handlers/
-│   ├── common.py            # /start, кнопка "Адмінка"
+│   ├── common.py            # /start, RBAC перевірка, кнопка "Адмінка"
+│   ├── archive.py           # Архівні операції
+│   ├── user_search.py       # Пошук (deprecated, логіка в webapp)
 │   ├── admin/               # Адмін-хендлери (bot)
 │   │   ├── core.py
 │   │   ├── import_handlers.py
 │   │   ├── report_handlers.py
-│   │   └── archive_handlers.py
+│   │   ├── archive_handlers.py
+│   │   └── lock_common.py   # Блокування відділів
+│   ├── user/                # Хендлери користувача (deprecated, логіка в webapp)
+│   │   ├── list_editing.py
+│   │   ├── list_management.py
+│   │   └── list_saving.py
 │   ├── webapp_handler.py    # Обробка webapp_data
 │   └── error_handler.py     # Глобальна обробка помилок
 ├── webapp/
@@ -71,7 +79,8 @@ epicservice/
 │   ├── routers/
 │   │   ├── client.py        # User API endpoints
 │   │   ├── admin.py         # Admin API endpoints
-│   │   └── photos.py        # Photos API endpoints
+│   │   ├── photos.py        # Photos API endpoints
+│   │   └── user_management.py # RBAC / управління користувачами
 │   ├── templates/
 │   │   └── index.html       # Mini App frontend
 │   ├── utils/
@@ -84,10 +93,12 @@ epicservice/
 ├── utils/
 │   ├── list_processor.py    # Створення Excel
 │   ├── archive_manager.py   # Ротація файлів
-│   └── admin_helpers.py     # Admin utilities
+│   ├── card_generator.py    # Генерація карток
+│   ├── force_save_helper.py # Примусове збереження
+│   └── markdown_corrector.py # Корекція форматування
 ├── keyboards/
 │   ├── inline.py            # Inline keyboards
-│   └── reply.py             # Reply keyboards
+│   └── webapp.py            # WebApp keyboards
 ├── middlewares/
 │   └── logging_middleware.py
 ├── lexicon/
@@ -291,7 +302,10 @@ server {
 
 #### **User API** (`/api`)
 - `POST /api/search` - Пошук товарів
+- `POST /api/products/filter` - Фільтрація товарів
+- `GET /api/products/departments` - Список відділів
 - `GET /api/list/{user_id}` - Поточний список
+- `GET /api/list/department/{user_id}` - Поточний відділ списку
 - `POST /api/add` - Додати товар
 - `POST /api/update` - Оновити кількість
 - `POST /api/delete` - Видалити товар
@@ -299,6 +313,9 @@ server {
 - `POST /api/clear/{user_id}` - Очистити список
 - `GET /api/archives/{user_id}` - Архіви користувача
 - `GET /api/archives/download-all/{user_id}` - ZIP всіх архівів
+- `GET /api/archive/stats/{filename}` - Статистика архіву
+- `GET /api/archive/download/{filename}` - Завантажити архів
+- `DELETE /api/archive/delete/{filename}` - Видалити архів
 - `GET /api/statistics/{user_id}` - Статистика користувача
 
 #### **Photos API** (`/api/photos`)
@@ -310,13 +327,26 @@ server {
 
 #### **Admin API** (`/api/admin`)
 - `GET /api/admin/statistics` - Загальна статистика
+- `GET /api/admin/summary` - Зведена статистика
 - `POST /api/admin/import` - Імпорт з Excel
 - `GET /api/admin/export/stock` - Експорт залишків
 - `POST /api/admin/force-save/{user_id}` - Примусове збереження
 - `POST /api/admin/broadcast` - Розсилка повідомлень
-- `GET /api/admin/users/all` - Всі користувачі
+- `GET /api/admin/users` - Список користувачів
+- `GET /api/admin/users/all` - Всі користувачі (з статистикою)
 - `GET /api/admin/users/active` - Активні списки
+- `GET /api/admin/products/info` - Інфо про товари
+- `GET /api/admin/reserved/by-department` - Резерви по відділах
+- `GET /api/admin/archives` - Всі архіви
+- `GET /api/admin/archives/download/{filename}` - Завантажити архів
 - `GET /api/admin/archives/download-all` - ZIP всіх архівів
+
+#### **User Management API** (`/api/admin/user-management`)
+- `GET /api/admin/user-management/users` - Список користувачів (з RBAC)
+- `POST /api/admin/user-management/approve` - Схвалити користувача
+- `POST /api/admin/user-management/block` - Заблокувати користувача
+- `POST /api/admin/user-management/unblock` - Розблокувати користувача
+- `POST /api/admin/user-management/role` - Змінити роль користувача
 
 ---
 

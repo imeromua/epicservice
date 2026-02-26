@@ -27,6 +27,7 @@ WebApp — це клієнтська частина проекту EpicService, 
 - 🔍 **Пошук** товарів з debounce (500ms)
 - 📋 **Списки** з редагуванням та видаленням
 - 🔒 **Блокування відділів** — візуальна індикація
+- 📷 **Фото товарів** — завантаження, галерея, модерація
 - 📊 **Статистика** — красива картка з градієнтом
 - 📁 **Архів** — з детальною інформацією
 - 📥 **ZIP експорт** всіх архівів
@@ -40,6 +41,8 @@ WebApp — це клієнтська частина проекту EpicService, 
 - 💾 **Примусове збереження** списків
 - 📢 **Розсилка** повідомлень
 - 📈 **Візуалізація** резервів по відділах
+- 🖼️ **Модерація фото** — черга pending, схвалення/відхилення
+- 👥 **Управління користувачами** — RBAC (approve/block/unblock/role)
 
 ---
 
@@ -50,11 +53,17 @@ webapp/
 ├── api.py                  # FastAPI додаток
 ├── routers/
 │   ├── client.py          # User API endpoints
-│   └── admin.py           # Admin API endpoints
+│   ├── admin.py           # Admin API endpoints
+│   ├── photos.py          # Photos API endpoints
+│   └── user_management.py # RBAC / управління користувачами
 ├── templates/
 │   └── index.html         # Основний SPA
+├── utils/
+│   └── image_processing.py # Стиснення/обробка зображень
 └── static/
     ├── admin.html         # Адмін-панель (статична)
+    ├── css/               # Стилі (variables, layout, photos, admin, ...)
+    ├── js/                # Скрипти (app, search, list, photos, admin, ...)
     └── icons/
         ├── icon-192x192.png
         ├── icon-512x512.png
@@ -488,7 +497,7 @@ WantedBy=multi-user.target
 
 ---
 
-**Версія:** 2.1.0  
+**Версія:** 2.2.0  
 **Остання оновлення:** 25.02.2026
 
 ---
