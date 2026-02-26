@@ -61,10 +61,14 @@ export function createUser(
     'INSERT INTO users (login, password_hash, first_name, role) VALUES (?, ?, ?, ?)',
     [login, passwordHash, firstName, role]
   );
-  return db.getFirstSync<User>(
+  const user = db.getFirstSync<User>(
     'SELECT * FROM users WHERE id = ?',
     [result.lastInsertRowId]
-  )!;
+  );
+  if (!user) {
+    throw new Error('Failed to create user');
+  }
+  return user;
 }
 
 export function getUserByLogin(login: string): User | null {

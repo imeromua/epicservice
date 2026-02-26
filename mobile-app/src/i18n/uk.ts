@@ -77,7 +77,7 @@ export const uk = {
   // Archives
   archivesTitle: 'Архіви',
   archivesEmpty: 'Архіви порожні',
-  archivesEmptyHint: 'Збережені списки з\'являться тут',
+  archivesEmptyHint: 'Збережені списки з\u2019являться тут',
   deleteArchive: 'Видалити архів?',
   deleteArchiveConfirm: 'Видалити цей збережений список?',
   archiveDeleted: 'Архів видалено',

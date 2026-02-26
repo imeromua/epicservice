@@ -1,7 +1,4 @@
-import { parseCSV, parseCSVLine } from '../src/utils/csv';
-
-// Експортуємо parseCSVLine для тестування
-// Тестуємо через parseCSV яка використовує parseCSVLine внутрішньо
+import { parseCSV } from '../src/utils/csv';
 
 describe('parseCSV — парсинг CSV файлів', () => {
   test('парсить прості CSV дані без заголовка', () => {
