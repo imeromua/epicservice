@@ -169,3 +169,32 @@ def orm_get_all_users_sync() -> List[int]:
     with sync_session() as session:
         query = select(User.id)
         return list(session.execute(query).scalars().all())
+
+
+async def orm_get_user_by_login(login: str) -> User | None:
+    """Знаходить користувача за логіном (для автономної автентифікації)."""
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.login == login))
+        return result.scalar_one_or_none()
+
+
+async def orm_create_standalone_user(
+    user_id: int,
+    login: str,
+    password_hash: str,
+    first_name: str,
+) -> User:
+    """Створює користувача з логіном та паролем (автономний режим)."""
+    async with async_session() as session:
+        user = User(
+            id=user_id,
+            login=login,
+            password_hash=password_hash,
+            first_name=first_name,
+            status="pending",
+            role="user",
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        return user

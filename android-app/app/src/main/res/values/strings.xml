@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EpicService</string>
+    <string name="error_no_connection">Немає з\'єднання з сервером.\nПеревірте підключення до мережі.</string>
+    <string name="retry">🔄 Повторити</string>
+    <string name="biometric_title">Біометрична автентифікація</string>
+    <string name="biometric_subtitle">Підтвердіть свою особу</string>
+    <string name="biometric_cancel">Скасувати</string>
+</resources>

@@ -51,8 +51,10 @@ from .archives import (
 from .users import (
     orm_approve_user,
     orm_block_user,
+    orm_create_standalone_user,
     orm_get_all_users_sync,
     orm_get_user_by_id,
+    orm_get_user_by_login,
     orm_list_users,
     orm_set_user_role,
     orm_set_user_status,
@@ -98,4 +100,6 @@ __all__ = [
     "orm_unblock_user",
     "orm_set_user_role",
     "orm_get_all_users_sync",
+    "orm_get_user_by_login",
+    "orm_create_standalone_user",
 ]

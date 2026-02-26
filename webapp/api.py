@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from webapp.routers import admin, client, photos, user_management
+from webapp.routers import auth
 
 APP_VERSION = "2.2.0"
 
@@ -65,6 +66,13 @@ app.include_router(
     tags=["admin"]
 )
 
+# Автентифікація для автономного додатку
+app.include_router(
+    auth.router,
+    prefix="/api/auth",
+    tags=["auth"]
+)
+
 
 # === Загальні ендпоїнти ===
 
@@ -111,6 +119,17 @@ async def admin_panel(request: Request):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+@app.get("/standalone", response_class=HTMLResponse)
+async def standalone_home(request: Request):
+    """Standalone app page (no Telegram dependency)"""
+    admin_ids_str = os.getenv("WEBAPP_ADMIN_IDS", "")
+    admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
+    return templates.TemplateResponse("standalone.html", {
+        "request": request,
+        "admin_ids": admin_ids
+    })
 
 
 @app.get("/health")
