@@ -119,15 +119,23 @@
 ### 3.1 ER-діаграма
 
 ```
-┌──────────────────┐
-│      User          │
-├──────────────────┤
-│ id (PK)           │
-│ username          │
-│ first_name        │
-│ last_name         │
-│ created_at        │
-└─────┬─────────────┘
+┌────────────────────────────┐
+│          User               │
+├────────────────────────────┤
+│ id (PK, BigInt)            │
+│ username                   │
+│ first_name                 │
+│ created_at                 │
+│ status (pending/active/    │
+│         blocked)           │
+│ role (user/admin)          │
+│ approved_by                │
+│ approved_at                │
+│ blocked_by                 │
+│ blocked_at                 │
+│ blocked_reason             │
+│ updated_at                 │
+└─────┬──────────────────────┘
      │
      │ 1:N
      │
@@ -136,64 +144,89 @@
 ├────────────────────┤
 │ id (PK)             │
 │ user_id (FK)        │
-│ product_id (FK) ───┬───────────────────┐
-│ quantity            │ ┌───────────────────────┤
-│ created_at          │ │       Product        │
-└────────────────────┘ ├───────────────────────┤
-                         │ id (PK)              │
-┌────────────────────┐ │ article (UNIQUE)     │
-│    SavedList        │ │ name                 │
-├────────────────────┤ │ department           │
-│ id (PK)            │ │ group_name           │
-│ user_id (FK)       │ │ price                │
-│ filename           │ │ available            │
-│ filepath           │ │ reserved (резерв)  │
-│ created_at         │ │ no_movement          │
-└───┬─────────────────┘ │ is_active            │
-   │                    │ updated_at           │
-   │ 1:N                └───────────────────────┘
-   │
-┌──┼────────────────────┐
-│  SavedListItem       │
-├──────────────────────┤
-│ id (PK)             │
-│ saved_list_id (FK)  │
-│ product_id (FK)     │
-│ quantity            │
-│ price               │
-└──────────────────────┘
+│ product_id (FK) ───┬───────────────────────┐
+│ quantity            │ ┌───────────────────────────┤
+│                     │ │       Product              │
+└────────────────────┘ ├───────────────────────────┤
+                         │ id (PK)                    │
+┌────────────────────┐ │ артикул (UNIQUE, INDEX)    │
+│    SavedList        │ │ назва                      │
+├────────────────────┤ │ відділ                     │
+│ id (PK)            │ │ група                      │
+│ user_id (FK)       │ │ кількість                  │
+│ file_name          │ │ відкладено (резерв)       │
+│ file_path          │ │ місяці_без_руху            │
+│ created_at         │ │ сума_залишку               │
+└───┬─────────────────┘ │ ціна                       │
+   │                    │ активний                   │
+   │ 1:N                └──────────┬────────────────┘
+   │                               │ 1:N
+┌──┼────────────────────┐ ┌──────┼────────────────────┐
+│  SavedListItem       │ │  ProductPhoto              │
+├──────────────────────┤ ├──────────────────────────┤
+│ id (PK)             │ │ id (PK)                    │
+│ list_id (FK)        │ │ артикул (FK)               │
+│ article_name        │ │ file_path                  │
+│ quantity            │ │ file_size                  │
+└──────────────────────┘ │ original_size              │
+                          │ photo_order                │
+                          │ uploaded_by (FK → User)    │
+                          │ uploaded_at                │
+                          │ status (pending/approved/  │
+                          │         rejected)          │
+                          │ moderated_by (FK → User)   │
+                          │ moderated_at               │
+                          │ rejection_reason           │
+                          └────────────────────────────┘
 ```
 
 ### 3.2 Основні таблиці
 
 #### **User**
 Зберігає інформацію про користувачів Telegram.
-- `id` — Telegram User ID (Primary Key)
-- `username`, `first_name`, `last_name` — з Telegram
+- `id` — Telegram User ID (Primary Key, BigInteger)
+- `username`, `first_name` — з Telegram
 - `created_at` — дата першого входу
+- `status` — стан доступу: `pending` (очікує), `active` (активний), `blocked` (заблокований)
+- `role` — роль: `user` (звичайний), `admin` (адміністратор)
+- `approved_by`, `approved_at` — хто та коли схвалив
+- `blocked_by`, `blocked_at`, `blocked_reason` — хто, коли та чому заблокував
+- `updated_at` — дата останнього оновлення запису
 
 #### **Product**
-Каталог товарів.
+Каталог товарів (назви колонок — кирилиця, відповідає структурі БД).
 - `id` — внутрішній ID
-- `article` — унікальний артикул (UNIQUE INDEX)
-- `name`, `department`, `group_name` — описові поля
-- `price`, `available` — ціна та доступна кількість
-- `reserved` — зарезервована кількість (для блокування)
-- `no_movement` — без руху (діагностика)
-- `is_active` — м'яке видалення
+- `артикул` — унікальний артикул (UNIQUE INDEX)
+- `назва`, `відділ`, `група` — описові поля
+- `кількість` — доступна кількість (String для гнучкості)
+- `відкладено` — зарезервована кількість
+- `місяці_без_руху` — місяців без руху (діагностика)
+- `сума_залишку` — сума залишку
+- `ціна` — ціна за одиницю
+- `активний` — м'яке видалення
+
+#### **ProductPhoto**
+Фото товарів з модерацією.
+- `артикул` — FK на Product
+- `file_path` — шлях на сервері
+- `file_size`, `original_size` — розмір після стискання та оригінальний
+- `photo_order` — порядок (0, 1, 2)
+- `uploaded_by`, `uploaded_at` — автор та дата
+- `status` — `pending`, `approved`, `rejected`
+- `moderated_by`, `moderated_at`, `rejection_reason` — дані модерації
 
 #### **TempList**
 Поточні (незбережені) списки користувачів.
-- `user_id` + `product_id` — composite key
+- `user_id` + `product_id` — зовнішні ключі
 - `quantity` — кількість у списку
 
-**Логіка:** При додаванні товару в список → `product.reserved += quantity`
+**Логіка:** При додаванні товару в список → `product.відкладено += quantity`
 
 #### **SavedList / SavedListItem**
 Збережені списки та їхні позиції.
 - Зберігаються після натискання "💾 Зберегти"
-- `filename` / `filepath` — Excel файл у `archives/active/`
-- Використовується для статистики
+- `file_name` / `file_path` — Excel файл у `archives/active/`
+- `SavedListItem` — позиції: `article_name`, `quantity`
 
 ---
 
@@ -211,7 +244,9 @@ database/
   orm.py                 # ORM queries
 
 handlers/
-  common.py              # /start, персистент клавіатура
+  common.py              # /start, RBAC перевірка, персистент клавіатура
+  archive.py             # Архівні операції
+  user_search.py         # Пошук (deprecated, логіка в webapp)
   webapp_handler.py      # Обробка webapp_data
   error_handler.py       # Глобальні помилки
   admin/
@@ -219,10 +254,15 @@ handlers/
     import_handlers.py   # Імпорт Excel
     report_handlers.py   # Звіти
     archive_handlers.py  # Архіви
+    lock_common.py       # Блокування відділів
+  user/                  # Deprecated (логіка перенесена в webapp)
+    list_editing.py
+    list_management.py
+    list_saving.py
 
 keyboards/
   inline.py              # Inline keyboards
-  reply.py               # Reply keyboards
+  webapp.py              # WebApp keyboards
 
 middlewares/
   logging_middleware.py  # Логування
@@ -230,7 +270,9 @@ middlewares/
 utils/
   list_processor.py      # Створення Excel
   archive_manager.py     # Ротація файлів
-  admin_helpers.py       # Admin utilities
+  card_generator.py      # Генерація карток
+  force_save_helper.py   # Примусове збереження
+  markdown_corrector.py  # Корекція форматування
 
 lexicon/
   lexicon.py             # Текстові константи
@@ -295,8 +337,12 @@ webapp/
   routers/
     client.py            # User endpoints
     admin.py             # Admin endpoints
+    photos.py            # Photos endpoints
+    user_management.py   # RBAC / управління користувачами
   templates/
     index.html           # SPA frontend
+  utils/
+    image_processing.py  # Стиснення/обробка зображень
   static/
     admin.html           # Адмін-сторінка
     css/                 # Статичні стилі
@@ -315,35 +361,60 @@ Mini App залежить від Telegram WebApp контексту (`window.Tel
 | Method | Endpoint | Опис |
 |--------|----------|------|
 | POST | `/api/search` | Пошук товарів |
+| POST | `/api/products/filter` | Фільтрація товарів |
+| GET | `/api/products/departments` | Список відділів |
 | GET | `/api/list/{user_id}` | Поточний список |
+| GET | `/api/list/department/{user_id}` | Поточний відділ |
 | POST | `/api/add` | Додати товар |
 | POST | `/api/update` | Оновити кількість |
 | POST | `/api/delete` | Видалити товар |
 | POST | `/api/save/{user_id}` | Зберегти список |
 | POST | `/api/clear/{user_id}` | Очистити список |
 | GET | `/api/archives/{user_id}` | Архіви |
-| GET | `/api/archives/download/{filename}` | Завантажити файл |
+| GET | `/api/archive/download/{filename}` | Завантажити файл |
+| DELETE | `/api/archive/delete/{filename}` | Видалити архів |
 | GET | `/api/archives/download-all/{user_id}` | ZIP експорт |
 | GET | `/api/statistics/{user_id}` | Статистика користувача |
 | GET | `/api/archive/stats/{filename}` | Статистика архіву |
-| GET | `/api/list/department/{user_id}` | Поточний відділ |
+
+#### **Photos API** (`/api/photos/*`)
+
+| Method | Endpoint | Опис |
+|--------|----------|------|
+| POST | `/api/photos/upload` | Завантажити фото (multipart) |
+| GET | `/api/photos/product/{article}` | Approved фото товару |
+| GET | `/api/photos/moderation/pending` | Черга на модерацію (admin) |
+| POST | `/api/photos/moderation/{photo_id}` | Схвалити/відхилити (admin) |
+| DELETE | `/api/photos/{photo_id}` | Видалити фото |
 
 #### **Admin API** (`/api/admin/*`)
 
 | Method | Endpoint | Опис |
 |--------|----------|------|
 | GET | `/api/admin/statistics` | Загальна статистика |
+| GET | `/api/admin/summary` | Зведена статистика |
 | POST | `/api/admin/import` | Імпорт Excel |
 | GET | `/api/admin/export/stock` | Експорт залишків |
 | POST | `/api/admin/force-save/{target_user_id}` | Примусове збереження |
 | POST | `/api/admin/broadcast` | Розсилка повідомлень |
-| GET | `/api/admin/users/all` | Всі користувачі |
+| GET | `/api/admin/users` | Список користувачів |
+| GET | `/api/admin/users/all` | Всі користувачі (з статистикою) |
 | GET | `/api/admin/users/active` | Активні списки |
 | GET | `/api/admin/products/info` | Інфо про товари |
 | GET | `/api/admin/reserved/by-department` | Резерви по відділах |
 | GET | `/api/admin/archives` | Всі архіви всіх юзерів |
 | GET | `/api/admin/archives/download/{filename}` | Завантажити архів |
 | GET | `/api/admin/archives/download-all` | ZIP всіх архівів |
+
+#### **User Management API** (`/api/admin/user-management/*`)
+
+| Method | Endpoint | Опис |
+|--------|----------|------|
+| GET | `/api/admin/user-management/users` | Список користувачів (RBAC) |
+| POST | `/api/admin/user-management/approve` | Схвалити користувача |
+| POST | `/api/admin/user-management/block` | Заблокувати |
+| POST | `/api/admin/user-management/unblock` | Розблокувати |
+| POST | `/api/admin/user-management/role` | Змінити роль |
 
 ---
 

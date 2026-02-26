@@ -25,6 +25,7 @@ make up
 make logs
 make ps
 make migrate
+make restart
 make down
 ```
 
