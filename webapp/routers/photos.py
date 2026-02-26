@@ -13,6 +13,8 @@ from database.engine import async_session
 from database.models import ProductPhoto, Product, User
 from webapp.utils.image_processing import compress_image
 
+from config import ADMIN_IDS
+
 # prefix="/photos" + include_router prefix="/api"  =>  "/api/photos/..."
 router = APIRouter(prefix="/photos", tags=["photos"])
 
@@ -141,9 +143,21 @@ async def get_product_photos(article: str):
         return JSONResponse(content={"success": False, "photos": []}, status_code=500)
 
 
+async def _verify_moderator_or_admin(user_id: int) -> None:
+    """Перевіряє, що користувач є модератором або адміністратором."""
+    if user_id in ADMIN_IDS:
+        return
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user or user.role not in ("moderator", "admin"):
+            raise HTTPException(status_code=403, detail="Доступ заборонено. Потрібні права модератора.")
+
+
 @router.get("/moderation/pending")
 async def get_pending_photos(user_id: int):
-    """Фото на модерації (тільки адмін)."""
+    """Фото на модерації (адмін або модератор)."""
+    await _verify_moderator_or_admin(user_id)
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -190,6 +204,7 @@ async def moderate_photo(
     user_id: int = Form(...),
 ):
     """Модерація: схвалити або відхилити."""
+    await _verify_moderator_or_admin(user_id)
     try:
         async with async_session() as session:
             result = await session.execute(

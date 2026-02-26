@@ -29,6 +29,7 @@ from database.orm import (
     orm_find_products,
     orm_get_temp_list,
     orm_get_temp_list_department,
+    orm_get_user_by_id,
     orm_update_temp_list_item_quantity,
 )
 from utils.archive_manager import ACTIVE_DIR, get_user_archives as fetch_user_archives, parse_filename
@@ -73,6 +74,16 @@ class FilterProductsRequest(BaseModel):
 
 
 # === Ендпоїнти ===
+
+
+@router.get("/user/role")
+async def get_user_role(user_id: int):
+    """Повертає роль користувача з бази даних."""
+    user = await orm_get_user_by_id(user_id)
+    if not user:
+        return JSONResponse(content={"role": "user"})
+    return JSONResponse(content={"role": user.role})
+
 
 @router.post("/search")
 async def search_products(req: SearchRequest):

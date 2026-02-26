@@ -14,6 +14,20 @@ if (isAdmin) {
     if (adminBtn) adminBtn.classList.remove('hidden');
 }
 
+// Fetch user role and show moderation tab for moderators
+if (userId) {
+    fetch(`/api/user/role?user_id=${userId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.role === 'moderator' || data.role === 'admin') {
+                isModerator = true;
+                const modBtn = document.getElementById('moderatorTabBtn');
+                if (modBtn && !isAdmin) modBtn.classList.remove('hidden');
+            }
+        })
+        .catch(e => console.warn('Failed to fetch user role:', e));
+}
+
 // Update functions
 function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
 function updateSearchBoxVisibility() { const searchBox = document.getElementById('searchBoxContainer'); if (currentTab === 'search') { searchBox.style.display = 'block'; } else { searchBox.style.display = 'none'; } }
@@ -42,7 +56,7 @@ function switchTab(tab) {
     currentTab = tab; 
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
-    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminContent']}; 
+    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'moderation': [3,'moderationContent'], 'admin': [4,'adminContent']}; 
     const [idx, id] = tabs[tab]; 
     document.querySelectorAll('.tab')[idx].classList.add('active'); 
     document.getElementById(id).classList.add('active'); 
@@ -54,6 +68,7 @@ function switchTab(tab) {
     
     if (tab === 'list') loadList(); 
     if (tab === 'archives') loadArchives(); 
+    if (tab === 'moderation' && isModerator) loadPhotoModerationMod();
     if (tab === 'admin' && isAdmin) loadAdminData();
 }
 

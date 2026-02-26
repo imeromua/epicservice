@@ -107,7 +107,18 @@ async function compressImage(file) {
  * Завантажити фото на модерацію (адмін)
  */
 async function loadPhotoModeration() {
-    const container = document.getElementById('photoModeration');
+    _loadPhotoModerationInto('photoModeration');
+}
+
+/**
+ * Завантажити фото на модерацію (модератор)
+ */
+async function loadPhotoModerationMod() {
+    _loadPhotoModerationInto('photoModerationMod');
+}
+
+async function _loadPhotoModerationInto(containerId) {
+    const container = document.getElementById(containerId);
     if (!container) return;
 
     container.innerHTML = '<div class="loader">Завантаження...</div>';
