@@ -4,7 +4,7 @@ JWT-based login/password auth without Telegram dependency.
 """
 
 import logging
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -101,7 +101,7 @@ async def register(req: RegisterRequest):
 
     # Генеруємо унікальний ID (великий, щоб не конфліктувати з Telegram ID)
     for _ in range(10):
-        user_id = random.randint(10_000_000_000, 99_999_999_999)
+        user_id = 10_000_000_000 + secrets.randbelow(89_999_999_999)
         if not await orm_get_user_by_id(user_id):
             break
     else:

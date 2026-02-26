@@ -42,6 +42,8 @@ logger.info("WebApp URL: %s", WEBAPP_URL)
 
 # --- JWT Authentication (Standalone App) ---
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "epicservice-standalone-secret-change-in-production")
+if JWT_SECRET_KEY == "epicservice-standalone-secret-change-in-production":
+    logger.warning("JWT_SECRET_KEY не задано! Використовується значення за замовчуванням. Обов'язково змініть для production!")
 
 
 def get_admin_ids() -> List[int]:
