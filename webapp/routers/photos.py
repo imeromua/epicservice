@@ -5,16 +5,27 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
+from config import ADMIN_IDS
 from database.engine import async_session
 from database.models import ProductPhoto, Product, User
 from webapp.utils.image_processing import compress_image
 
 # prefix="/photos" + include_router prefix="/api"  =>  "/api/photos/..."
 router = APIRouter(prefix="/photos", tags=["photos"])
+
+
+async def _is_admin_or_moderator(user_id: int) -> bool:
+    """Перевірка: чи є користувач адміністратором або модератором."""
+    if user_id in ADMIN_IDS:
+        return True
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        return user is not None and user.role in ("admin", "moderator")
 
 
 @router.post("/upload")
@@ -142,8 +153,10 @@ async def get_product_photos(article: str):
 
 
 @router.get("/moderation/pending")
-async def get_pending_photos(user_id: int):
-    """Фото на модерації (тільки адмін)."""
+async def get_pending_photos(user_id: int = Query(...)):
+    """Фото на модерації (адмін або модератор)."""
+    if not await _is_admin_or_moderator(user_id):
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -189,7 +202,9 @@ async def moderate_photo(
     reason: str = Form(None),
     user_id: int = Form(...),
 ):
-    """Модерація: схвалити або відхилити."""
+    """Модерація: схвалити або відхилити (адмін або модератор)."""
+    if not await _is_admin_or_moderator(user_id):
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
     try:
         async with async_session() as session:
             result = await session.execute(

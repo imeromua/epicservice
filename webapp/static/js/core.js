@@ -14,6 +14,26 @@ if (isAdmin) {
     if (adminBtn) adminBtn.classList.remove('hidden');
 }
 
+// Перевірка ролі користувача (модератор/адмін з БД)
+let userRole = 'user';
+
+async function checkUserRole() {
+    if (!userId) return;
+    try {
+        const resp = await fetch(`/api/user/role?user_id=${userId}`);
+        const data = await resp.json();
+        userRole = data.role || 'user';
+        if (userRole === 'moderator' || userRole === 'admin') {
+            const modBtn = document.getElementById('moderationTabBtn');
+            if (modBtn) modBtn.classList.remove('hidden');
+        }
+    } catch (e) {
+        console.warn('⚠️ Не вдалося отримати роль користувача:', e);
+    }
+}
+
+checkUserRole();
+
 // Update functions
 function updateListBadge(count) { const badge = document.getElementById('listBadge'); if (count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; } }
 function updateSearchBoxVisibility() { const searchBox = document.getElementById('searchBoxContainer'); if (currentTab === 'search') { searchBox.style.display = 'block'; } else { searchBox.style.display = 'none'; } }
@@ -42,10 +62,10 @@ function switchTab(tab) {
     currentTab = tab; 
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); 
-    const tabs = {'search': [0,'searchTab'], 'list': [1,'listTab'], 'archives': [2,'archivesTab'], 'admin': [3,'adminContent']}; 
-    const [idx, id] = tabs[tab]; 
-    document.querySelectorAll('.tab')[idx].classList.add('active'); 
-    document.getElementById(id).classList.add('active'); 
+    const tabs = {'search': ['searchTabBtn','searchTab'], 'list': ['listTabBtn','listTab'], 'archives': ['archivesTabBtn','archivesTab'], 'moderation': ['moderationTabBtn','moderationContent'], 'admin': ['adminTabBtn','adminContent']}; 
+    const [btnId, contentId] = tabs[tab]; 
+    document.getElementById(btnId).classList.add('active'); 
+    document.getElementById(contentId).classList.add('active'); 
     updateSearchBoxVisibility(); 
     
     if (typeof updateFiltersButtonVisibility === 'function') {
@@ -54,6 +74,7 @@ function switchTab(tab) {
     
     if (tab === 'list') loadList(); 
     if (tab === 'archives') loadArchives(); 
+    if (tab === 'moderation') loadModeratorPhotoModeration();
     if (tab === 'admin' && isAdmin) loadAdminData();
 }
 
