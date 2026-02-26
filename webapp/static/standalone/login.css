@@ -1,0 +1,18 @@
+/* standalone/login.css - Styles for standalone login overlay */
+/* Login form styling is inline in standalone.html */
+/* This file provides additional polish for focus states and transitions */
+
+#login-overlay input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+#login-overlay button:active {
+    transform: scale(0.98);
+}
+
+#login-btn:hover,
+#register-btn:hover,
+#biometric-btn:hover {
+    opacity: 0.9;
+}
