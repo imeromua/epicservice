@@ -35,6 +35,9 @@ archives/
 data.csv
 data.xlsx
 *.json
+!mobile-app/package.json
+!mobile-app/tsconfig.json
+!mobile-app/app.json
 .env.save
 # Backup files
 *.bak.*
@@ -52,3 +55,12 @@ android-app/*.apk
 android-app/app/release/
 android-app/app/debug/
 *.hprof
+
+# --- Mobile App (React Native / Expo) ---
+mobile-app/node_modules/
+mobile-app/.expo/
+mobile-app/dist/
+mobile-app/ios/
+mobile-app/android/
+mobile-app/.env
+mobile-app/web-build/
