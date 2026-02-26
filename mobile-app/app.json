@@ -33,7 +33,7 @@
     },
     "scheme": "epicservice",
     "extra": {
-      "apiBaseUrl": "https://epicservice.com.ua",
+      "apiBaseUrl": "https://anubis-ua.pp.ua",
       "router": {
         "origin": false
       }
