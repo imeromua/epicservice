@@ -35,6 +35,11 @@ archives/
 data.csv
 data.xlsx
 *.json
+!mobile-app/package.json
+!mobile-app/package-lock.json
+!mobile-app/app.json
+!mobile-app/tsconfig.json
+!mobile-app/jest.config.js
 .env.save
 # Backup files
 *.bak.*
