@@ -40,6 +40,9 @@ BOT_TOKEN = get_required_env("BOT_TOKEN")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://epicservice.example.com")
 logger.info("WebApp URL: %s", WEBAPP_URL)
 
+# --- JWT Authentication (Standalone App) ---
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "epicservice-standalone-secret-change-in-production")
+
 
 def get_admin_ids() -> List[int]:
     """

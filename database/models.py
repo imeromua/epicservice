@@ -29,6 +29,11 @@ class User(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     username: Mapped[str] = mapped_column(String(100), nullable=True)
     first_name: Mapped[str] = mapped_column(String(100))
+
+    # Автентифікація для автономного додатку (без Telegram)
+    login: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     created_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
 
     # RBAC + погодження доступу
