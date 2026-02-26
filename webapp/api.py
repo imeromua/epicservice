@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from webapp.routers import admin, client, photos
+from webapp.routers import admin, client, photos, user_management
 
 APP_VERSION = "2.2.0"
 
@@ -58,6 +58,13 @@ app.include_router(
     tags=["photos"]
 )
 
+# User management під /api/admin/user-management/*
+app.include_router(
+    user_management.router,
+    prefix="/api/admin",
+    tags=["admin"]
+)
+
 
 # === Загальні ендпоїнти ===
 
@@ -71,6 +78,8 @@ async def favicon():
 async def service_worker():
     """Віддає Service Worker (історичний ендпоїнт; файл лежить у static/)"""
     sw_path = os.path.join(os.path.dirname(__file__), "static", "sw.js")
+    if not os.path.isfile(sw_path):
+        return Response(status_code=204)
     response = FileResponse(sw_path, media_type="application/javascript")
     # Забороняємо кешування Service Worker
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

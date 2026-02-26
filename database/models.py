@@ -2,24 +2,49 @@
 
 from typing import List
 
-from sqlalchemy import (BigInteger, Boolean, DateTime, Float, ForeignKey, Integer,
-                        String, func)
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
     """Базовий клас для декларативних моделей SQLAlchemy."""
+
     pass
 
 
 class User(Base):
     """Модель, що представляє користувача бота."""
-    __tablename__ = 'users'
+
+    __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     username: Mapped[str] = mapped_column(String(100), nullable=True)
     first_name: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
+
+    # RBAC + погодження доступу
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
+
+    approved_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    approved_at: Mapped[DateTime | None] = mapped_column(DateTime, nullable=True)
+
+    blocked_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    blocked_at: Mapped[DateTime | None] = mapped_column(DateTime, nullable=True)
+    blocked_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     saved_lists: Mapped[List["SavedList"]] = relationship(back_populates="user")
     temp_list_items: Mapped[List["TempList"]] = relationship(back_populates="user")
@@ -27,7 +52,8 @@ class User(Base):
 
 class Product(Base):
     """Модель, що представляє товар на складі."""
-    __tablename__ = 'products'
+
+    __tablename__ = "products"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     # Кирилиця в назвах колонок зберігається навмисно — відповідає структурі БД
     артикул: Mapped[str] = mapped_column(String(20), unique=True, index=True)
@@ -46,43 +72,50 @@ class Product(Base):
 
 class ProductPhoto(Base):
     """Модель для зберігання фото товарів."""
-    __tablename__ = 'product_photos'
+
+    __tablename__ = "product_photos"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    артикул: Mapped[str] = mapped_column(String(20), ForeignKey('products.артикул'), index=True)
+    артикул: Mapped[str] = mapped_column(
+        String(20), ForeignKey("products.артикул"), index=True
+    )
     file_path: Mapped[str] = mapped_column(String(500))  # Шлях на сервері
     file_size: Mapped[int] = mapped_column(Integer)  # Розмір після стискання (байти)
     original_size: Mapped[int] = mapped_column(Integer)  # Оригінальний розмір
     photo_order: Mapped[int] = mapped_column(Integer, default=0)  # Порядок (0, 1, 2)
 
-    uploaded_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     uploaded_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
 
     # Модерація
-    status: Mapped[str] = mapped_column(String(20), default='pending')  # pending, approved, rejected
-    moderated_by: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, approved, rejected
+    moderated_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
     moderated_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
     rejection_reason: Mapped[str] = mapped_column(String(500), nullable=True)
 
 
 class SavedList(Base):
     """Модель, що представляє збережений список товарів користувача."""
-    __tablename__ = 'saved_lists'
+
+    __tablename__ = "saved_lists"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     file_name: Mapped[str] = mapped_column(String(100))
     file_path: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
 
-    items: Mapped[List["SavedListItem"]] = relationship(back_populates="saved_list", cascade="all, delete-orphan")
+    items: Mapped[List["SavedListItem"]] = relationship(
+        back_populates="saved_list", cascade="all, delete-orphan"
+    )
     user: Mapped["User"] = relationship(back_populates="saved_lists")
 
 
 class SavedListItem(Base):
     """Модель, що представляє один пункт у збереженому списку."""
-    __tablename__ = 'saved_list_items'
+
+    __tablename__ = "saved_list_items"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    list_id: Mapped[int] = mapped_column(ForeignKey('saved_lists.id'))
+    list_id: Mapped[int] = mapped_column(ForeignKey("saved_lists.id"))
     article_name: Mapped[str] = mapped_column(String(255))
     quantity: Mapped[int] = mapped_column(Integer)
 
@@ -91,11 +124,12 @@ class SavedListItem(Base):
 
 class TempList(Base):
     """Модель, що представляє тимчасовий (поточний) список товарів користувача."""
-    __tablename__ = 'temp_lists'
+
+    __tablename__ = "temp_lists"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     # index=True — прискорює запити пошуку за product_id та перевірки резервів
-    product_id: Mapped[int] = mapped_column(ForeignKey('products.id'), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
     quantity: Mapped[int] = mapped_column(Integer)
 
     product: Mapped["Product"] = relationship()
