@@ -11,21 +11,38 @@ let currentModerationPhoto = null;
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
     const adminContent = document.getElementById('adminContent');
-    if (!adminContent) return;
-
-    // Спостерігаємо зміни class — коли таб стає active, завантажуємо модерацію
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class' && adminContent.classList.contains('active')) {
-                loadPhotoModeration();
-            }
+    if (adminContent) {
+        // Спостерігаємо зміни class — коли таб стає active, завантажуємо модерацію
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class' && adminContent.classList.contains('active')) {
+                    loadPhotoModeration();
+                }
+            });
         });
-    });
-    observer.observe(adminContent, { attributes: true });
+        observer.observe(adminContent, { attributes: true });
 
-    // Якщо адмін вже активний при завантаженні
-    if (adminContent.classList.contains('active')) {
-        loadPhotoModeration();
+        // Якщо адмін вже активний при завантаженні
+        if (adminContent.classList.contains('active')) {
+            loadPhotoModeration();
+        }
+    }
+
+    // Автозавантаження модерації для вкладки модератора
+    const moderationContent = document.getElementById('moderationContent');
+    if (moderationContent) {
+        const modObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class' && moderationContent.classList.contains('active')) {
+                    loadModeratorPhotoModeration();
+                }
+            });
+        });
+        modObserver.observe(moderationContent, { attributes: true });
+
+        if (moderationContent.classList.contains('active')) {
+            loadModeratorPhotoModeration();
+        }
     }
 });
 
@@ -519,4 +536,67 @@ async function loadProductPhotos(article) {
         console.error('❌ Error loading photos:', error);
     }
     return [];
+}
+
+
+// ============================================================
+// Модерація для вкладки модератора
+// ============================================================
+
+/**
+ * Завантажити фото на модерацію (вкладка модератора)
+ */
+async function loadModeratorPhotoModeration() {
+    const container = document.getElementById('moderatorPhotoModeration');
+    if (!container) return;
+
+    container.innerHTML = '<div class="loader">Завантаження...</div>';
+
+    try {
+        const uid = typeof userId !== 'undefined' ? userId : 0;
+        const response = await fetch(`/api/photos/moderation/pending?user_id=${uid}`);
+        const data = await safeParseResponse(response);
+
+        if (!data.success) {
+            container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${data.message || 'Невідома'}</div>`;
+            return;
+        }
+
+        if (!data.photos || data.photos.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>Немає фото на модерацію</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="moderation-horizontal-list">
+                ${data.photos.map(photo => {
+                    const escapedArticle = (photo.article || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedName = (photo.product_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedUser = (photo.uploaded_by || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedDate = (photo.uploaded_at || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    
+                    return `
+                    <div class="moderation-card" id="mod-${photo.id}" onclick="openModerationPopup(${photo.id}, '/static/${photo.file_path}', '${escapedArticle}', '${escapedName}', '${escapedUser}', '${escapedDate}', ${photo.file_size})">
+                        <img src="/static/${photo.file_path}" 
+                             alt="Фото ${escapedArticle}"
+                             class="moderation-card-thumb"
+                             loading="lazy"
+                             onerror="this.src=''; this.alt='✖'">
+                        <div class="moderation-card-info">
+                            <div class="info-line"><strong>${photo.article}</strong></div>
+                            <div class="info-line">${photo.product_name}</div>
+                            <div class="info-line">👤 ${photo.uploaded_by}</div>
+                            <div class="info-line">📅 ${photo.uploaded_at}</div>
+                            <div class="info-line">💾 ${(photo.file_size / 1024).toFixed(0)} KB</div>
+                        </div>
+                    </div>
+                `;
+                }).join('')}
+            </div>
+        `;
+
+    } catch (error) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${error.message}</div>`;
+        console.error('❌ loadModeratorPhotoModeration error:', error);
+    }
 }
