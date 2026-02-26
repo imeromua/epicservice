@@ -52,3 +52,13 @@ android-app/*.apk
 android-app/app/release/
 android-app/app/debug/
 *.hprof
+
+# --- Mobile App (React Native + Expo) ---
+mobile-app/node_modules/
+mobile-app/.expo/
+mobile-app/dist/
+mobile-app/android/
+mobile-app/ios/
+mobile-app/.env
+mobile-app/*.apk
+mobile-app/*.aab
