@@ -94,7 +94,6 @@ android-app/android/.cxx/
 !android-app/android/gradle/wrapper/gradle-wrapper.properties
 android-app/package-lock.json
 android-app/package.json
-android-app/capacitor.config.json
 android-app/android/capacitor.settings.gradle
 android-app/android/gradlew
 android-app/android/gradlew.bat

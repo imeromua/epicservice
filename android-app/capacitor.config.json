@@ -1,0 +1,9 @@
+{
+  "appId": "ua.epicservice.app",
+  "appName": "EpicService",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["anubis-ua.pp.ua"]
+  }
+}
