@@ -33,6 +33,7 @@ from database.orm import (
     orm_get_users_with_active_lists,
     orm_smart_import,
     orm_subtract_collected,
+    orm_get_user_by_id,
 )
 from database.orm.products import SmartColumnMapper
 from database.engine import async_session
@@ -59,6 +60,21 @@ def verify_admin(user_id: int) -> int:
         logger.warning(f"Unauthorized admin access attempt by user {user_id}")
         raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
     return user_id
+
+
+async def verify_admin_or_moderator(user_id: int) -> int:
+    """
+    Перевіряє, чи є користувач адміністратором або модератором.
+    Адміни перевіряються за ADMIN_IDS, модератори — за роллю в БД.
+    Викидає HTTPException(403) якщо доступ заборонено.
+    """
+    if user_id in ADMIN_IDS:
+        return user_id
+    user = await orm_get_user_by_id(user_id)
+    if user and user.role == "moderator":
+        return user_id
+    logger.warning(f"Unauthorized access attempt by user {user_id}")
+    raise HTTPException(status_code=403, detail="Access denied. Admin or moderator rights required.")
 
 
 # === Pydantic Models ===
@@ -425,7 +441,7 @@ async def import_products(
     Підтримує розумне розпізнавання колонок.
     Опціонально розсилає сповіщення користувачам.
     """
-    verify_admin(user_id)
+    await verify_admin_or_moderator(user_id)
     
     if not file.filename.endswith((".xlsx", ".xls")):
         return JSONResponse(
@@ -493,7 +509,7 @@ async def export_stock_report(user_id: int = Query(...), background_tasks: Backg
     Експорт звіту про залишки на складі.
     Враховує резерви з temp_list.
     """
-    verify_admin(user_id)
+    await verify_admin_or_moderator(user_id)
     try:
         loop = asyncio.get_running_loop()
         report_path = await loop.run_in_executor(None, _create_stock_report_sync)
