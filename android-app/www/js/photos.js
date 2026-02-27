@@ -130,3 +130,115 @@ const EpicPhotos = (function() {
 
     return { loadModeration, moderatePhoto, openModerationPopup, closeModerationPopup, moderateFromPopup };
 })();
+
+/**
+ * Photos - модуль для додавання фотографій товарів
+ */
+const Photos = (function() {
+    'use strict';
+
+    const _SERVER = window.APP_CONFIG ? window.APP_CONFIG.serverUrl : 'https://anubis-ua.pp.ua';
+
+    function _esc(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    async function openCamera(article) {
+        // FIX: Використати Capacitor Camera або fallback через file input
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
+            try {
+                const Camera = window.Capacitor.Plugins.Camera;
+                const image = await Camera.getPhoto({
+                    quality: 80,
+                    allowEditing: false,
+                    resultType: 'dataUrl',
+                    source: 'PROMPT'
+                });
+                const blob = await fetch(image.dataUrl).then(function(r) { return r.blob(); });
+                await uploadPhoto(article, blob);
+            } catch (error) {
+                if (error.message !== 'User cancelled photos app') {
+                    App.toast('❌ ' + error.message, 'error');
+                }
+            }
+        } else {
+            // Fallback: використати стандартний file input з capture
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = 'environment';
+            input.onchange = async function(e) {
+                var file = e.target.files[0];
+                if (file) await uploadPhoto(article, file);
+            };
+            input.click();
+        }
+    }
+
+    async function uploadPhoto(article, blob) {
+        try {
+            App.toast('⏳ Завантаження фото...', 'info');
+            var token = App.getToken();
+            var formData = new FormData();
+            formData.append('photo', blob, 'photo.jpg');
+            formData.append('article', article);
+            var response = await fetch(_SERVER + '/api/photos/upload', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: formData
+            });
+            var data = await response.json();
+            if (data.success) {
+                App.toast('✅ Фото додано!', 'success');
+                loadProductPhotos(article);
+            } else {
+                App.toast('❌ ' + (data.message || 'Помилка'), 'error');
+            }
+        } catch (error) {
+            App.toast('❌ ' + error.message, 'error');
+        }
+    }
+
+    async function loadProductPhotos(article) {
+        try {
+            var token = App.getToken();
+            var data = await EpicAPI.get('/api/photos/' + encodeURIComponent(article), token);
+            var safeId = article.replace(/[^a-zA-Z0-9]/g, '_');
+            var container = document.getElementById('product-photos-' + safeId);
+            if (!container) return;
+            if (!data.photos || !data.photos.length) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = '<div style="font-size:14px;font-weight:600;margin-bottom:8px">📷 Фото товару (' + data.photos.length + ')</div>' +
+                '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
+                data.photos.map(function(photo) {
+                    var src = _SERVER + (photo.file_path.startsWith('/') ? '' : '/') + photo.file_path;
+                    // FIX: Екранувати URL для безпечної вставки в HTML атрибути
+                    return '<img src="' + _esc(src) + '" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer" onclick="Photos.viewPhoto(\'' + encodeURIComponent(src) + '\')">';
+                }).join('') +
+                '</div>';
+        } catch (error) {
+            console.error('Load photos error:', error);
+        }
+    }
+
+    function viewPhoto(encodedUrl) {
+        var url = decodeURIComponent(encodedUrl);
+        var modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+        var img = document.createElement('img');
+        img.src = url;
+        img.style.cssText = 'max-width:100%;max-height:100%;border-radius:12px';
+        var btn = document.createElement('button');
+        btn.style.cssText = 'position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);border:none;color:white;font-size:24px;padding:8px 16px;border-radius:8px;cursor:pointer';
+        btn.textContent = '✕';
+        btn.setAttribute('aria-label', 'Закрити перегляд фото');
+        btn.onclick = function() { modal.remove(); };
+        modal.appendChild(img);
+        modal.appendChild(btn);
+        document.body.appendChild(modal);
+    }
+
+    return { openCamera, uploadPhoto, loadProductPhotos, viewPhoto };
+})();
