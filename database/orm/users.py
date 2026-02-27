@@ -178,6 +178,22 @@ async def orm_get_user_by_login(login: str) -> User | None:
         return result.scalar_one_or_none()
 
 
+async def orm_get_user_by_phone(phone: str) -> User | None:
+    """Знаходить користувача за номером телефону."""
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.phone == phone))
+        return result.scalar_one_or_none()
+
+
+async def orm_set_user_phone(user_id: int, phone: str) -> None:
+    """Зберігає номер телефону користувача."""
+    async with async_session() as session:
+        await session.execute(
+            update(User).where(User.id == user_id).values(phone=phone, updated_at=func.now())
+        )
+        await session.commit()
+
+
 async def orm_create_standalone_user(
     user_id: int,
     login: str,

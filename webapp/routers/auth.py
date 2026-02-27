@@ -1,20 +1,30 @@
 """
 Роутер автентифікації для автономного додатку.
 JWT-based login/password auth without Telegram dependency.
+Phone OTP auth for Android app.
 """
 
 import logging
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from config import JWT_SECRET_KEY
-from database.orm.users import orm_create_standalone_user, orm_get_user_by_id, orm_get_user_by_login
+from database.orm.users import (
+    orm_create_standalone_user,
+    orm_get_user_by_id,
+    orm_get_user_by_login,
+    orm_get_user_by_phone,
+    orm_set_user_phone,
+)
+from utils.otp import TooManyAttemptsError, generate_otp, otp_exists, store_otp, verify_otp
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +227,177 @@ async def me(authorization: str = Header(...)):
             "login": user.login,
             "first_name": user.first_name,
             "username": user.username,
+            "role": user.role,
+            "status": user.status,
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
+# Phone OTP Authentication (Android App)
+# ---------------------------------------------------------------------------
+
+# Регулярний вираз для Ukrainian phone numbers (+380XXXXXXXXX)
+_UA_PHONE_RE = re.compile(r"^\+380\d{9}$")
+
+# Шаблон повідомлення OTP для Telegram-бота
+_BOT_OTP_MSG = (
+    "🔐 Ваш код підтвердження EpicService: *{otp}*\n\n"
+    "Код дійсний 5 хвилин. Нікому не повідомляйте його."
+)
+
+
+def _normalize_phone(phone: str) -> str:
+    """Нормалізує номер телефону до формату +380XXXXXXXXX."""
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("380") and len(digits) == 12:
+        return f"+{digits}"
+    if digits.startswith("80") and len(digits) == 11:
+        return f"+3{digits}"
+    if len(digits) == 10 and digits.startswith("0"):
+        return f"+38{digits}"
+    return f"+{digits}" if not phone.startswith("+") else phone
+
+
+class PhoneRequestModel(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=15)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        normalized = _normalize_phone(v)
+        if not _UA_PHONE_RE.match(normalized):
+            raise ValueError("Введіть коректний номер телефону у форматі +380XXXXXXXXX")
+        return normalized
+
+
+class PhoneVerifyModel(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=15)
+    otp: str = Field(..., min_length=4, max_length=8)
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        normalized = _normalize_phone(v)
+        if not _UA_PHONE_RE.match(normalized):
+            raise ValueError("Введіть коректний номер телефону у форматі +380XXXXXXXXX")
+        return normalized
+
+
+def _get_redis(request: Request):
+    """Повертає Redis-клієнт зі стану FastAPI-додатку."""
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        raise HTTPException(status_code=503, detail="Redis недоступний")
+    return redis
+
+
+async def _send_otp_via_bot(bot, chat_id: int, otp: str) -> bool:
+    """Відправляє OTP-код користувачу через Telegram-бот."""
+    try:
+        await bot.send_message(chat_id, _BOT_OTP_MSG.format(otp=otp), parse_mode="Markdown")
+        return True
+    except Exception as exc:
+        logger.warning("Не вдалося надіслати OTP через бот (chat_id=%s): %s", chat_id, exc)
+        return False
+
+
+@router.post("/phone/request")
+async def phone_request_otp(req: PhoneRequestModel, request: Request):
+    """
+    Крок 1: Відправляє OTP-код на номер телефону.
+
+    Якщо номер знайдено у базі — надсилає код через Telegram-бот.
+    Якщо номер не знайдено — повідомляє, що потрібна реєстрація (перший вхід).
+    """
+    redis = _get_redis(request)
+    phone = req.phone
+
+    otp = generate_otp()
+    await store_otp(redis, phone, otp)
+
+    user = await orm_get_user_by_phone(phone)
+    sent_via_bot = False
+
+    if user:
+        # Відправляємо OTP через Telegram, якщо бот доступний
+        bot = getattr(request.app.state, "bot", None)
+        if bot:
+            sent_via_bot = await _send_otp_via_bot(bot, user.id, otp)
+
+    if not sent_via_bot:
+        # Логуємо OTP для dev/ручного тестування (у production замінити на SMS)
+        logger.info("OTP для %s: %s (bot_sent=%s)", phone, otp, sent_via_bot)
+
+    return JSONResponse({
+        "success": True,
+        "phone": phone,
+        "registered": user is not None,
+        "sent_via_bot": sent_via_bot,
+        "message": (
+            "Код надіслано в Telegram-бот" if sent_via_bot
+            else "Код згенеровано. Зверніться до адміністратора або введіть код з логів."
+        ),
+    })
+
+
+@router.post("/phone/verify")
+async def phone_verify_otp(req: PhoneVerifyModel, request: Request):
+    """
+    Крок 2: Перевіряє OTP та повертає JWT-токени.
+
+    Якщо користувач новий — реєструє його (status='pending').
+    """
+    redis = _get_redis(request)
+    phone = req.phone
+
+    try:
+        valid = await verify_otp(redis, phone, req.otp)
+    except TooManyAttemptsError:
+        raise HTTPException(
+            status_code=429,
+            detail="Забагато невірних спроб. Спробуйте ще раз через 15 хвилин.",
+        )
+
+    if not valid:
+        raise HTTPException(status_code=400, detail="Невірний або протермінований код")
+
+    # Шукаємо або створюємо користувача
+    user = await orm_get_user_by_phone(phone)
+
+    if not user:
+        # Перший вхід — реєструємо нового користувача
+        first_name = req.first_name or "Користувач"
+        for _ in range(10):
+            user_id = 10_000_000_000 + secrets.randbelow(89_999_999_999)
+            if not await orm_get_user_by_id(user_id):
+                break
+        else:
+            raise HTTPException(status_code=500, detail="Не вдалося згенерувати унікальний ID")
+
+        user = await orm_create_standalone_user(
+            user_id=user_id,
+            login=None,
+            password_hash=None,
+            first_name=first_name,
+        )
+        await orm_set_user_phone(user.id, phone)
+        user = await orm_get_user_by_id(user.id)
+
+    # Генеруємо JWT токени
+    login_val = user.login or phone
+    access_token = create_token(user.id, login_val, user.role, "access")
+    refresh_token = create_token(user.id, login_val, user.role, "refresh")
+
+    return JSONResponse({
+        "success": True,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": {
+            "id": user.id,
+            "phone": phone,
+            "first_name": user.first_name,
             "role": user.role,
             "status": user.status,
         },

@@ -64,3 +64,18 @@ mobile-app/ios/
 mobile-app/android/
 mobile-app/.env
 mobile-app/web-build/
+# --- Android Capacitor App ---
+android-app/node_modules/
+android-app/android/.gradle/
+android-app/android/build/
+android-app/android/app/build/
+android-app/android/local.properties
+android-app/android/app/release/
+android-app/android/.idea/
+android-app/android/captures/
+android-app/android/.externalNativeBuild/
+android-app/android/.cxx/
+*.apk
+*.aab
+*.keystore
+!android-app/android/app/src/main/res/**

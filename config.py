@@ -45,6 +45,9 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "epicservice-standalone-secret-chan
 if JWT_SECRET_KEY == "epicservice-standalone-secret-change-in-production":
     logger.warning("JWT_SECRET_KEY не задано! Використовується значення за замовчуванням. Обов'язково змініть для production!")
 
+# URL сервера для мобільного додатку
+SERVER_URL = os.getenv("SERVER_URL", "https://anubis-ua.pp.ua")
+
 
 def get_admin_ids() -> List[int]:
     """

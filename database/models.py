@@ -33,6 +33,7 @@ class User(Base):
     # Автентифікація для автономного додатку (без Telegram)
     login: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
 
     created_at: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
 

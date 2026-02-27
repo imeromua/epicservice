@@ -55,7 +55,9 @@ from .users import (
     orm_get_all_users_sync,
     orm_get_user_by_id,
     orm_get_user_by_login,
+    orm_get_user_by_phone,
     orm_list_users,
+    orm_set_user_phone,
     orm_set_user_role,
     orm_set_user_status,
     orm_unblock_user,
@@ -101,5 +103,7 @@ __all__ = [
     "orm_set_user_role",
     "orm_get_all_users_sync",
     "orm_get_user_by_login",
+    "orm_get_user_by_phone",
+    "orm_set_user_phone",
     "orm_create_standalone_user",
 ]
