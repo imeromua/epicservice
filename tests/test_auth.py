@@ -278,3 +278,41 @@ def test_standalone_page_returns_html():
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "EpicService" in resp.text
+
+
+# --- Тести CORS для мобільного додатку ---
+
+def test_cors_allows_capacitor_https_localhost():
+    """CORS дозволяє запити з https://localhost (Capacitor 6 Android)."""
+    from webapp.api import app
+
+    client = TestClient(app)
+    resp = client.options(
+        "/api/auth/login",
+        headers={
+            "Origin": "https://localhost",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["access-control-allow-origin"] == "https://localhost"
+
+
+def test_cors_allows_capacitor_scheme():
+    """CORS дозволяє запити з capacitor://localhost."""
+    from webapp.api import app
+
+    client = TestClient(app)
+    resp = client.options(
+        "/api/auth/login",
+        headers={
+            "Origin": "capacitor://localhost",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["access-control-allow-origin"] == "capacitor://localhost"
