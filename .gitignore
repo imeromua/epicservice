@@ -108,3 +108,5 @@ android-app/android/gradle/wrapper/gradle-wrapper.jar
 android-app/android/gradle/wrapper/gradle-wrapper.properties
 android-app/android/capacitor-cordova-android-plugins/cordova.variables.gradle
 android-app/android/capacitor-cordova-android-plugins/build.gradle
+android-app/android/keystore.properties
+android-app/epicservice.keystore
