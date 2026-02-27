@@ -9,6 +9,7 @@ import sys
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -19,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from webapp.routers import admin, client, photos, user_management
 from webapp.routers import auth
 
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 
 # Створюємо FastAPI додаток
 app = FastAPI(
@@ -27,6 +28,49 @@ app = FastAPI(
     description="API для управління замовленнями та товарами",
     version=APP_VERSION
 )
+
+# --- CORS для мобільного додатку (Capacitor) ---
+_cors_origins = [
+    "https://anubis-ua.pp.ua",
+    "capacitor://localhost",
+    "http://localhost",
+    "http://localhost:8080",
+    "ionic://localhost",
+]
+_extra_origins = os.getenv("CORS_ORIGINS", "")
+if _extra_origins:
+    _cors_origins.extend(o.strip() for o in _extra_origins.split(",") if o.strip())
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)
+
+
+# --- Lifecycle: ініціалізація Redis для OTP-автентифікації ---
+@app.on_event("startup")
+async def startup_event():
+    """Ініціалізує Redis-клієнт при старті FastAPI."""
+    try:
+        from config import REDIS_ENABLED, REDIS_URL
+        if REDIS_ENABLED:
+            from redis.asyncio import Redis as AioRedis
+            app.state.redis = AioRedis.from_url(REDIS_URL, decode_responses=False)
+        else:
+            app.state.redis = None
+    except Exception:
+        app.state.redis = None
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Закриває Redis-з'єднання при зупинці."""
+    redis = getattr(app.state, "redis", None)
+    if redis:
+        await redis.aclose()
 
 # Статичні файли
 app.mount(

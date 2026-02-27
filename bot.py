@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from config import BOT_TOKEN, REDIS_ENABLED, REDIS_URL
 from database.engine import async_session
-from handlers import common, error_handler, webapp_handler
+from handlers import common, error_handler, webapp_handler, phone_link
 from handlers.admin import (archive_handlers as admin_archive,
                             core as admin_core,
                             import_handlers as admin_import,
@@ -122,6 +122,7 @@ async def main():
     # Загальні роутери (для всіх користувачів)
     dp.include_router(common.router)  # /start і кнопка Адмінка
     dp.include_router(webapp_handler.router)  # Web App handler
+    dp.include_router(phone_link.router)  # /linkphone — прив'язка телефону для Android-додатку
 
     try:
         await set_main_menu(bot)

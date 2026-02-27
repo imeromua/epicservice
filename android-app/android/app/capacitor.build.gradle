@@ -1,0 +1,23 @@
+// capacitor.build.gradle — автоматично генерується Capacitor CLI
+// (цей файл включає всі встановлені Capacitor-плагіни)
+
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle", to: project
+
+dependencies {
+    // Capacitor core
+    implementation project(':capacitor-android')
+
+    // Встановлені плагіни (додаються автоматично при npx cap sync)
+    // @capacitor/app
+    // @capacitor/network
+    // @capacitor/preferences
+    // @capacitor/splash-screen
+    // @capacitor/status-bar
+}
