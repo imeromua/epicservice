@@ -79,3 +79,32 @@ android-app/android/.cxx/
 *.aab
 *.keystore
 !android-app/android/app/src/main/res/**
+
+# --- Виключення для android-app JSON-файлів ---
+!android-app/package.json
+!android-app/package-lock.json
+!android-app/capacitor.config.json
+
+# Gradle Wrapper — комітити обов'язково
+!android-app/android/gradlew
+!android-app/android/gradlew.bat
+!android-app/android/gradle/
+!android-app/android/gradle/wrapper/
+!android-app/android/gradle/wrapper/gradle-wrapper.jar
+!android-app/android/gradle/wrapper/gradle-wrapper.properties
+android-app/package-lock.json
+android-app/package.json
+android-app/capacitor.config.json
+android-app/android/capacitor.settings.gradle
+android-app/android/gradlew
+android-app/android/gradlew.bat
+android-app/android/settings.gradle
+android-app/android/app/build.gradle
+android-app/android/app/capacitor.build.gradle
+android-app/android/settings.gradle
+android-app/android/app/build.gradle
+android-app/android/app/capacitor.build.gradle
+android-app/android/gradle/wrapper/gradle-wrapper.jar
+android-app/android/gradle/wrapper/gradle-wrapper.properties
+android-app/android/capacitor-cordova-android-plugins/cordova.variables.gradle
+android-app/android/capacitor-cordova-android-plugins/build.gradle

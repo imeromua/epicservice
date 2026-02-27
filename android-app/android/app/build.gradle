@@ -61,7 +61,6 @@ dependencies {
 
     // Capacitor
     implementation project(':capacitor-android')
-    implementation "com.getcapacitor:core:6.0.0"
 
     // Android основні залежності
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"

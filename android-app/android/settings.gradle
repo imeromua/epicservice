@@ -1,1 +1,8 @@
 include ':app'
+
+// Capacitor — підключаємо бібліотеку з node_modules
+def capacitorRoot = new File('../node_modules/@capacitor/android/capacitor')
+if (capacitorRoot.exists()) {
+    include ':capacitor-android'
+    project(':capacitor-android').projectDir = capacitorRoot
+}
