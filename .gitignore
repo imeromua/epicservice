@@ -110,3 +110,4 @@ android-app/android/capacitor-cordova-android-plugins/build.gradle
 android-app/android/keystore.properties
 android-app/epicservice.keystore
 android-app/android/app/build.gradle
+android-app/android/app/build.gradle

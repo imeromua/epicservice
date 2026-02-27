@@ -27,10 +27,10 @@ cd "$PROJECT_ROOT" || {
     exit 1
 }
 
-# Генерація версії: ММДД.ЧЧММ
-VERSION_NAME=$(date +"%m%d.%H%M")
-# versionCode: ММДДЧЧММ (8 цифр, int32 підтримує до 2147483647)
-VERSION_CODE=$(date +"%m%d%H%M")     # 02271742 = 2,271,742
+# Генерація версії: ГГММДД.ЧЧММ
+VERSION_NAME=$(date +"%y%m%d.%H%M")
+# versionCode: ММДДЧЧММ без ведучих нулів
+VERSION_CODE=$(date +"%m%d%H%M" | sed 's/^0*//')
 
 echo -e "${CYAN}📌 Нова версія: ${VERSION_NAME} (code: ${VERSION_CODE})${NC}\n"
 
