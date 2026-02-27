@@ -69,13 +69,21 @@ if [ -f "$BUILD_GRADLE" ]; then
     # Backup
     cp "$BUILD_GRADLE" "$BUILD_GRADLE.bak"
     
-    # Оновлення versionCode та versionName
-    sed -i "s/versionCode [0-9]\+/versionCode $VERSION_CODE/" "$BUILD_GRADLE"
-    sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" "$BUILD_GRADLE"
+    # Використовуємо perl для надійнішої заміни (працює однаково на Linux/macOS)
+    perl -i -pe "s/versionCode\s+\d+/versionCode $VERSION_CODE/g" "$BUILD_GRADLE"
+    perl -i -pe "s/versionName\s+\"[^\"]*\"/versionName \"$VERSION_NAME\"/g" "$BUILD_GRADLE"
     
-    echo -e "${GREEN}✓ Версія оновлена в build.gradle${NC}"
-    echo -e "${CYAN}  versionName: $VERSION_NAME${NC}"
-    echo -e "${CYAN}  versionCode: $VERSION_CODE${NC}\n"
+    # Перевірка що заміна відбулась
+    if grep -q "versionCode $VERSION_CODE" "$BUILD_GRADLE" && grep -q "versionName \"$VERSION_NAME\"" "$BUILD_GRADLE"; then
+        echo -e "${GREEN}✓ Версія оновлена в build.gradle${NC}"
+        echo -e "${CYAN}  versionName: $VERSION_NAME${NC}"
+        echo -e "${CYAN}  versionCode: $VERSION_CODE${NC}\n"
+    else
+        echo -e "${RED}❌ Помилка оновлення версії!${NC}"
+        echo -e "${YELLOW}Відновлюємо backup...${NC}"
+        mv "$BUILD_GRADLE.bak" "$BUILD_GRADLE"
+        exit 1
+    fi
 else
     echo -e "${RED}❌ Файл build.gradle не знайдено!${NC}"
     exit 1
@@ -171,6 +179,9 @@ if [ -f "$APK_PATH" ]; then
         echo "  - Файл: $DEPLOY_PATH"
     fi
     
+    # Видалення backup після успішної збірки
+    rm -f "$BUILD_GRADLE.bak"
+    
     # Commit оновленої версії (опціонально)
     echo ""
     read -p "Закомітити нову версію в Git? (y/N): " -n 1 -r
@@ -189,13 +200,11 @@ else
     
     # Відновлення backup
     if [ -f "$BUILD_GRADLE.bak" ]; then
+        echo -e "${YELLOW}⚠ Відновлюємо build.gradle з backup...${NC}"
         mv "$BUILD_GRADLE.bak" "$BUILD_GRADLE"
-        echo -e "${YELLOW}⚠ build.gradle відновлено з backup${NC}"
+        echo -e "${GREEN}✓ Файл відновлено${NC}"
     fi
     exit 1
 fi
-
-# Видалення backup
-rm -f "$BUILD_GRADLE.bak"
 
 echo -e "\n${GREEN}🎉 Готово!${NC}\n"

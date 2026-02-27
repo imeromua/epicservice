@@ -2,6 +2,11 @@
  * www/js/app.js
  * Головний модуль додатку EpicService Android.
  */
+// FIX: Округлення цін до 2 знаків після коми
+function formatPrice(value) {
+    return parseFloat(value || 0).toFixed(2);
+}
+
 const App = (function () {
     'use strict';
 
@@ -165,7 +170,7 @@ const App = (function () {
             '<div class="product-meta">' +
             (dept ? '<span class="product-tag">🏢 Відділ ' + dept + '</span>' : '') +
             (group ? '<span class="product-tag">📂 ' + group + '</span>' : '') +
-            (price ? '<span class="product-tag">💰 ' + price + ' грн</span>' : '') +
+            (price ? '<span class="product-tag">💰 ' + formatPrice(price) + ' грн</span>' : '') +
             (months > 3 ? '<span class="product-tag" style="color:var(--warning)">⏳ ' + months + ' міс. без руху</span>' : '') +
             (userReserved > 0 ? '<span class="product-tag" style="color:var(--accent)">🛒 Ваш: ' + userReserved + '</span>' : '') +
             '</div>' +
@@ -185,6 +190,8 @@ const App = (function () {
         if (cached) {
             content.innerHTML = _productDetailHtml(cached);
             modal.style.display = 'flex';
+            // FIX: Завантажити фото товару
+            if (typeof Photos !== 'undefined') Photos.loadProductPhotos(article);
             return;
         }
 
@@ -195,6 +202,8 @@ const App = (function () {
             .then(data => {
                 const p = data.product || data;
                 content.innerHTML = _productDetailHtml(p);
+                // FIX: Завантажити фото товару
+                if (typeof Photos !== 'undefined') Photos.loadProductPhotos(p.article || article);
             })
             .catch(() => {
                 content.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><p>Помилка завантаження</p></div>';
@@ -217,25 +226,33 @@ const App = (function () {
         const avColor = available <= 0 ? 'var(--danger)' : available < 5 ? 'var(--warning)' : 'var(--success)';
         const mColor = months > 6 ? 'var(--danger)' : months > 3 ? 'var(--warning)' : 'var(--text-muted)';
 
+        const safeArticleId = article.replace(/[^a-zA-Z0-9]/g, '_');
         return '<div>' +
             '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:6px">' + name + '</h2>' +
             '<div style="font-family:\'Courier New\',monospace;color:var(--accent-light);font-size:14px;margin-bottom:16px">' + article + '</div>' +
             '<div class="stats-grid">' +
             '<div class="stat-card"><div class="stat-value" style="color:' + avColor + '">' + available + '</div><div class="stat-label">Доступно</div></div>' +
             '<div class="stat-card"><div class="stat-value" style="color:var(--warning)">' + reserved + '</div><div class="stat-label">Відкладено</div></div>' +
-            '<div class="stat-card"><div class="stat-value" style="font-size:18px">' + price.toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Ціна</div></div>' +
-            '<div class="stat-card"><div class="stat-value" style="font-size:18px">' + balanceSum.toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Сума</div></div>' +
+            // FIX: Відображення резерву користувача як stat-card
+            (userReserved > 0 ? '<div class="stat-card"><div class="stat-value" style="color:var(--accent)">🛒 ' + userReserved + '</div><div class="stat-label">В резерві</div></div>' : '') +
+            // FIX: Округлення ціни та суми до 2 знаків
+            '<div class="stat-card"><div class="stat-value" style="font-size:18px">' + formatPrice(price) + ' ₴</div><div class="stat-label">Ціна</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="font-size:18px">' + formatPrice(balanceSum) + ' ₴</div><div class="stat-label">Сума</div></div>' +
             '</div>' +
             '<div class="product-meta" style="margin-bottom:16px">' +
             (dept ? '<span class="product-tag">🏢 Відділ ' + dept + '</span>' : '') +
             (group ? '<span class="product-tag">📂 ' + group + '</span>' : '') +
             (months > 0 ? '<span class="product-tag" style="color:' + mColor + '">⏳ ' + months + ' міс. без руху</span>' : '') +
-            (userReserved > 0 ? '<span class="product-tag" style="color:var(--accent)">🛒 Ваш: ' + userReserved + '</span>' : '') +
             '</div>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
             '<button class="action-btn action-btn-primary" style="flex:1"' +
             ' onclick="App.openAddModal(' + pEnc + '); App.closeProductModal()">➕ До списку</button>' +
-            '</div></div>';
+            // FIX: Кнопка додавання фото
+            (typeof Photos !== 'undefined' ? '<button class="action-btn" style="flex:1;background:var(--accent-light)" onclick="Photos.openCamera(' + artEnc + ')">📷 Фото</button>' : '') +
+            '</div>' +
+            // FIX: Контейнер для фотографій товару
+            '<div id="product-photos-' + safeArticleId + '" style="margin-top:16px"></div>' +
+            '</div>';
     }
 
     function closeProductModal(event) {
@@ -249,6 +266,15 @@ const App = (function () {
         let p;
         try { p = typeof productJson === 'string' ? JSON.parse(productJson) : productJson; }
         catch (e) { toast('Помилка даних товару', 'error'); return; }
+
+        // FIX: Попередження при додаванні товару з іншого відділу
+        if (p.is_different_department) {
+            const msg = _currentDepartment
+                ? '🔒 Товар з іншого відділу!\n\nПоточний список: ' + _currentDepartment + '\nТовар: відділ ' + (p.department || '?') + '\n\nЗбережіть або очистіть список.'
+                : '🔒 Товар з іншого відділу! Збережіть або очистіть поточний список.';
+            alert(msg);
+            return;
+        }
 
         _selectedProduct = p;
         _addQty = 1;
@@ -264,7 +290,8 @@ const App = (function () {
         const customInp = document.getElementById('add-custom-input');
 
         if (titleEl) titleEl.textContent = p.name || p.article || '';
-        if (priceEl) priceEl.textContent = p.price ? '💰 ' + p.price + ' грн' : '';
+        // FIX: Округлення ціни до 2 знаків
+        if (priceEl) priceEl.textContent = p.price ? '💰 ' + formatPrice(p.price) + ' грн' : '';
         if (availableEl) availableEl.textContent = '📦 Доступно: ' + (p.available || 0);
         if (qtyDisplay) qtyDisplay.textContent = '1';
         if (normalSel) normalSel.style.display = 'block';
@@ -337,6 +364,12 @@ const App = (function () {
                 }
                 toast(data.message || 'Додано до списку ✅', 'success');
                 closeAddModal();
+                // FIX: Перерендерувати результати пошуку після оновлення резерву
+                if (_activeTab === 'search') {
+                    _renderSearchResults(_cachedProducts.filter(function(p) {
+                        return (p.available || 0) > 0 || (p.user_reserved || 0) > 0;
+                    }));
+                }
                 loadList();
             } else {
                 toast(data.message || 'Помилка додавання', 'error');
@@ -379,7 +412,7 @@ const App = (function () {
                     '<div style="flex:1">' +
                     '<div class="product-article">' + (item.article || '') + '</div>' +
                     '<div class="product-name">' + (item.name || '') + '</div>' +
-                    (item.price ? '<div style="font-size:12px;color:var(--text-muted)">💰 ' + item.price + ' грн</div>' : '') +
+                    (item.price ? '<div style="font-size:12px;color:var(--text-muted)">💰 ' + formatPrice(item.price) + ' грн</div>' : '') +
                     '</div>' +
                     '<div class="qty-control">' +
                     '<button class="qty-btn" onclick="App.changeQty(' + item.product_id + ', -1)">−</button>' +
@@ -469,6 +502,7 @@ const App = (function () {
     }
 
     function updateDepartmentInfo(dept, count) {
+        _currentDepartment = dept || null; // FIX: Зберегти поточний відділ для перевірки при додаванні
         const banner = document.getElementById('dept-banner');
         const deptName = document.getElementById('dept-name');
         const deptCount = document.getElementById('dept-count');

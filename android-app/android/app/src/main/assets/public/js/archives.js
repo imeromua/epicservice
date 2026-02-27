@@ -6,6 +6,11 @@ const EpicArchives = (function() {
 
     const SERVER = window.APP_CONFIG ? window.APP_CONFIG.serverUrl : 'https://anubis-ua.pp.ua';
 
+    // FIX: Округлення сум до 2 знаків після коми
+    function _fmt(value) {
+        return parseFloat(value || 0).toFixed(2);
+    }
+
     async function load() {
         var el = document.getElementById('archives-content');
         if (!el) return;
@@ -27,7 +32,8 @@ const EpicArchives = (function() {
             if (statsData) {
                 html += '<div class="stats-grid" style="margin-bottom:16px">' +
                     '<div class="stat-card"><div class="stat-value">' + (statsData.total_lists || 0) + '</div><div class="stat-label">Всього списків</div></div>' +
-                    '<div class="stat-card"><div class="stat-value">' + (statsData.total_amount || 0).toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Загальна сума</div></div>' +
+                    // FIX: Округлення загальної суми до 2 знаків
+                    '<div class="stat-card"><div class="stat-value">' + _fmt(statsData.total_amount) + ' ₴</div><div class="stat-label">Загальна сума</div></div>' +
                     '<div class="stat-card"><div class="stat-value">' + (statsData.this_month_lists || 0) + '</div><div class="stat-label">Цього місяця</div></div>' +
                     (statsData.popular_department ? '<div class="stat-card"><div class="stat-value" style="font-size:14px">' + statsData.popular_department + '</div><div class="stat-label">Топ відділ</div></div>' : '') +
                     '</div>';
@@ -66,7 +72,13 @@ const EpicArchives = (function() {
 
     function download(filename) {
         var token = App.getToken();
-        window.open(SERVER + '/api/archive/download/' + filename + '?token=' + token, '_blank');
+        var url = SERVER + '/api/archive/download/' + filename + '?token=' + token;
+        // FIX: Використати Capacitor Browser або window.location.href для скачування
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
+            window.Capacitor.Plugins.Browser.open({ url: url });
+        } else {
+            window.open(url, '_blank');
+        }
     }
 
     async function deleteArchive(filename) {

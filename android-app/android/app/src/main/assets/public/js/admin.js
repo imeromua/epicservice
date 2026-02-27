@@ -4,6 +4,11 @@
 const EpicAdmin = (function() {
     'use strict';
 
+    // FIX: Округлення цін до 2 знаків після коми
+    function _fmt(value) {
+        return parseFloat(value || 0).toFixed(2);
+    }
+
     function _esc(str) {
         return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
@@ -42,7 +47,8 @@ const EpicAdmin = (function() {
                 '<div class="stat-value" style="color:var(--warning)">' + (stats.pending_users || 0) + '</div>' +
                 '<div class="stat-label">Очікують</div></div>' +
                 (stats.total_reserved_sum ? '<div class="stat-card" style="grid-column:1/-1"><div class="stat-value" style="font-size:18px">' +
-                    parseFloat(stats.total_reserved_sum).toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Загальний резерв</div></div>' : '');
+                    // FIX: Округлення суми резерву до 2 знаків
+                    _fmt(stats.total_reserved_sum) + ' ₴</div><div class="stat-label">Загальний резерв</div></div>' : '');
         } catch (e) {
             if (grid) grid.innerHTML = '<div class="empty-state"><p>' + e.message + '</p></div>';
         }
@@ -64,7 +70,7 @@ const EpicAdmin = (function() {
                 return '<div class="product-card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">' +
                     '<div style="flex:1">' +
                     '<div style="font-weight:600;color:var(--text-primary)">' + (u.username || u.user_id) + '</div>' +
-                    '<div style="font-size:12px;color:var(--text-muted)">' + (u.department || '') + ' · ' + (u.items_count || 0) + ' поз. · ' + (u.total_sum || 0).toLocaleString('uk-UA') + ' ₴</div>' +
+                    '<div style="font-size:12px;color:var(--text-muted)">' + (u.department || '') + ' · ' + (u.items_count || 0) + ' поз. · ' + _fmt(u.total_sum) + ' ₴</div>' +
                     '</div>' +
                     '<button class="action-btn action-btn-primary" onclick="EpicAdmin.forceSave(' + u.user_id + ')">💾</button>' +
                     '</div>';
@@ -126,7 +132,7 @@ const EpicAdmin = (function() {
                 users.map(function(u) {
                     return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
                         '<div><div style="font-weight:600">' + (u.username || u.user_id) + '</div>' +
-                        '<div style="font-size:12px;color:var(--text-muted)">' + (u.department || '') + ' · ' + (u.items_count || 0) + ' поз. · ' + (u.total_sum || 0).toLocaleString('uk-UA') + ' ₴</div></div>' +
+                        '<div style="font-size:12px;color:var(--text-muted)">' + (u.department || '') + ' · ' + (u.items_count || 0) + ' поз. · ' + _fmt(u.total_sum) + ' ₴</div></div>' +
                         '<button class="action-btn action-btn-primary" onclick="EpicAdmin.forceSave(' + u.user_id + ')">💾 Зберегти</button>' +
                         '</div>';
                 }).join('');
@@ -149,13 +155,30 @@ const EpicAdmin = (function() {
                 '<div class="stats-grid">' +
                 '<div class="stat-card"><div class="stat-value">' + (data.original_articles || 0) + '</div><div class="stat-label">Оригінальних арт.</div></div>' +
                 '<div class="stat-card"><div class="stat-value">' + (data.current_articles || 0) + '</div><div class="stat-label">Поточних арт.</div></div>' +
-                '<div class="stat-card"><div class="stat-value">' + (data.original_sum || 0).toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Початкова сума</div></div>' +
-                '<div class="stat-card"><div class="stat-value">' + (data.current_sum || 0).toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Поточна сума</div></div>' +
-                '<div class="stat-card"><div class="stat-value">' + (data.collected_sum || 0).toLocaleString('uk-UA') + ' ₴</div><div class="stat-label">Зібрано сума</div></div>' +
+                // FIX: Округлення сум до 2 знаків
+                '<div class="stat-card"><div class="stat-value">' + _fmt(data.original_sum) + ' ₴</div><div class="stat-label">Початкова сума</div></div>' +
+                '<div class="stat-card"><div class="stat-value">' + _fmt(data.current_sum) + ' ₴</div><div class="stat-label">Поточна сума</div></div>' +
+                '<div class="stat-card"><div class="stat-value">' + _fmt(data.collected_sum) + ' ₴</div><div class="stat-label">Зібрано сума</div></div>' +
                 '<div class="stat-card"><div class="stat-value">' + (data.collected_articles || 0) + '</div><div class="stat-label">Зібрано арт.</div></div>' +
                 '</div>' +
                 (data.last_import ? '<div style="font-size:12px;color:var(--text-muted);margin-top:12px">Останній імпорт: ' + data.last_import + '</div>' : '') +
-                (data.departments ? '<div style="margin-top:12px;font-size:13px;color:var(--text-secondary)">Відділи: ' + data.departments + '</div>' : '');
+                // FIX: Відображення масиву відділів замість "[object Object]"
+                (data.departments && data.departments.length > 0 ?
+                    '<div style="margin-top:16px">' +
+                    '<div style="font-size:14px;font-weight:600;color:var(--text-secondary);margin-bottom:8px">🏢 Відділи</div>' +
+                    data.departments.map(function(dept) {
+                        var deptName = dept.department || dept;
+                        var origCount = dept.original_count || 0;
+                        var currCount = dept.current_count || 0;
+                        var collected = origCount - currCount;
+                        return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">' +
+                            '<span style="color:var(--text-primary)">🏢 ' + _esc(deptName) + '</span>' +
+                            '<span style="color:var(--text-muted);float:right">' + origCount + ' → ' + currCount +
+                            (collected > 0 ? ' <span style="color:var(--success)">(−' + collected + ')</span>' : '') +
+                            '</span></div>';
+                    }).join('') +
+                    '</div>' :
+                    '<div style="text-align:center;padding:20px;color:var(--hint-color)">Немає даних по відділах</div>');
         } catch (e) {
             content.innerHTML = '<div class="empty-state"><p>' + e.message + '</p></div>';
         }
@@ -176,7 +199,7 @@ const EpicAdmin = (function() {
                 depts.map(function(d) {
                     return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">' +
                         '<div style="font-weight:600">Відділ ' + d.department + '</div>' +
-                        '<div style="font-size:12px;color:var(--text-muted)">Сума: ' + (d.reserved_sum || 0).toLocaleString('uk-UA') + ' ₴ · Товарів: ' + (d.products_count || 0) + ' · Кор.: ' + (d.users_count || 0) + '</div>' +
+                        '<div style="font-size:12px;color:var(--text-muted)">Сума: ' + _fmt(d.reserved_sum) + ' ₴ · Товарів: ' + (d.products_count || 0) + ' · Кор.: ' + (d.users_count || 0) + '</div>' +
                         '</div>';
                 }).join('');
         } catch (e) {
