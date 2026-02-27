@@ -64,17 +64,16 @@ async def force_save_user_list(user_id: int, bot: Bot, state: FSMContext) -> boo
         
         async with async_session() as session:
             async with session.begin():
-                # Генеруємо файли
+                # Генеруємо файли (вже зберігаються в ACTIVE_DIR)
                 main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
                 
                 if not main_list_path and not surplus_list_path:
                     return True
                 
-                # Переміщуємо файли в archives/active/
-                if main_list_path:
-                    archive_main_path = _move_to_archives(main_list_path)
-                if surplus_list_path:
-                    archive_surplus_path = _move_to_archives(surplus_list_path)
+                # Файли вже збережено в archives/active/ — просто фіксуємо шляхи,
+                # щоб блок finally не видалив їх.
+                archive_main_path = main_list_path
+                archive_surplus_path = surplus_list_path
 
         # Прибираємо клавіатуру з попереднього головного меню користувача
         await clean_previous_keyboard(user_state, bot, user_id)
@@ -132,18 +131,23 @@ async def force_save_user_list_web(user_id: int, bot: Bot) -> bool:
     try:
         async with async_session() as session:
             async with session.begin():
-                # Генеруємо файли
+                # Генеруємо файли (вже зберігаються в ACTIVE_DIR)
                 main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
 
                 if not main_list_path and not surplus_list_path:
-                    await bot.send_message(user_id, "⚠️ У вас немає активного списку для збереження")
-                    return True
-                
-                # Переміщуємо файли в archives/active/
-                if main_list_path:
-                    archive_main_path = _move_to_archives(main_list_path)
-                if surplus_list_path:
-                    archive_surplus_path = _move_to_archives(surplus_list_path)
+                    # Файли відсутні — виходимо з транзакції перед викликом Telegram API
+                    archive_main_path = None
+                    archive_surplus_path = None
+                else:
+                    # Файли вже збережено в archives/active/ — просто фіксуємо шляхи,
+                    # щоб блок finally не видалив їх.
+                    archive_main_path = main_list_path
+                    archive_surplus_path = surplus_list_path
+
+        # Телеграм-повідомлення надсилаємо ПІСЛЯ завершення транзакції
+        if not archive_main_path and not archive_surplus_path:
+            await bot.send_message(user_id, "⚠️ У вас немає активного списку для збереження")
+            return True
         
         # Надсилаємо повідомлення БЕЗ файлу
         message = (
