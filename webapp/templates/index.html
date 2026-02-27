@@ -146,6 +146,29 @@
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="loadModeratorPhotoModeration()">🔄 Оновити</button>
             </div>
+
+            <div class="admin-section-title">📥 Імпорт товарів</div>
+            <div id="moderatorImportAlert"></div>
+            <div class="file-upload-area" id="moderatorDropZone" onclick="document.getElementById('moderatorFileInput').click()">
+                <div class="upload-icon">📁</div>
+                <div style="font-size: 15px; margin-bottom: 6px;">Оберіть Excel файл для імпорту</div>
+                <div style="color: var(--hint-color); font-size: 13px;">Підтримка .xlsx, .xls</div>
+                <input type="file" id="moderatorFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleModeratorFileSelect(event)">
+            </div>
+            <div id="moderatorFileInfo" style="display: none; margin-bottom: 12px; font-size: 14px; color: var(--button-color);"></div>
+            <div class="checkbox-group" style="margin-bottom: 12px;">
+                <input type="checkbox" id="moderatorNotifyUsers">
+                <label for="moderatorNotifyUsers">📢 Повідомити користувачів про оновлення</label>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="uploadModeratorFile()" id="moderatorUploadBtn" disabled>📤 Імпортувати</button>
+                <button class="btn btn-danger" onclick="cancelModeratorUpload()">✖️ Скасувати</button>
+            </div>
+
+            <div class="admin-section-title">📤 Експорт</div>
+            <div class="action-buttons">
+                <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportModeratorStock()">📊 Звіт про залишки (Excel)</button>
+            </div>
         </div>
 
         <!-- Admin Tab -->

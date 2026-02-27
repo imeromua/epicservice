@@ -62,3 +62,63 @@ async function loadAdminStats() {
 }
 
 // ... (rest of admin.js from 3.0.1 stays the same)
+
+// === MODERATOR IMPORT/EXPORT FUNCTIONS ===
+
+let moderatorSelectedFile = null;
+
+function handleModeratorFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    moderatorSelectedFile = file;
+    const fileInfo = document.getElementById('moderatorFileInfo');
+    fileInfo.textContent = `📄 ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+    fileInfo.style.display = 'block';
+    document.getElementById('moderatorUploadBtn').disabled = false;
+}
+
+function cancelModeratorUpload() {
+    moderatorSelectedFile = null;
+    document.getElementById('moderatorFileInput').value = '';
+    document.getElementById('moderatorFileInfo').style.display = 'none';
+    document.getElementById('moderatorUploadBtn').disabled = true;
+    document.getElementById('moderatorImportAlert').innerHTML = '';
+}
+
+function _resetModeratorFileSelection() {
+    moderatorSelectedFile = null;
+    document.getElementById('moderatorFileInput').value = '';
+    document.getElementById('moderatorFileInfo').style.display = 'none';
+    document.getElementById('moderatorUploadBtn').disabled = true;
+}
+
+async function uploadModeratorFile() {
+    if (!moderatorSelectedFile) return;
+    const notifyUsers = document.getElementById('moderatorNotifyUsers').checked;
+    const alertEl = document.getElementById('moderatorImportAlert');
+    alertEl.innerHTML = '<div class="loader">Завантаження...</div>';
+
+    const formData = new FormData();
+    formData.append('file', moderatorSelectedFile);
+
+    try {
+        const response = await fetch(`/api/admin/import?user_id=${userId}&notify_users=${notifyUsers}`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        if (data.success || data.added !== undefined) {
+            alertEl.innerHTML = `<div style="color:var(--button-color);padding:8px 0">✅ Імпорт завершено! Додано: ${data.added || 0}, Оновлено: ${data.updated || 0}, Деактивовано: ${data.deactivated || 0}</div>`;
+            _resetModeratorFileSelection();
+        } else {
+            alertEl.innerHTML = `<div style="color:#ff3b30;padding:8px 0">❌ ${data.error || 'Помилка імпорту'}</div>`;
+        }
+    } catch (error) {
+        alertEl.innerHTML = `<div style="color:#ff3b30;padding:8px 0">❌ Помилка: ${error.message}</div>`;
+        console.error('❌ uploadModeratorFile error:', error);
+    }
+}
+
+function exportModeratorStock() {
+    window.location.href = `/api/admin/export/stock?user_id=${userId}`;
+}
