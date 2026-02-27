@@ -122,9 +122,6 @@ async def main():
     # Загальні роутери (для всіх користувачів)
     dp.include_router(common.router)  # /start і кнопка Адмінка
     dp.include_router(webapp_handler.router)  # Web App handler
-    
-    # ВИДАЛЕНО: archive, user_search, list_management, list_editing, list_saving
-    # Причина: весь user-функціонал тепер у webapp (Mini App)
 
     try:
         await set_main_menu(bot)

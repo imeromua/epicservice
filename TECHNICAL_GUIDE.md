@@ -1,7 +1,7 @@
 # 🛠️ Технічний посібник EpicService
 
-**Версія:** 2.2.0  
-**Останнє оновлення:** 25.02.2026
+**Версія:** 2.3.0  
+**Останнє оновлення:** 27.02.2026
 
 Цей документ надає поглиблений технічний огляд EpicService, призначений для розробників, DevOps-інженерів та системних адміністраторів.
 
@@ -244,9 +244,7 @@ database/
   orm.py                 # ORM queries
 
 handlers/
-  common.py              # /start, RBAC перевірка, персистент клавіатура
-  archive.py             # Архівні операції
-  user_search.py         # Пошук (deprecated, логіка в webapp)
+  common.py              # /start, RBAC перевірка
   webapp_handler.py      # Обробка webapp_data
   error_handler.py       # Глобальні помилки
   admin/
@@ -255,10 +253,6 @@ handlers/
     report_handlers.py   # Звіти
     archive_handlers.py  # Архіви
     lock_common.py       # Блокування відділів
-  user/                  # Deprecated (логіка перенесена в webapp)
-    list_editing.py
-    list_management.py
-    list_saving.py
 
 keyboards/
   inline.py              # Inline keyboards
@@ -270,7 +264,6 @@ middlewares/
 utils/
   list_processor.py      # Створення Excel
   archive_manager.py     # Ротація файлів
-  card_generator.py      # Генерація карток
   force_save_helper.py   # Примусове збереження
   markdown_corrector.py  # Корекція форматування
 

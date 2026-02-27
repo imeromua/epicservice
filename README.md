@@ -59,19 +59,13 @@ epicservice/
 │   ├── engine.py            # Async engine
 │   └── orm.py               # ORM queries
 ├── handlers/
-│   ├── common.py            # /start, RBAC перевірка, кнопка "Адмінка"
-│   ├── archive.py           # Архівні операції
-│   ├── user_search.py       # Пошук (deprecated, логіка в webapp)
+│   ├── common.py            # /start, RBAC перевірка
 │   ├── admin/               # Адмін-хендлери (bot)
 │   │   ├── core.py
 │   │   ├── import_handlers.py
 │   │   ├── report_handlers.py
 │   │   ├── archive_handlers.py
 │   │   └── lock_common.py   # Блокування відділів
-│   ├── user/                # Хендлери користувача (deprecated, логіка в webapp)
-│   │   ├── list_editing.py
-│   │   ├── list_management.py
-│   │   └── list_saving.py
 │   ├── webapp_handler.py    # Обробка webapp_data
 │   └── error_handler.py     # Глобальна обробка помилок
 ├── webapp/
@@ -93,7 +87,6 @@ epicservice/
 ├── utils/
 │   ├── list_processor.py    # Створення Excel
 │   ├── archive_manager.py   # Ротація файлів
-│   ├── card_generator.py    # Генерація карток
 │   ├── force_save_helper.py # Примусове збереження
 │   └── markdown_corrector.py # Корекція форматування
 ├── keyboards/
@@ -477,7 +470,6 @@ curl http://localhost:8000/health
 
 - [ ] Експорт звітів у PDF
 - [ ] Інтеграція з 1С
-- [ ] Мобільний додаток (React Native)
 - [ ] Розширена аналітика (графіки, тренди)
 - [ ] Багатомовність (англійська)
 
@@ -491,7 +483,7 @@ curl http://localhost:8000/health
 
 ---
 
-**Версія:** 2.2.0  
-**Останнє оновлення:** 25.02.2026
+**Версія:** 2.3.0  
+**Останнє оновлення:** 27.02.2026
 
 "Зроблено в Україні з ❤️"
