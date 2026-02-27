@@ -110,7 +110,7 @@ const API = (function() {
             sendBroadcast: (userId, message) => 
                 request('/admin/broadcast', {
                     method: 'POST',
-                    body: { admin_id: userId, message: message }
+                    body: { user_id: userId, message: message }
                 }),
 
             uploadDatabase: async (userId, file) => {

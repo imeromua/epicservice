@@ -17,7 +17,7 @@ function debouncedLoadUserManagement() {
 function _renderRoleSelect(u) {
     const roles = ['user', 'moderator', 'admin'];
     const options = roles.map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('');
-    return `<select style="padding:8px; border-radius:8px; border:2px solid var(--hint-color); background:var(--bg-color); color:var(--text-color);" onchange="changeUserRole(${u.id}, this.value)">${options}</select>`;
+    return `<select style="padding:8px; border-radius:8px; border:2px solid var(--hint-color); background:var(--bg-color); color:var(--text-color);" onchange="changeUserRole(${u.id}, this.value, '${u.role}', this)">${options}</select>`;
 }
 
 function _renderUserActions(u) {
@@ -121,8 +121,12 @@ async function unblockUser(targetUserId) {
     }
 }
 
-async function changeUserRole(targetUserId, role) {
-    if (!confirm(`Змінити роль користувачу ${targetUserId} на ${role}?`)) return;
+async function changeUserRole(targetUserId, role, originalRole, selectEl) {
+    if (!confirm(`Змінити роль користувачу ${targetUserId} на ${role}?`)) {
+        // Повертаємо попереднє значення в селекті без зайвого запиту
+        if (selectEl) selectEl.value = originalRole;
+        return;
+    }
     try {
         const response = await fetch('/api/admin/user-management/role', {
             method: 'POST',

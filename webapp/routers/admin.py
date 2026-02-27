@@ -89,6 +89,10 @@ class BroadcastRequest(BaseModel):
     message: str
 
 
+class ForceSaveRequest(BaseModel):
+    user_id: int
+
+
 # === Допоміжні функції ===
 
 def cleanup_file(file_path: str):
@@ -596,14 +600,13 @@ async def get_summary_stats(user_id: int = Query(...)):
 @router.post("/force-save/{target_user_id}")
 async def force_save_user_list_endpoint(
     target_user_id: int,
-    request: dict
+    request: ForceSaveRequest
 ):
     """
     Примусово зберегти список користувача.
     Використовується перед важливими операціями (імпорт, експорт).
     """
-    user_id = request.get("user_id")
-    verify_admin(user_id)
+    verify_admin(request.user_id)
     
     try:
         # Використовуємо веб-версію без FSMContext
