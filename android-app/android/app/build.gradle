@@ -16,8 +16,8 @@ android {
         applicationId 'ua.epicservice.app'
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 02271804
-        versionName "0227.1804"
+        versionCode 2271806
+        versionName "260227.1806"
 
         // Налаштування для Capacitor
         manifestPlaceholders['appAuthRedirectScheme'] = 'ua.epicservice.app'

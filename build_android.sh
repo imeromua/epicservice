@@ -29,8 +29,9 @@ cd "$PROJECT_ROOT" || {
 
 # Генерація версії: ГГММДД.ЧЧММ
 VERSION_NAME=$(date +"%y%m%d.%H%M")
-# versionCode: ММДДЧЧММ без ведучих нулів
-VERSION_CODE=$(date +"%m%d%H%M" | sed 's/^0*//')
+# versionCode: ГГММДДЧЧ (без хвилин, 8 цифр, без нулів на початку)
+VERSION_CODE=$(date +"%-y%m%d%H" | sed 's/^0*//')
+
 
 echo -e "${CYAN}📌 Нова версія: ${VERSION_NAME} (code: ${VERSION_CODE})${NC}\n"
 
