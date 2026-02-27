@@ -13,7 +13,7 @@ from typing import List, Optional
 
 import openpyxl
 from aiogram import Bot
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,7 +21,7 @@ from sqlalchemy import select, func, Float, cast
 
 from config import BOT_TOKEN
 from database.engine import async_session
-from database.models import Product
+from database.models import Product, SavedList, SavedListItem
 from database.orm import (
     orm_add_item_to_temp_list,
     orm_clear_temp_list,
@@ -715,3 +715,199 @@ async def delete_archive(filename: str, user_id: int):
         print(f"❌ ERROR in delete_archive: {type(e).__name__}: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Delete error")
+
+
+# ===========================================================================
+# Mobile App (Android) API endpoints — JWT Bearer token authentication
+# ===========================================================================
+
+def _get_user_id_from_token(authorization: str) -> int:
+    """Extracts and validates user_id from a Bearer JWT token header."""
+    from webapp.routers.auth import get_current_user
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Невірний формат заголовка Authorization")
+    return get_current_user(authorization[7:])
+
+
+class SaveListMobileRequest(BaseModel):
+    items: List[dict]  # [{"article_name": str, "quantity": int}]
+
+
+@router.get("/products/search")
+async def mobile_search_products(
+    q: str,
+    limit: int = 50,
+    authorization: str = Header(...),
+):
+    """
+    GET /api/products/search?q=...&limit=...
+    Пошук товарів для мобільного додатку (JWT-автентифікація).
+    """
+    _get_user_id_from_token(authorization)
+    try:
+        all_products = await orm_find_products(q)
+        items = all_products[:limit]
+        return JSONResponse({
+            "items": [
+                {
+                    "article": p.артикул,
+                    "name": p.назва,
+                    "quantity": p.кількість,
+                    "department": p.відділ,
+                    "group": p.група,
+                    "reserved": p.відкладено,
+                    "months_no_move": p.місяці_без_руху,
+                    "price": p.ціна,
+                    "total_value": p.сума_залишку,
+                }
+                for p in items
+            ],
+            "total": len(all_products),
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/products/{article}")
+async def mobile_get_product(
+    article: str,
+    authorization: str = Header(...),
+):
+    """
+    GET /api/products/{article}
+    Деталі товару за артикулом для мобільного додатку.
+    """
+    _get_user_id_from_token(authorization)
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                select(Product).where(Product.артикул == article, Product.активний)
+            )
+            product = result.scalar_one_or_none()
+        if not product:
+            raise HTTPException(status_code=404, detail="Товар не знайдено")
+        return JSONResponse({
+            "product": {
+                "article": product.артикул,
+                "name": product.назва,
+                "quantity": product.кількість,
+                "department": product.відділ,
+                "group": product.група,
+                "reserved": product.відкладено,
+                "months_no_move": product.місяці_без_руху,
+                "price": product.ціна,
+                "total_value": product.сума_залишку,
+            }
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/saved-lists")
+async def mobile_get_saved_lists(authorization: str = Header(...)):
+    """
+    GET /api/saved-lists
+    Отримати збережені списки поточного користувача (JWT-автентифікація).
+    """
+    user_id = _get_user_id_from_token(authorization)
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                select(SavedList)
+                .where(SavedList.user_id == user_id)
+                .order_by(SavedList.created_at.desc())
+            )
+            lists = result.scalars().all()
+        return JSONResponse({
+            "lists": [
+                {
+                    "id": sl.id,
+                    "name": sl.file_name,
+                    "file_name": sl.file_name,
+                    "created_at": sl.created_at.isoformat() if sl.created_at else None,
+                }
+                for sl in lists
+            ]
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/saved-lists")
+async def mobile_save_list(
+    req: SaveListMobileRequest,
+    authorization: str = Header(...),
+):
+    """
+    POST /api/saved-lists
+    Зберегти список для поточного користувача (JWT-автентифікація).
+    """
+    user_id = _get_user_id_from_token(authorization)
+    if not req.items:
+        raise HTTPException(status_code=400, detail="Список порожній")
+    try:
+        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        file_name = f"list_{user_id}_{ts}.txt"
+        async with async_session() as session:
+            new_list = SavedList(
+                user_id=user_id,
+                file_name=file_name,
+                file_path="",
+                created_at=datetime.utcnow(),
+            )
+            session.add(new_list)
+            await session.flush()
+            for item in req.items:
+                article = str(item.get("article_name", ""))
+                qty = int(item.get("quantity", 1))
+                session.add(SavedListItem(
+                    list_id=new_list.id,
+                    article_name=article,
+                    quantity=qty,
+                ))
+            await session.commit()
+            list_id = new_list.id
+        return JSONResponse({"success": True, "id": list_id})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/saved-lists/{list_id}/download")
+async def mobile_download_saved_list(
+    list_id: int,
+    token: str,
+):
+    """
+    GET /api/saved-lists/{list_id}/download?token=...
+    Завантажити збережений список як текстовий файл.
+    """
+    from webapp.routers.auth import get_current_user
+    user_id = get_current_user(token)
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                select(SavedList).where(SavedList.id == list_id, SavedList.user_id == user_id)
+            )
+            saved_list = result.scalar_one_or_none()
+            if not saved_list:
+                raise HTTPException(status_code=404, detail="Список не знайдено")
+            items_result = await session.execute(
+                select(SavedListItem).where(SavedListItem.list_id == list_id)
+            )
+            items = items_result.scalars().all()
+
+        lines = [f"{item.article_name}\t{item.quantity}" for item in items]
+        content = "\n".join(lines).encode("utf-8")
+        filename = saved_list.file_name or f"list_{list_id}.txt"
+
+        return Response(
+            content=content,
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

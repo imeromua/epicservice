@@ -17,7 +17,7 @@ import openpyxl
 import pandas as pd
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.background import BackgroundTasks
 from pydantic import BaseModel
@@ -1208,3 +1208,54 @@ async def danger_full_wipe(user_id: int = Query(...)):
             content={"success": False, "message": f"Помилка: {str(e)}"},
             status_code=500
         )
+
+
+# ===========================================================================
+# Mobile App (Android) Admin endpoint — JWT Bearer token authentication
+# ===========================================================================
+
+@router.get("/stats")
+async def mobile_admin_stats(authorization: str = Header(...)):
+    """
+    GET /api/admin/stats
+    Статистика системи для мобільного адмін-модуля (JWT-автентифікація).
+    """
+    from webapp.routers.auth import get_current_user
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Невірний формат заголовка Authorization")
+    user_id = get_current_user(authorization[7:])
+
+    user = await orm_get_user_by_id(user_id)
+    if not user or user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
+
+    try:
+        loop = asyncio.get_running_loop()
+        all_users = await loop.run_in_executor(None, orm_get_all_users_sync)
+        all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
+        active_users_data = await orm_get_users_with_active_lists()
+        temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
+
+        pending_count = 0
+        async with async_session() as session:
+            from sqlalchemy import select as sa_select, func as sa_func
+            from database.models import User as UserModel
+            res = await session.execute(
+                sa_select(sa_func.count()).select_from(UserModel).where(UserModel.status == "pending")
+            )
+            pending_count = res.scalar_one()
+
+        total_reserved_sum = sum(
+            item.quantity * (item.product.ціна or 0.0) for item in temp_list_items
+        )
+
+        return JSONResponse({
+            "total_users": len(all_users),
+            "active_users": len(active_users_data),
+            "total_products": len(all_products),
+            "pending_users": pending_count,
+            "total_reserved_sum": round(total_reserved_sum, 2),
+        })
+    except Exception as e:
+        logger.error("Помилка отримання статистики (mobile): %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Помилка отримання статистики")

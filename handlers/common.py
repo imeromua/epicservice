@@ -96,6 +96,12 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
             parse_mode="Markdown"
         )
 
+        # Якщо телефон ще не прив'язано — пропонуємо зробити це
+        if not db_user.phone:
+            await message.answer(
+                "📱 Для роботи Android-додатка прив'яжіть номер телефону командою /linkphone"
+            )
+
     except Exception as e:
         logger.error("Неочікувана помилка в cmd_start для %s: %s", user.id, e, exc_info=True)
         await message.answer(LEXICON.UNEXPECTED_ERROR)

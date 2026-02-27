@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 # Додаємо шлях до кореневої папки проекту
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from config import ADMIN_IDS as CONFIG_ADMIN_IDS
 from webapp.routers import admin, client, photos, user_management
 from webapp.routers import auth
 
@@ -54,7 +55,7 @@ app.add_middleware(
 # --- Lifecycle: ініціалізація Redis для OTP-автентифікації ---
 @app.on_event("startup")
 async def startup_event():
-    """Ініціалізує Redis-клієнт при старті FastAPI."""
+    """Ініціалізує Redis-клієнт та Telegram Bot при старті FastAPI."""
     try:
         from config import REDIS_ENABLED, REDIS_URL
         if REDIS_ENABLED:
@@ -65,13 +66,23 @@ async def startup_event():
     except Exception:
         app.state.redis = None
 
+    try:
+        from aiogram import Bot
+        from config import BOT_TOKEN
+        app.state.bot = Bot(token=BOT_TOKEN)
+    except Exception:
+        app.state.bot = None
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Закриває Redis-з'єднання при зупинці."""
+    """Закриває Redis-з'єднання та Telegram Bot при зупинці."""
     redis = getattr(app.state, "redis", None)
     if redis:
         await redis.aclose()
+    bot = getattr(app.state, "bot", None)
+    if bot:
+        await bot.session.close()
 
 # Статичні файли
 app.mount(
@@ -144,9 +155,9 @@ async def service_worker():
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Головна сторінка Mini App"""
-    # Читаємо список ID адмінів з .env
+    # Читаємо список ID адмінів з .env; якщо WEBAPP_ADMIN_IDS не задано — беремо ADMIN_IDS
     admin_ids_str = os.getenv("WEBAPP_ADMIN_IDS", "")
-    admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
+    admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()] or list(CONFIG_ADMIN_IDS)
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -170,7 +181,7 @@ async def admin_panel(request: Request):
 async def standalone_home(request: Request):
     """Standalone app page (no Telegram dependency)"""
     admin_ids_str = os.getenv("WEBAPP_ADMIN_IDS", "")
-    admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
+    admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()] or list(CONFIG_ADMIN_IDS)
     return templates.TemplateResponse("standalone.html", {
         "request": request,
         "admin_ids": admin_ids
