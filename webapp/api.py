@@ -33,6 +33,7 @@ app = FastAPI(
 _cors_origins = [
     "https://anubis-ua.pp.ua",
     "capacitor://localhost",
+    "https://localhost",
     "http://localhost",
     "http://localhost:8080",
     "ionic://localhost",
