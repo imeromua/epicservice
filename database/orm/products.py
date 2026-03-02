@@ -333,7 +333,7 @@ def _sync_subtract_collected_from_stock(dataframe: pd.DataFrame) -> dict:
                 continue
 
             product = session.execute(
-                select(Product).where(Product.артикул == article)
+                select(Product).where(Product.артикул == article, Product.активний == True)
             ).scalar_one_or_none()
 
             if not product:

@@ -182,6 +182,7 @@ async def filter_products(req: FilterProductsRequest):
         async with async_session() as session:
             # Базовий запит - рахуємо тільки товари, де є ДОСТУПНИЙ залишок (кількість - відкладено > 0)
             query = select(Product).where(
+                Product.активний == True,
                 (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0
             )
             
@@ -227,6 +228,7 @@ async def filter_products(req: FilterProductsRequest):
                 func.sum(Product.сума_залишку).label('total_sum'),
                 func.sum(cast(Product.кількість, Float)).label('total_quantity')
             ).where(
+                Product.активний == True,
                 (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0
             )
             
@@ -316,6 +318,7 @@ async def get_departments():
                 Product.відділ,
                 func.count(Product.id).label('count')
             ).where(
+                Product.активний == True,
                 (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0,
                 Product.відділ != 0,  # виключаємо відділ 0
                 Product.відділ.isnot(None)  # виключаємо NULL
