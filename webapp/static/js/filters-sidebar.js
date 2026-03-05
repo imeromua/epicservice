@@ -323,7 +323,7 @@ function displayFilteredProducts(products, isNewFilter = false) {
     } else {
         // Fallback рендер
         const html = availableProducts.map(p => `
-            <div class="product-card" onclick='openAddModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+            <div class="product-card" data-product-id="${p.id}" onclick="openAddModalById(${p.id})">
                 <div class="product-header">
                     <span class="product-article">🆔 ${p.article}</span>
                     <span class="product-status">✅ Знайдено</span>
@@ -459,3 +459,9 @@ if (typeof window !== 'undefined') {
 }
 
 console.log('🎛️ Filters sidebar with debounced infinite scroll loaded');
+
+function openAddModalById(id) {
+    const p = cachedProducts && cachedProducts.find(x => x.id === id);
+    if (p) openAddModal(p);
+    else console.error('Product not found in cache for id:', id);
+}

@@ -118,7 +118,7 @@ function renderProduct(p) {
     const lockedClass = isLocked ? ' locked' : '';
     const statusClass = isLocked ? ' locked' : '';
     const statusText = isLocked ? '🔒 Заблоковано' : '✅ Знайдено';
-    const clickHandler = isLocked ? `onclick=\"showLockedAlert('${p.current_list_department}')\"` : `onclick='openModalWithPhotos(${JSON.stringify(p).replace(/'/g, "&#39;")})'`;
+    const clickHandler = isLocked ? `onclick="showLockedAlert('${p.current_list_department}')"` : `onclick="openProductById(${p.id})"`;
     const hasPhotos = p.photos && p.photos.length > 0;
     const photoIndicator = hasPhotos ? `<span class=\"photo-badge photo-badge-inline\">📷 ${p.photos.length}</span>` : '';
     
@@ -145,6 +145,11 @@ function renderProduct(p) {
 
 function showLockedAlert(dept) {
     tg.showAlert(`🔒 Цей товар з іншого відділу.\n\nПоточний список для відділу ${dept}.\nЗбережіть або очистіть список щоб почати новий.`);
+}
+function openProductById(id) {
+    const p = cachedProducts.find(x => x.id === id);
+    if (p) openModalWithPhotos(p);
+    else console.error('Product not found in cache for id:', id);
 }
 
 function updateSearchResults() {
