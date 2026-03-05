@@ -168,7 +168,10 @@
             <div class="admin-section-title">📤 Експорт</div>
             <div class="action-buttons">
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportModeratorStock()">📊 Звіт про залишки (Excel)</button>
+                <button class="btn btn-secondary" id="btn-moderator-subtract-collected" style="background: #5856d6;">📉 Відняти зібране</button>
+                <input type="file" id="moderator-subtract-file-input" accept=".xlsx,.xls" style="display:none">
             </div>
+            <div id="moderatorSubtractAlert"></div>
         </div>
 
         <!-- Admin Tab -->
@@ -225,7 +228,10 @@
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
+                <button class="btn btn-secondary" id="btn-subtract-collected" style="background: #5856d6;">📉 Відняти зібране</button>
+                <input type="file" id="subtract-file-input" accept=".xlsx,.xls" style="display:none">
             </div>
+            <div id="subtractAlert"></div>
 
             <div class="admin-section-title">📢 Розсилка повідомлень</div>
             <div id="broadcastAlert"></div>

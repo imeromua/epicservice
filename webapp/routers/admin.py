@@ -507,6 +507,172 @@ async def import_products(
             os.remove(temp_file_path)
 
 
+@router.post("/subtract-collected")
+async def subtract_collected(
+    file: UploadFile = File(...),
+    user_id: int = Query(...)
+):
+    """
+    Відняти зібране — коригування залишків з Excel-файлу (2 колонки: артикул + кількість).
+    Перевіряє блокування перед змінами. Повертає детальний звіт.
+    """
+    await verify_admin_or_moderator(user_id)
+
+    if not file.filename.endswith((".xlsx", ".xls")):
+        return JSONResponse(
+            content={"error": "Невірний формат файлу. Потрібен Excel (.xlsx або .xls)"},
+            status_code=400
+        )
+
+    contents = await file.read()
+
+    # --- Перевірки блокування ---
+    active_list_users = await orm_get_users_with_active_lists()
+    if active_list_users:
+        return JSONResponse(
+            content={"blocked": True, "reason": "active_list"},
+            status_code=409
+        )
+
+    async with async_session() as session:
+        result_reserved = await session.execute(
+            text("SELECT COUNT(*) FROM products WHERE відкладено > 0")
+        )
+        reserved_count = result_reserved.scalar()
+    if reserved_count and reserved_count > 0:
+        return JSONResponse(
+            content={"blocked": True, "reason": "reserved_exists"},
+            status_code=409
+        )
+
+    # --- Парсинг файлу ---
+    def _parse_xlsx(data: bytes):
+        import io
+        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        ws = wb.worksheets[0]
+
+        rows_total = 0
+        rows_valid = 0
+        article_map: dict = {}
+        skipped_invalid = []
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=1), start=1):
+            cell_a = row[0].value if len(row) > 0 else None
+            cell_b = row[1].value if len(row) > 1 else None
+
+            if cell_a is None and cell_b is None:
+                continue
+
+            rows_total += 1
+
+            article = str(cell_a).strip() if cell_a is not None else ""
+            if not article:
+                skipped_invalid.append({
+                    "row": row_idx,
+                    "article": article,
+                    "qty": str(cell_b),
+                    "reason": "empty_article"
+                })
+                continue
+
+            try:
+                qty = int(cell_b)
+                if qty <= 0:
+                    raise ValueError("qty <= 0")
+            except (TypeError, ValueError):
+                skipped_invalid.append({
+                    "row": row_idx,
+                    "article": article,
+                    "qty": str(cell_b),
+                    "reason": "invalid_qty"
+                })
+                continue
+
+            rows_valid += 1
+            article_map[article] = article_map.get(article, 0) + qty
+
+        wb.close()
+        return rows_total, rows_valid, article_map, skipped_invalid
+
+    try:
+        rows_total, rows_valid, article_map, skipped_invalid = await asyncio.to_thread(
+            _parse_xlsx, contents
+        )
+    except Exception as e:
+        logger.error("Помилка парсингу файлу subtract-collected: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"error": f"Помилка обробки файлу: {str(e)}"},
+            status_code=500
+        )
+
+    # --- Застосування змін ---
+    updated = 0
+    skipped_not_found = 0
+    skipped_inactive = 0
+    set_to_zero_list = []
+
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                from sqlalchemy import select as sa_select
+                for article, qty in article_map.items():
+                    row_result = await session.execute(
+                        sa_select(Product).where(Product.артикул == article)
+                    )
+                    product = row_result.scalar_one_or_none()
+
+                    if product is None:
+                        skipped_not_found += 1
+                        continue
+
+                    if not product.активний:
+                        skipped_inactive += 1
+                        continue
+
+                    try:
+                        db_before = int(float(str(product.кількість).replace(",", ".")))
+                    except (ValueError, TypeError):
+                        db_before = 0
+
+                    new_qty = db_before - qty
+                    if new_qty < 0:
+                        set_to_zero_list.append({
+                            "article": article,
+                            "db_before": db_before,
+                            "subtract": qty,
+                            "db_after": 0
+                        })
+                        product.кількість = "0"
+                    else:
+                        product.кількість = str(new_qty)
+                        updated += 1
+
+    except SQLAlchemyError as e:
+        logger.critical("Помилка БД під час subtract-collected: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"error": f"Помилка бази даних: {str(e)}"},
+            status_code=500
+        )
+
+    return JSONResponse(content={
+        "success": True,
+        "summary": {
+            "rows_total": rows_total,
+            "rows_valid": rows_valid,
+            "unique_articles": len(article_map),
+            "updated": updated,
+            "set_to_zero": len(set_to_zero_list),
+            "skipped_not_found": skipped_not_found,
+            "skipped_inactive": skipped_inactive,
+            "skipped_invalid": len(skipped_invalid),
+        },
+        "details": {
+            "set_to_zero": set_to_zero_list,
+            "skipped_invalid": skipped_invalid,
+        }
+    })
+
+
 @router.get("/export/stock")
 async def export_stock_report(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
     """
