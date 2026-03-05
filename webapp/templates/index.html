@@ -168,8 +168,9 @@
             <div class="admin-section-title">📤 Експорт</div>
             <div class="action-buttons">
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportModeratorStock()">📊 Звіт про залишки (Excel)</button>
-                <button class="btn btn-secondary" id="btn-moderator-subtract-collected" style="background: #5856d6;">📉 Відняти зібране</button>
-                <input type="file" id="moderator-subtract-file-input" accept=".xlsx,.xls" style="display:none">
+                <!-- FIX: label відкриває file dialog нативно без .click() — сумісно з Telegram WebApp -->
+                <label for="moderator-subtract-file-input" class="btn btn-secondary" id="btn-moderator-subtract-collected" style="background: #5856d6; cursor: pointer;">📉 Відняти зібране</label>
+                <input type="file" id="moderator-subtract-file-input" accept=".xlsx" style="display:none">
             </div>
             <div id="moderatorSubtractAlert"></div>
         </div>
@@ -228,8 +229,9 @@
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
-                <button class="btn btn-secondary" id="btn-subtract-collected" style="background: #5856d6;">📉 Відняти зібране</button>
-                <input type="file" id="subtract-file-input" accept=".xlsx,.xls" style="display:none">
+                <!-- FIX: label відкриває file dialog нативно без .click() — сумісно з Telegram WebApp -->
+                <label for="subtract-file-input" class="btn btn-secondary" id="btn-subtract-collected" style="background: #5856d6; cursor: pointer;">📉 Відняти зібране</label>
+                <input type="file" id="subtract-file-input" accept=".xlsx" style="display:none">
             </div>
             <div id="subtractAlert"></div>
 

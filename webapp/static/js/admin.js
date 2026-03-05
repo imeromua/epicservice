@@ -746,18 +746,20 @@ async function _doSubtractCollected(fileInputId, alertElId, btnEl) {
 }
 
 function _initSubtractCollectedButton(btnId, fileInputId, alertElId) {
-    const btn = document.getElementById(btnId);
+    // FIX: НЕ чіпаємо btn.click() — label у HTML відкриває діалог нативно
+    // Telegram WebApp блокує програмний fileInput.click() з addEventListener
     const fileInput = document.getElementById(fileInputId);
     const alertEl = document.getElementById(alertElId);
-    if (!btn || !fileInput || !alertEl) return;
+    if (!fileInput || !alertEl) return;
 
-    btn.addEventListener('click', () => { fileInput.click(); });
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            _doSubtractCollected(fileInputId, alertElId, btn);
+            const btn = document.getElementById(btnId);
+            _doSubtractCollected(fileInputId, alertElId, btn || fileInput);
         }
     });
-    // Event delegation: single listener on alert container for copy button clicks.
+
+    // Event delegation: copy button clicks
     alertEl.addEventListener('click', (e) => {
         const copyBtn = e.target.closest('[data-copy-subtract]');
         if (!copyBtn) return;
