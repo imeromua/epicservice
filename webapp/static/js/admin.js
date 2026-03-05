@@ -653,3 +653,124 @@ async function uploadModeratorFile() {
 function exportModeratorStock() {
     window.location.href = `/api/admin/export/stock?user_id=${userId}`;
 }
+
+// === Відняти зібране ===
+
+// Stores last subtract result JSON per alert element id for copy-to-clipboard.
+const _subtractLastResult = {};
+
+function _buildSubtractResultHTML(data, alertElId) {
+    _subtractLastResult[alertElId] = JSON.stringify(data, null, 2);
+    const s = data.summary;
+    let html = `<div style="margin-top:12px;">`;
+    html += `<div style="font-weight:600;margin-bottom:8px;">📊 Результат операції</div>`;
+    html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">`;
+    const rows = [
+        ['Рядків всього', s.rows_total],
+        ['Рядків валідних', s.rows_valid],
+        ['Унікальних артикулів', s.unique_articles],
+        ['Оновлено', s.updated],
+        ['Встановлено в 0', s.set_to_zero],
+        ['Не знайдено', s.skipped_not_found],
+        ['Неактивні', s.skipped_inactive],
+        ['Некоректні рядки', s.skipped_invalid],
+    ];
+    rows.forEach(([label, val]) => {
+        html += `<tr><td style="padding:4px 8px;border-bottom:1px solid var(--hint-color,#aaa);color:var(--hint-color)">${label}</td><td style="padding:4px 8px;border-bottom:1px solid var(--hint-color,#aaa);font-weight:600">${val}</td></tr>`;
+    });
+    html += `</table>`;
+
+    if (data.details.set_to_zero && data.details.set_to_zero.length > 0) {
+        html += `<div style="font-weight:600;margin:8px 0 4px;">⚠️ Встановлено в 0 (${data.details.set_to_zero.length})</div>`;
+        html += `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">`;
+        html += `<tr><th style="text-align:left;padding:4px 6px;background:var(--secondary-bg-color,#eee)">Артикул</th><th style="padding:4px 6px;background:var(--secondary-bg-color,#eee)">До</th><th style="padding:4px 6px;background:var(--secondary-bg-color,#eee)">Відняти</th><th style="padding:4px 6px;background:var(--secondary-bg-color,#eee)">Після</th></tr>`;
+        data.details.set_to_zero.forEach(item => {
+            html += `<tr><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc)">${item.article}</td><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc);text-align:center">${item.db_before}</td><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc);text-align:center">${item.subtract}</td><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc);text-align:center">0</td></tr>`;
+        });
+        html += `</table></div>`;
+    }
+
+    if (data.details.skipped_invalid && data.details.skipped_invalid.length > 0) {
+        html += `<div style="font-weight:600;margin:8px 0 4px;">❌ Некоректні рядки (${data.details.skipped_invalid.length})</div>`;
+        html += `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">`;
+        html += `<tr><th style="text-align:left;padding:4px 6px;background:var(--secondary-bg-color,#eee)">Рядок</th><th style="padding:4px 6px;background:var(--secondary-bg-color,#eee)">Артикул</th><th style="padding:4px 6px;background:var(--secondary-bg-color,#eee)">Кіл-ть</th><th style="padding:4px 6px;background:var(--secondary-bg-color,#eee)">Причина</th></tr>`;
+        data.details.skipped_invalid.forEach(item => {
+            html += `<tr><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc)">${item.row}</td><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc)">${item.article}</td><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc);text-align:center">${item.qty}</td><td style="padding:3px 6px;border-bottom:1px solid var(--hint-color,#ccc)">${item.reason}</td></tr>`;
+        });
+        html += `</table></div>`;
+    }
+
+    html += `<button class="btn btn-secondary" data-copy-subtract="${alertElId}" style="margin-top:10px;font-size:12px;">📋 Скопіювати JSON</button>`;
+    html += `</div>`;
+    return html;
+}
+
+async function _doSubtractCollected(fileInputId, alertElId, btnEl) {
+    const fileInput = document.getElementById(fileInputId);
+    const alertEl = document.getElementById(alertElId);
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = '⌛ Обробка...';
+    alertEl.innerHTML = '<div class="loader">Завантаження...</div>';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`/api/admin/subtract-collected?user_id=${userId}`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (response.status === 409 && data.blocked) {
+            const msg = data.reason === 'active_list'
+                ? '❌ Є активний список — операція недоступна'
+                : '❌ Є активні резерви — операція недоступна';
+            alertEl.innerHTML = `<div class="alert alert-error"><span style="font-size:20px;">⛔</span><div>${msg}</div></div>`;
+        } else if (data.success) {
+            alertEl.innerHTML = `<div class="alert alert-success"><span style="font-size:20px;">✅</span><div>Операцію виконано</div></div>` + _buildSubtractResultHTML(data, alertElId);
+        } else {
+            alertEl.innerHTML = `<div class="alert alert-error"><span style="font-size:20px;">❌</span><div>${data.error || 'Помилка операції'}</div></div>`;
+        }
+    } catch (error) {
+        alertEl.innerHTML = `<div class="alert alert-error"><span style="font-size:20px;">❌</span><div>Помилка: ${error.message}</div></div>`;
+    } finally {
+        fileInput.value = '';
+        btnEl.disabled = false;
+        btnEl.textContent = origText;
+    }
+}
+
+function _initSubtractCollectedButton(btnId, fileInputId, alertElId) {
+    const btn = document.getElementById(btnId);
+    const fileInput = document.getElementById(fileInputId);
+    const alertEl = document.getElementById(alertElId);
+    if (!btn || !fileInput || !alertEl) return;
+
+    btn.addEventListener('click', () => { fileInput.click(); });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            _doSubtractCollected(fileInputId, alertElId, btn);
+        }
+    });
+    // Event delegation: single listener on alert container for copy button clicks.
+    alertEl.addEventListener('click', (e) => {
+        const copyBtn = e.target.closest('[data-copy-subtract]');
+        if (!copyBtn) return;
+        const key = copyBtn.dataset.copySubtract;
+        const json = _subtractLastResult[key] || '';
+        navigator.clipboard.writeText(json).then(() => {
+            copyBtn.textContent = '✅ Скопійовано!';
+            setTimeout(() => { copyBtn.textContent = '📋 Скопіювати JSON'; }, 2000);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    _initSubtractCollectedButton('btn-subtract-collected', 'subtract-file-input', 'subtractAlert');
+    _initSubtractCollectedButton('btn-moderator-subtract-collected', 'moderator-subtract-file-input', 'moderatorSubtractAlert');
+});
