@@ -518,9 +518,10 @@ async def subtract_collected(
     """
     await verify_admin_or_moderator(user_id)
 
-    if not file.filename.endswith((".xlsx", ".xls")):
+    # FIX: приймаємо лише .xlsx (openpyxl не підтримує старий формат .xls)
+    if not file.filename.endswith(".xlsx"):
         return JSONResponse(
-            content={"error": "Невірний формат файлу. Потрібен Excel (.xlsx або .xls)"},
+            content={"error": "Невірний формат файлу. Потрібен Excel (.xlsx)"},
             status_code=400
         )
 
@@ -576,7 +577,8 @@ async def subtract_collected(
                 continue
 
             try:
-                qty = int(cell_b)
+                # FIX: int(float(str(...))) — коректно обробляє і числові (5.0) і рядкові ("5") значення з Excel
+                qty = int(float(str(cell_b)))
                 if qty <= 0:
                     raise ValueError("qty <= 0")
             except (TypeError, ValueError):
