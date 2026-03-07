@@ -35,7 +35,7 @@ async function loadStatistics() {
     }
 }
 
-async function loadArchiveStats(filename) { try { const r = await fetch(`/api/archive/stats/${filename}?user_id=${userId}`); const d = await r.json(); if (d.success) { return `<div class="stat-row"><span class="stat-label">📦 Товарів:</span><span class="stat-value">${d.items_count}</span></div><div class="stat-row"><span class="stat-label">🏢 Відділ:</span><span class="stat-value">${d.department}</span></div><div class="stat-row"><span class="stat-label">👤 Автор:</span><span class="stat-value">ID ${d.author_id}</span></div>`; } return ''; } catch (e) { return ''; } }
+async function loadArchiveStats(filename) { try { const r = await fetch(`/api/archive/stats/${filename}`); const d = await r.json(); if (d.success) { return `<div class="stat-row"><span class="stat-label">📦 Товарів:</span><span class="stat-value">${d.items_count}</span></div><div class="stat-row"><span class="stat-label">🏢 Відділ:</span><span class="stat-value">${d.department}</span></div>`; } return ''; } catch (e) { return ''; } }
 
 async function loadArchives() { 
     const el = document.getElementById('archivesContent'); 
@@ -69,11 +69,17 @@ async function loadArchives() {
 }
 
 function downloadAllArchives() {
-    window.open(`/api/archives/download-all/${userId}`, '_blank');
+    // Use fetch+blob download to include TMA auth header
+    API.downloadFile(`/api/archives/download-all/${userId}`, `epicservice_archives_${userId}.zip`);
     tg.HapticFeedback.notificationOccurred('success');
 }
 
-function downloadArchive(f) { window.open(`/api/archive/download/${f}`, '_blank'); tg.HapticFeedback.notificationOccurred('success'); }
-async function deleteArchive(filename) { if (!confirm(`Видалити файл "${filename}"?`)) return; try { const r = await fetch(`/api/archive/delete/${filename}?user_id=${userId}`, { method: 'DELETE' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); tg.HapticFeedback.notificationOccurred('success'); loadArchives(); } else { tg.showAlert('❌ Помилка видалення'); } } catch (e) { tg.showAlert('❌ Помилка: ' + e.message); } }
+function downloadArchive(f) {
+    // Use fetch+blob download to include TMA auth header
+    API.downloadFile(`/api/archive/download/${f}`, f);
+    tg.HapticFeedback.notificationOccurred('success');
+}
+
+async function deleteArchive(filename) { if (!confirm(`Видалити файл "${filename}"?`)) return; try { const r = await fetch(`/api/archive/delete/${filename}`, { method: 'DELETE' }); const d = await r.json(); if (d.success) { tg.showAlert(`✅ ${d.message}`); tg.HapticFeedback.notificationOccurred('success'); loadArchives(); } else { tg.showAlert('❌ Помилка видалення'); } } catch (e) { tg.showAlert('❌ Помилка: ' + e.message); } }
 
 

@@ -2,13 +2,8 @@
 Адміністративний роутер для управління системою через веб-інтерфейс.
 Містить ендпоїнти для імпорту/експорту даних, управління користувачами та звітів.
 
-Security hardening status (first pass):
-- SECURED (JWT Bearer token required):
-    POST /danger/clear-database
-    POST /danger/delete-all-photos
-    POST /danger/delete-all-archives
-    POST /danger/full-wipe
-- TODO (still accept user_id from query/body — migrate to JWT in follow-up PR):
+Security hardening status (second pass — TMA initData auth applied):
+- SECURED with TMA initData (X-Telegram-Init-Data header required):
     GET /users, GET /users/active, GET /users/all
     GET /archives, GET /archives/download/{filename}, GET /archives/download-all
     POST /import, POST /subtract-collected
@@ -16,6 +11,11 @@ Security hardening status (first pass):
     POST /force-save/{target_user_id}, POST /broadcast
     GET /products/info, GET /reserved/by-department
     POST /danger/reset-moderation
+- SECURED with JWT Bearer OR TMA initData (admin only):
+    POST /danger/clear-database
+    POST /danger/delete-all-photos
+    POST /danger/delete-all-archives
+    POST /danger/full-wipe
 """
 
 import asyncio
@@ -55,7 +55,13 @@ from database.engine import async_session
 from database.models import Product, ProductPhoto
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
-from webapp.deps import require_admin, require_admin_or_moderator
+from webapp.deps import (
+    require_admin,
+    require_admin_any_auth,
+    require_admin_or_moderator,
+    require_tma_admin,
+    require_tma_admin_or_moderator,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -101,12 +107,12 @@ class AdminActionRequest(BaseModel):
 
 
 class BroadcastRequest(BaseModel):
-    user_id: int
     message: str
+    user_id: int | None = None  # kept for backward compat, ignored — admin identity from TMA
 
 
 class ForceSaveRequest(BaseModel):
-    user_id: int
+    user_id: int | None = None  # kept for backward compat, ignored — admin identity from TMA
 
 
 # === Допоміжні функції ===
@@ -255,12 +261,11 @@ async def broadcast_import_update(result: dict):
 # === Ендпоїнти ===
 
 @router.get("/users")
-async def get_all_users(user_id: int = Query(...)):
+async def get_all_users(user_id: int = Depends(require_tma_admin)):
     """
     Отримати список всіх користувачів системи.
-    Потрібні права адміністратора.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -275,12 +280,11 @@ async def get_all_users(user_id: int = Query(...)):
 
 
 @router.get("/users/active")
-async def get_active_users(user_id: int = Query(...)):
+async def get_active_users(user_id: int = Depends(require_tma_admin)):
     """
     Отримати користувачів з активними списками (temp_list).
-    Потрібні права адміністратора.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         active_users_raw = await orm_get_users_with_active_lists()
@@ -333,12 +337,12 @@ async def get_active_users(user_id: int = Query(...)):
 
 
 @router.get("/archives")
-async def list_archives(user_id: int = Query(...)):
+async def list_archives(user_id: int = Depends(require_tma_admin)):
     """
     Отримати список всіх архівів користувачів.
+    Потрібні права адміністратора (TMA initData).
     Читає файли з /home/anubis/epicservice/archives/active.
     """
-    verify_admin(user_id)
     try:
         archives_dir = os.path.join(ARCHIVES_PATH, "active")
         
@@ -378,11 +382,11 @@ async def list_archives(user_id: int = Query(...)):
 
 
 @router.get("/archives/download/{filename}")
-async def download_archive(filename: str, user_id: int = Query(...)):
+async def download_archive(filename: str, user_id: int = Depends(require_tma_admin)):
     """
     Скачати конкретний файл архіву.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         # Безпека: перевіряємо що filename не містить шляхи
         if '/' in filename or '\\' in filename or '..' in filename:
@@ -410,11 +414,14 @@ async def download_archive(filename: str, user_id: int = Query(...)):
 
 
 @router.get("/archives/download-all")
-async def download_all_archives(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
+async def download_all_archives(
+    user_id: int = Depends(require_tma_admin),
+    background_tasks: BackgroundTasks = None,
+):
     """
     Скачати всі архіви одним ZIP файлом.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         archives_dir = os.path.join(ARCHIVES_PATH, "active")
         
@@ -453,16 +460,15 @@ async def download_all_archives(user_id: int = Query(...), background_tasks: Bac
 @router.post("/import")
 async def import_products(
     file: UploadFile = File(...),
-    user_id: int = Query(...),
-    notify_users: bool = Query(False)
+    user_id: int = Depends(require_tma_admin_or_moderator),
+    notify_users: bool = Query(False),
 ):
     """
     Імпорт товарів з Excel файлу.
     Підтримує розумне розпізнавання колонок.
     Опціонально розсилає сповіщення користувачам.
+    Потрібні права адміністратора або модератора (TMA initData).
     """
-    await verify_admin_or_moderator(user_id)
-    
     if not file.filename.endswith((".xlsx", ".xls")):
         return JSONResponse(
             content={"error": "Невірний формат файлу. Потрібен Excel (.xlsx або .xls)"},
@@ -526,13 +532,13 @@ async def import_products(
 @router.post("/subtract-collected")
 async def subtract_collected(
     file: UploadFile = File(...),
-    user_id: int = Query(...)
+    user_id: int = Depends(require_tma_admin_or_moderator),
 ):
     """
     Відняти зібране — коригування залишків з Excel-файлу (2 колонки: артикул + кількість).
     Перевіряє блокування перед змінами. Повертає детальний звіт.
+    Потрібні права адміністратора або модератора (TMA initData).
     """
-    await verify_admin_or_moderator(user_id)
 
     # FIX: приймаємо лише .xlsx (openpyxl не підтримує старий формат .xls)
     if not file.filename.endswith(".xlsx"):
@@ -692,12 +698,15 @@ async def subtract_collected(
 
 
 @router.get("/export/stock")
-async def export_stock_report(user_id: int = Query(...), background_tasks: BackgroundTasks = None):
+async def export_stock_report(
+    user_id: int = Depends(require_tma_admin_or_moderator),
+    background_tasks: BackgroundTasks = None,
+):
     """
     Експорт звіту про залишки на складі.
     Враховує резерви з temp_list.
+    Потрібні права адміністратора або модератора (TMA initData).
     """
-    await verify_admin_or_moderator(user_id)
     try:
         loop = asyncio.get_running_loop()
         report_path = await loop.run_in_executor(None, _create_stock_report_sync)
@@ -726,12 +735,12 @@ async def export_stock_report(user_id: int = Query(...), background_tasks: Backg
 
 
 @router.get("/summary")
-async def get_summary_stats(user_id: int = Query(...)):
+async def get_summary_stats(user_id: int = Depends(require_tma_admin)):
     """
     Отримати зведену статистику по відділах у форматі JSON.
     Показує кількість артикулів та загальну суму збору.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
@@ -784,14 +793,14 @@ async def get_summary_stats(user_id: int = Query(...)):
 @router.post("/force-save/{target_user_id}")
 async def force_save_user_list_endpoint(
     target_user_id: int,
-    request: ForceSaveRequest
+    request: ForceSaveRequest,
+    admin_id: int = Depends(require_tma_admin),
 ):
     """
     Примусово зберегти список користувача.
     Використовується перед важливими операціями (імпорт, експорт).
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(request.user_id)
-    
     try:
         # Використовуємо веб-версію без FSMContext
         success = await force_save_user_list_web(target_user_id, bot)
@@ -817,14 +826,14 @@ async def force_save_user_list_endpoint(
 
 @router.post("/broadcast")
 async def broadcast_message(
-    request: BroadcastRequest
+    request: BroadcastRequest,
+    admin_id: int = Depends(require_tma_admin),
 ):
     """
     Розіслати повідомлення всім користувачам системи.
     Використовується для важливих оголошень.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(request.user_id)
-    
     try:
         loop = asyncio.get_running_loop()
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -863,13 +872,12 @@ async def broadcast_message(
 
 
 @router.get("/statistics")
-async def get_system_statistics(user_id: int = Query(...)):
+async def get_system_statistics(user_id: int = Depends(require_tma_admin)):
     """
     Отримати загальну статистику системи для адмін-панелі.
     Включає інформацію про користувачів, товари та резерви.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
-    
     try:
         loop = asyncio.get_running_loop()
         
@@ -898,12 +906,12 @@ async def get_system_statistics(user_id: int = Query(...)):
 
 
 @router.get("/users/all")
-async def get_all_users_with_stats(user_id: int = Query(...)):
+async def get_all_users_with_stats(user_id: int = Depends(require_tma_admin)):
     """
     Отримати всіх користувачів з історією архівів та загальною сумою.
     Формат файлів: {відділ}_{user_id}_{дата}_{час}.xlsx
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         user_ids = await loop.run_in_executor(None, orm_get_all_users_sync)
@@ -986,12 +994,12 @@ async def get_all_users_with_stats(user_id: int = Query(...)):
 
 
 @router.get("/products/info")
-async def get_products_info(user_id: int = Query(...)):
+async def get_products_info(user_id: int = Depends(require_tma_admin)):
     """
     Отримати інформацію про товари з було/стало статистикою.
     Враховує доступні товари та зібрані за сесію.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
@@ -1082,11 +1090,11 @@ async def get_products_info(user_id: int = Query(...)):
 
 
 @router.get("/reserved/by-department")
-async def get_reserved_by_department(user_id: int = Query(...)):
+async def get_reserved_by_department(user_id: int = Depends(require_tma_admin)):
     """
     Отримати розбивку резервів по відділах з детальною статистикою.
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
     try:
         loop = asyncio.get_running_loop()
         temp_list_items = await loop.run_in_executor(None, orm_get_all_temp_list_items_sync)
@@ -1139,11 +1147,11 @@ async def get_reserved_by_department(user_id: int = Query(...)):
 # ==================== DANGER ZONE ENDPOINTS ====================
 
 @router.post("/danger/clear-database")
-async def danger_clear_database(user_id: int = Depends(require_admin)):
+async def danger_clear_database(user_id: int = Depends(require_admin_any_auth)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ товари з бази даних.
-    Незворотна операція! Вимагає JWT Bearer токен адміністратора.
+    Незворотна операція! Вимагає JWT Bearer токен або Telegram initData адміністратора.
     """
     
     try:
@@ -1177,13 +1185,13 @@ async def danger_clear_database(user_id: int = Depends(require_admin)):
 
 
 @router.post("/danger/delete-all-photos")
-async def danger_delete_all_photos(user_id: int = Depends(require_admin)):
+async def danger_delete_all_photos(user_id: int = Depends(require_admin_any_auth)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ фото з серверу (за file_path з БД) та записи з БД.
     file_path в БД: "uploads/photos/61605401/photo_0.jpg"
     Повний шлях: webapp/static/ + file_path
-    Незворотна операція! Вимагає JWT Bearer токен адміністратора.
+    Незворотна операція! Вимагає JWT Bearer токен або Telegram initData адміністратора.
     """
     
     try:
@@ -1242,13 +1250,12 @@ async def danger_delete_all_photos(user_id: int = Depends(require_admin)):
 
 
 @router.post("/danger/reset-moderation")
-async def danger_reset_moderation(user_id: int = Query(...)):
+async def danger_reset_moderation(user_id: int = Depends(require_tma_admin)):
     """
     ⚠️ Скидає статус модерації для ВСІХ фото.
     Всі фото стануть 'pending' (очікують модерації).
+    Потрібні права адміністратора (TMA initData).
     """
-    verify_admin(user_id)
-    
     try:
         logger.warning("⚠️ DANGER ZONE: User %s initiated RESET MODERATION operation", user_id)
         
@@ -1276,11 +1283,11 @@ async def danger_reset_moderation(user_id: int = Query(...)):
 
 
 @router.post("/danger/delete-all-archives")
-async def danger_delete_all_archives(user_id: int = Depends(require_admin)):
+async def danger_delete_all_archives(user_id: int = Depends(require_admin_any_auth)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ архіви користувачів.
-    Незворотна операція! Вимагає JWT Bearer токен адміністратора.
+    Незворотна операція! Вимагає JWT Bearer токен або Telegram initData адміністратора.
     """
     
     try:
@@ -1313,7 +1320,7 @@ async def danger_delete_all_archives(user_id: int = Depends(require_admin)):
 
 
 @router.post("/danger/full-wipe")
-async def danger_full_wipe(user_id: int = Depends(require_admin)):
+async def danger_full_wipe(user_id: int = Depends(require_admin_any_auth)):
     """
     🚨🚨🚨 НАЙКРИТИЧНІША ОПЕРАЦІЯ 🚨🚨🚨
     Повне очищення системи:
@@ -1322,7 +1329,7 @@ async def danger_full_wipe(user_id: int = Depends(require_admin)):
     - Всі архіви
     - Всі дані модерації
 
-    НЕЗВОРОТНА ОПЕРАЦІЯ! Вимагає JWT Bearer токен адміністратора.
+    НЕЗВОРОТНА ОПЕРАЦІЯ! Вимагає JWT Bearer токен або Telegram initData адміністратора.
     """
     
     try:

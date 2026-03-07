@@ -43,7 +43,7 @@ async function loadUserManagement() {
     container.innerHTML = '<div class="loader">⏳ Завантаження...</div>';
 
     try {
-        const url = `/api/admin/user-management/users?user_id=${userId}&status=${encodeURIComponent(userMgmtFilter)}&q=${encodeURIComponent(q)}&limit=50&offset=0`;
+        const url = `/api/admin/user-management/users?status=${encodeURIComponent(userMgmtFilter)}&q=${encodeURIComponent(q)}&limit=50&offset=0`;
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
@@ -75,7 +75,7 @@ async function approveUser(targetUserId) {
         const response = await fetch('/api/admin/user-management/approve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId })
+            body: JSON.stringify({ target_user_id: targetUserId })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
@@ -93,7 +93,7 @@ async function blockUser(targetUserId) {
         const response = await fetch('/api/admin/user-management/block', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId, reason: reason })
+            body: JSON.stringify({ target_user_id: targetUserId, reason: reason })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
@@ -110,7 +110,7 @@ async function unblockUser(targetUserId) {
         const response = await fetch('/api/admin/user-management/unblock', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId })
+            body: JSON.stringify({ target_user_id: targetUserId })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);
@@ -131,7 +131,7 @@ async function changeUserRole(targetUserId, role, originalRole, selectEl) {
         const response = await fetch('/api/admin/user-management/role', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, target_user_id: targetUserId, role: role })
+            body: JSON.stringify({ target_user_id: targetUserId, role: role })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || data.message || `HTTP ${response.status}`);

@@ -18,14 +18,14 @@ async function loadAdminStats() {
     const container = document.getElementById('adminStatsGrid');
     try {
         console.log('📊 Fetching admin statistics...');
-        const response = await fetch(`/api/admin/statistics?user_id=${userId}`);
+        const response = await fetch(`/api/admin/statistics`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data && data.success === false) throw new Error(data.message || data.error || 'Admin statistics error');
         console.log('📊 Stats data:', data);
         
         // Load products info for tile
-        const productsResponse = await fetch(`/api/admin/products/info?user_id=${userId}`);
+        const productsResponse = await fetch(`/api/admin/products/info`);
         const productsData = await productsResponse.json();
         cachedProductsInfo = productsData;
         
@@ -64,7 +64,7 @@ async function loadAdminStats() {
 async function loadAdminActiveUsers() {
     try {
         console.log('👥 Fetching active users...');
-        const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
+        const response = await fetch(`/api/admin/users/active`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data && data.success === false) throw new Error(data.message || data.error || 'Active users error');
@@ -103,7 +103,7 @@ async function forceSave(targetUserId) {
         const response = await fetch(`/api/admin/force-save/${targetUserId}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId })
+            body: JSON.stringify({})
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
@@ -182,7 +182,7 @@ async function uploadFile() {
     document.getElementById('uploadBtn').textContent = '⌛ Завантаження...';
     
     try {
-        const response = await fetch(`/api/admin/import?user_id=${userId}&notify_users=${notifyChecked}`, {
+        const response = await fetch(`/api/admin/import?notify_users=${notifyChecked}`, {
             method: 'POST',
             body: formData
         });
@@ -224,7 +224,7 @@ async function uploadFile() {
 
 async function exportStock() {
     try {
-        window.open(`/api/admin/export/stock?user_id=${userId}`, '_blank');
+        await API.downloadFile('/api/admin/export/stock', `stock_report.xlsx`);
         tg.HapticFeedback.notificationOccurred('success');
     } catch (error) {
         tg.showAlert('❌ Помилка експорту: ' + error.message);
@@ -233,7 +233,7 @@ async function exportStock() {
 
 async function showAdminArchives() {
     try {
-        const response = await fetch(`/api/admin/archives?user_id=${userId}`);
+        const response = await fetch(`/api/admin/archives`);
         const data = await response.json();
         
         if (data.success && data.files && data.files.length > 0) {
@@ -260,7 +260,7 @@ async function showAdminArchives() {
 
 async function showAllUsers() {
     try {
-        const response = await fetch(`/api/admin/users/all?user_id=${userId}`);
+        const response = await fetch(`/api/admin/users/all`);
         const data = await response.json();
         
         if (data.success && data.users && data.users.length > 0) {
@@ -289,7 +289,7 @@ async function showAllUsers() {
 
 async function showActiveUsers() {
     try {
-        const response = await fetch(`/api/admin/users/active?user_id=${userId}`);
+        const response = await fetch(`/api/admin/users/active`);
         const data = await response.json();
         
         if (data.success && data.users && data.users.length > 0) {
@@ -319,7 +319,7 @@ async function showProductsInfo() {
     try {
         let data = cachedProductsInfo;
         if (!data) {
-            const response = await fetch(`/api/admin/products/info?user_id=${userId}`);
+            const response = await fetch(`/api/admin/products/info`);
             data = await response.json();
             cachedProductsInfo = data;
         }
@@ -382,7 +382,7 @@ async function showProductsInfo() {
 
 async function showReservedByDepartment() {
     try {
-        const response = await fetch(`/api/admin/reserved/by-department?user_id=${userId}`);
+        const response = await fetch(`/api/admin/reserved/by-department`);
         const data = await response.json();
         
         if (data.success && data.departments && data.departments.length > 0) {
@@ -425,12 +425,12 @@ function closeAdminArchivesModal() {
 }
 
 function downloadAdminArchive(filename) {
-    window.open(`/api/admin/archives/download/${filename}?user_id=${userId}`, '_blank');
+    API.downloadFile(`/api/admin/archives/download/${filename}`, filename);
     tg.HapticFeedback.notificationOccurred('success');
 }
 
 function downloadAllAdminArchives() {
-    window.open(`/api/admin/archives/download-all?user_id=${userId}`, '_blank');
+    API.downloadFile('/api/admin/archives/download-all', 'archives.zip');
     tg.HapticFeedback.notificationOccurred('success');
 }
 
@@ -445,11 +445,10 @@ async function sendBroadcast() {
     if (!confirm(`Розіслати повідомлення всім користувачам?\n\nТекст: "${message}"`)) return;
     
     try {
-        const response = await fetch(`/api/admin/broadcast?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/broadcast`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                user_id: userId,
                 message: message
             })
         });
@@ -489,7 +488,7 @@ async function clearDatabase() {
     if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nДані НЕ можна буде відновити!\n\nТочно видалити всі товари?')) return;
     
     try {
-        const response = await fetch(`/api/admin/danger/clear-database?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/danger/clear-database`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -510,7 +509,7 @@ async function deleteAllPhotos() {
     if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nФото НЕ можна буде відновити!\n\nТочно видалити всі фото?')) return;
     
     try {
-        const response = await fetch(`/api/admin/danger/delete-all-photos?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/danger/delete-all-photos`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -529,7 +528,7 @@ async function resetModeration() {
     if (!confirm('⚠️ Скинути статус модерації для всіх фото?\n\nВсі фото стануть "pending" (очікують модерації).\n\nПродовжити?')) return;
     
     try {
-        const response = await fetch(`/api/admin/danger/reset-moderation?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/danger/reset-moderation`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -549,7 +548,7 @@ async function deleteAllArchives() {
     if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nАрхіви НЕ можна буде відновити!\n\nТочно видалити?')) return;
     
     try {
-        const response = await fetch(`/api/admin/danger/delete-all-archives?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/danger/delete-all-archives`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -575,7 +574,7 @@ async function fullWipe() {
     }
     
     try {
-        const response = await fetch(`/api/admin/danger/full-wipe?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/danger/full-wipe`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -633,7 +632,7 @@ async function uploadModeratorFile() {
     formData.append('file', moderatorSelectedFile);
 
     try {
-        const response = await fetch(`/api/admin/import?user_id=${userId}&notify_users=${notifyUsers}`, {
+        const response = await fetch(`/api/admin/import?notify_users=${notifyUsers}`, {
             method: 'POST',
             body: formData
         });
@@ -651,7 +650,7 @@ async function uploadModeratorFile() {
 }
 
 function exportModeratorStock() {
-    window.location.href = `/api/admin/export/stock?user_id=${userId}`;
+    API.downloadFile('/api/admin/export/stock', 'stock_report.xlsx');
 }
 
 // === Відняти зібране ===
@@ -720,7 +719,7 @@ async function _doSubtractCollected(fileInputId, alertElId, btnEl) {
     formData.append('file', file);
 
     try {
-        const response = await fetch(`/api/admin/subtract-collected?user_id=${userId}`, {
+        const response = await fetch(`/api/admin/subtract-collected`, {
             method: 'POST',
             body: formData
         });

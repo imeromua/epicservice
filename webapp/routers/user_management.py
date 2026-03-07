@@ -31,7 +31,7 @@ from database.orm import (
     orm_set_user_role,
     orm_unblock_user,
 )
-from webapp.deps import require_admin
+from webapp.deps import require_admin, require_admin_any_auth
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class RoleRequest(BaseModel):
 
 @router.get("/users")
 async def list_users(
-    admin_user_id: int = Depends(require_admin),
+    admin_user_id: int = Depends(require_admin_any_auth),
     status: str | None = Query(None),
     role: str | None = Query(None),
     q: str | None = Query(None),
@@ -94,7 +94,7 @@ async def list_users(
 
 
 @router.post("/approve")
-async def approve_user(req: ApproveRequest, admin_user_id: int = Depends(require_admin)):
+async def approve_user(req: ApproveRequest, admin_user_id: int = Depends(require_admin_any_auth)):
     target = await orm_get_user_by_id(req.target_user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -126,7 +126,7 @@ async def approve_user(req: ApproveRequest, admin_user_id: int = Depends(require
 
 
 @router.post("/block")
-async def block_user(req: BlockRequest, admin_user_id: int = Depends(require_admin)):
+async def block_user(req: BlockRequest, admin_user_id: int = Depends(require_admin_any_auth)):
     target = await orm_get_user_by_id(req.target_user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -136,7 +136,7 @@ async def block_user(req: BlockRequest, admin_user_id: int = Depends(require_adm
 
 
 @router.post("/unblock")
-async def unblock_user(req: UnblockRequest, admin_user_id: int = Depends(require_admin)):
+async def unblock_user(req: UnblockRequest, admin_user_id: int = Depends(require_admin_any_auth)):
     target = await orm_get_user_by_id(req.target_user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -146,7 +146,7 @@ async def unblock_user(req: UnblockRequest, admin_user_id: int = Depends(require
 
 
 @router.post("/role")
-async def set_role(req: RoleRequest, admin_user_id: int = Depends(require_admin)):
+async def set_role(req: RoleRequest, admin_user_id: int = Depends(require_admin_any_auth)):
     if req.role not in ("user", "moderator", "admin"):
         raise HTTPException(status_code=400, detail="Invalid role")
 
