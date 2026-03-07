@@ -37,7 +37,8 @@ def get_required_env(var_name: str) -> str:
 BOT_TOKEN = get_required_env("BOT_TOKEN")
 
 # URL для Mini App (WebApp)
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://epicservice.example.com")
+_WEBAPP_URL_DEFAULT = "https://epicservice.example.com"
+WEBAPP_URL = os.getenv("WEBAPP_URL", _WEBAPP_URL_DEFAULT)
 logger.info("WebApp URL: %s", WEBAPP_URL)
 
 # --- Runtime environment (development | staging | production) ---
@@ -62,7 +63,8 @@ if JWT_SECRET_KEY == _INSECURE_JWT_DEFAULT:
         )
 
 # URL сервера для мобільного додатку
-SERVER_URL = os.getenv("SERVER_URL", "https://anubis-ua.pp.ua")
+_SERVER_URL_DEFAULT = "https://anubis-ua.pp.ua"
+SERVER_URL = os.getenv("SERVER_URL", _SERVER_URL_DEFAULT)
 
 
 def get_admin_ids() -> List[int]:
@@ -156,3 +158,59 @@ else:
 # Абсолютний шлях до папки archives відносно кореня проекту
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARCHIVES_PATH = os.path.join(BASE_DIR, "archives")
+
+
+# ---------------------------------------------------------------------------
+# Production startup guardrails
+# ---------------------------------------------------------------------------
+
+def _validate_production_config() -> None:
+    """
+    Warn about security-sensitive misconfiguration in production environments.
+
+    Called once at module load time when APP_ENV=production. Logs actionable
+    warnings for settings that degrade security but are not hard failures
+    (JWT_SECRET_KEY already raises ValueError above).
+
+    Conservative approach: only checks settings with direct security impact.
+    Does not fail the process for these — operators may have intentional overrides.
+    """
+    issues: List[str] = []
+
+    # Warn if WEBAPP_URL is still the placeholder default.
+    if WEBAPP_URL == _WEBAPP_URL_DEFAULT:
+        issues.append(
+            "WEBAPP_URL is still the placeholder default (%s). "
+            "Set it to your real domain." % _WEBAPP_URL_DEFAULT
+        )
+
+    # Warn if Redis is disabled in production (revocation/rotation/rate-limiting degrade).
+    if not REDIS_ENABLED:
+        issues.append(
+            "REDIS_ENABLED=false in production. "
+            "Token revocation, refresh-token rotation, and rate limiting will not work. "
+            "Set REDIS_ENABLED=true and configure REDIS_HOST/REDIS_PORT."
+        )
+
+    # Warn if ADMIN_IDS is empty (admin panel fully inaccessible).
+    if not ADMIN_IDS:
+        issues.append(
+            "ADMIN_IDS is empty. The admin panel will be inaccessible. "
+            "Set ADMIN_IDS to a comma-separated list of Telegram admin user IDs."
+        )
+
+    # Warn if TRUSTED_PROXIES is not set (rate limiting uses the direct connecting IP,
+    # which is safe but inaccurate behind a reverse proxy).
+    if not os.getenv("TRUSTED_PROXIES", "").strip():
+        issues.append(
+            "TRUSTED_PROXIES is not set. Rate limiting uses the direct connecting IP. "
+            "If the app runs behind a reverse proxy or load balancer, set TRUSTED_PROXIES "
+            "to your proxy IP/CIDR so X-Forwarded-For headers are trusted correctly."
+        )
+
+    for issue in issues:
+        logger.warning("[production config] %s", issue)
+
+
+if APP_ENV == "production":
+    _validate_production_config()

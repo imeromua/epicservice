@@ -27,6 +27,7 @@ from database.orm.users import (
     orm_set_user_phone,
 )
 from utils.otp import TooManyAttemptsError, generate_otp, otp_exists, store_otp, verify_otp
+from webapp.utils.client_ip import get_client_ip
 from webapp.utils.rate_limit import is_rate_limited
 
 logger = logging.getLogger(__name__)
@@ -461,10 +462,12 @@ def _get_redis(request: Request):
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extracts client IP address for rate limiting purposes."""
-    if request.client:
-        return request.client.host
-    return "unknown"
+    """Extracts client IP address for rate limiting purposes.
+
+    Deprecated: use get_client_ip() from webapp.utils.client_ip directly.
+    Kept for backwards compatibility; delegates to the centralized helper.
+    """
+    return get_client_ip(request)
 
 
 async def _send_otp_via_bot(bot, chat_id: int, otp: str) -> bool:
