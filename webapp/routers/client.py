@@ -2,6 +2,20 @@
 """
 Клієнтський роутер для обслуговування користувачів Telegram Mini App.
 Містить ендпоїнти для пошуку товарів, управління списками та архівами.
+
+Security hardening status (first pass):
+- SECURED (JWT Bearer token required, with ownership check):
+    GET /archive/download/{filename}    — user can only download their own archive
+    DELETE /archive/delete/{filename}   — user can only delete their own archive
+- TODO (still accept user_id from URL path/body — Telegram Mini App compatibility layer,
+  migrate to server-side identity in follow-up PR):
+    POST /save/{user_id}                — IDOR: anyone can save as another user's ID
+    POST /clear/{user_id}              — IDOR: anyone can clear another user's list
+    GET /archives/{user_id}            — IDOR: anyone can list another user's archives
+    GET /statistics/{user_id}          — IDOR: anyone can read another user's stats
+    GET /archive/stats/{filename}      — partially protected via parse_filename check
+    GET /list/{user_id}                — IDOR: list contents
+    POST /add, POST /update, POST /delete — IDOR: operate on arbitrary user lists
 """
 
 import os
@@ -668,15 +682,24 @@ async def get_archive_stats(filename: str, user_id: int):
 
 
 @router.get("/archive/download/{filename}")
-async def download_archive(filename: str):
-    """Завантажити архівний файл."""
+async def download_archive(filename: str, authorization: str = Header(...)):
+    """
+    Завантажити архівний файл.
+    Вимагає JWT Bearer токен. Користувач може завантажувати тільки власні архіви.
+    """
+    user_id = _get_user_id_from_token(authorization)
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
+
+        # Verify ownership: filename must belong to this user
+        parsed = parse_filename(filename)
+        if not parsed or parsed["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
         file_path = os.path.join(ACTIVE_DIR, filename)
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
-        print(f"📥 Download request: {filename}")
         return FileResponse(
             path=file_path,
             filename=filename,
@@ -686,37 +709,38 @@ async def download_archive(filename: str):
         raise
     except Exception as e:
         print(f"❌ ERROR in download_archive: {type(e).__name__}: {e}")
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Download error")
 
 
 @router.delete("/archive/delete/{filename}")
-async def delete_archive(filename: str, user_id: int):
-    """Видалити архівний файл."""
+async def delete_archive(filename: str, authorization: str = Header(...)):
+    """
+    Видалити архівний файл.
+    Вимагає JWT Bearer токен. Користувач може видаляти тільки власні архіви.
+    """
+    user_id = _get_user_id_from_token(authorization)
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
-        
+
         parsed = parse_filename(filename)
         if not parsed or parsed["user_id"] != user_id:
             print(f"⚠️ User {user_id} tried to delete file not owned by them: {filename}")
             raise HTTPException(status_code=403, detail="Access denied")
-        
+
         file_path = os.path.join(ACTIVE_DIR, filename)
-        
+
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
-        
+
         os.remove(file_path)
-        print(f"🗑️ Deleted archive: {filename} by user {user_id}")
-        
+
         return JSONResponse(content={"success": True, "message": "Файл видалено"}, status_code=200)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"❌ ERROR in delete_archive: {type(e).__name__}: {e}")
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Delete error")
 
 

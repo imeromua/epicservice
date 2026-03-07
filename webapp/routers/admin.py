@@ -1,6 +1,21 @@
 """
 Адміністративний роутер для управління системою через веб-інтерфейс.
 Містить ендпоїнти для імпорту/експорту даних, управління користувачами та звітів.
+
+Security hardening status (first pass):
+- SECURED (JWT Bearer token required):
+    POST /danger/clear-database
+    POST /danger/delete-all-photos
+    POST /danger/delete-all-archives
+    POST /danger/full-wipe
+- TODO (still accept user_id from query/body — migrate to JWT in follow-up PR):
+    GET /users, GET /users/active, GET /users/all
+    GET /archives, GET /archives/download/{filename}, GET /archives/download-all
+    POST /import, POST /subtract-collected
+    GET /export/stock, GET /summary, GET /statistics
+    POST /force-save/{target_user_id}, POST /broadcast
+    GET /products/info, GET /reserved/by-department
+    POST /danger/reset-moderation
 """
 
 import asyncio
@@ -40,6 +55,7 @@ from database.engine import async_session
 from database.models import Product, ProductPhoto
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
+from webapp.deps import require_admin, require_admin_or_moderator
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1123,13 +1139,12 @@ async def get_reserved_by_department(user_id: int = Query(...)):
 # ==================== DANGER ZONE ENDPOINTS ====================
 
 @router.post("/danger/clear-database")
-async def danger_clear_database(user_id: int = Query(...)):
+async def danger_clear_database(user_id: int = Depends(require_admin)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ товари з бази даних.
-    Незворотна операція!
+    Незворотна операція! Вимагає JWT Bearer токен адміністратора.
     """
-    verify_admin(user_id)
     
     try:
         logger.critical("⚠️ DANGER ZONE: User %s initiated CLEAR DATABASE operation", user_id)
@@ -1156,21 +1171,20 @@ async def danger_clear_database(user_id: int = Query(...)):
     except Exception as e:
         logger.error("Помилка очищення БД: %s", e, exc_info=True)
         return JSONResponse(
-            content={"success": False, "message": f"Помилка: {str(e)}"},
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
             status_code=500
         )
 
 
 @router.post("/danger/delete-all-photos")
-async def danger_delete_all_photos(user_id: int = Query(...)):
+async def danger_delete_all_photos(user_id: int = Depends(require_admin)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ фото з серверу (за file_path з БД) та записи з БД.
     file_path в БД: "uploads/photos/61605401/photo_0.jpg"
     Повний шлях: webapp/static/ + file_path
-    Незворотна операція!
+    Незворотна операція! Вимагає JWT Bearer токен адміністратора.
     """
-    verify_admin(user_id)
     
     try:
         logger.critical("⚠️ DANGER ZONE: User %s initiated DELETE ALL PHOTOS operation", user_id)
@@ -1222,7 +1236,7 @@ async def danger_delete_all_photos(user_id: int = Query(...)):
     except Exception as e:
         logger.error("Помилка видалення фото: %s", e, exc_info=True)
         return JSONResponse(
-            content={"success": False, "message": f"Помилка: {str(e)}"},
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
             status_code=500
         )
 
@@ -1262,13 +1276,12 @@ async def danger_reset_moderation(user_id: int = Query(...)):
 
 
 @router.post("/danger/delete-all-archives")
-async def danger_delete_all_archives(user_id: int = Query(...)):
+async def danger_delete_all_archives(user_id: int = Depends(require_admin)):
     """
     🚨 КРИТИЧНА ОПЕРАЦІЯ 🚨
     Видаляє ВСІ архіви користувачів.
-    Незворотна операція!
+    Незворотна операція! Вимагає JWT Bearer токен адміністратора.
     """
-    verify_admin(user_id)
     
     try:
         logger.critical("⚠️ DANGER ZONE: User %s initiated DELETE ALL ARCHIVES operation", user_id)
@@ -1294,13 +1307,13 @@ async def danger_delete_all_archives(user_id: int = Query(...)):
     except Exception as e:
         logger.error("Помилка видалення архівів: %s", e, exc_info=True)
         return JSONResponse(
-            content={"success": False, "message": f"Помилка: {str(e)}"},
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
             status_code=500
         )
 
 
 @router.post("/danger/full-wipe")
-async def danger_full_wipe(user_id: int = Query(...)):
+async def danger_full_wipe(user_id: int = Depends(require_admin)):
     """
     🚨🚨🚨 НАЙКРИТИЧНІША ОПЕРАЦІЯ 🚨🚨🚨
     Повне очищення системи:
@@ -1308,10 +1321,9 @@ async def danger_full_wipe(user_id: int = Query(...)):
     - Всі фото (файли + БД)
     - Всі архіви
     - Всі дані модерації
-    
-    НЕЗВОРОТНА ОПЕРАЦІЯ!
+
+    НЕЗВОРОТНА ОПЕРАЦІЯ! Вимагає JWT Bearer токен адміністратора.
     """
-    verify_admin(user_id)
     
     try:
         logger.critical("🚨🚨🚨 DANGER ZONE: User %s initiated FULL WIPE operation!", user_id)
@@ -1373,7 +1385,7 @@ async def danger_full_wipe(user_id: int = Query(...)):
     except Exception as e:
         logger.error("Помилка повного очищення: %s", e, exc_info=True)
         return JSONResponse(
-            content={"success": False, "message": f"Помилка: {str(e)}"},
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
             status_code=500
         )
 
