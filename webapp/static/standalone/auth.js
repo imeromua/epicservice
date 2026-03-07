@@ -53,6 +53,8 @@ const StandaloneAuth = (function() {
                 if (refreshResp.ok) {
                     const refreshData = await refreshResp.json();
                     localStorage.setItem(TOKEN_KEY, refreshData.access_token);
+                    // Persist rotated refresh token if server returned one
+                    if (refreshData.refresh_token) localStorage.setItem(REFRESH_KEY, refreshData.refresh_token);
                     // Re-check
                     const meResp = await fetch('/api/auth/me', {
                         headers: { 'Authorization': 'Bearer ' + refreshData.access_token }
@@ -173,9 +175,20 @@ const StandaloneAuth = (function() {
     }
 
     function logout() {
+        const token = getToken();
+        const refreshToken = getRefreshToken();
         clearSession();
         _updateGlobals(0);
         showLogin();
+        // Notify server to revoke both tokens (fire-and-forget; ignore errors)
+        if (token) {
+            const body = refreshToken ? JSON.stringify({ refresh_token: refreshToken }) : undefined;
+            fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: Object.assign({ 'Authorization': 'Bearer ' + token }, body ? { 'Content-Type': 'application/json' } : {}),
+                body,
+            }).catch(() => {});
+        }
     }
 
     // Check biometric availability on load

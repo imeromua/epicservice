@@ -245,6 +245,329 @@ def test_refresh_with_access_token_fails():
     assert "тип" in resp.json()["detail"].lower()
 
 
+# ---------------------------------------------------------------------------
+# Refresh token rotation tests (PR #46)
+# ---------------------------------------------------------------------------
+
+def test_refresh_rotates_refresh_token():
+    """Оновлення токена видає новий refresh токен (ротація)."""
+    from webapp.api import app
+    from webapp.routers.auth import create_token
+
+    mock_user = MagicMock()
+    mock_user.id = 10000000020
+    mock_user.role = "user"
+    mock_user.status = "active"
+
+    refresh_token = create_token(10000000020, "rotateuser", "user", "refresh")
+
+    with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+        client = TestClient(app)
+        resp = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert "access_token" in data
+    assert "refresh_token" in data
+    # New refresh token must differ from the old one
+    assert data["refresh_token"] != refresh_token
+
+
+def test_refresh_rotated_token_is_different_jti():
+    """Новий refresh токен має інший jti ніж старий."""
+    import jwt as _jwt
+    from webapp.api import app
+    from webapp.routers.auth import create_token, SECRET_KEY, ALGORITHM
+
+    mock_user = MagicMock()
+    mock_user.id = 10000000021
+    mock_user.role = "user"
+    mock_user.status = "active"
+
+    old_refresh = create_token(10000000021, "jtiuser", "user", "refresh")
+    old_payload = _jwt.decode(old_refresh, SECRET_KEY, algorithms=[ALGORITHM])
+
+    with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+        client = TestClient(app)
+        resp = client.post("/api/auth/refresh", json={"refresh_token": old_refresh})
+
+    assert resp.status_code == 200
+    new_refresh = resp.json()["refresh_token"]
+    new_payload = _jwt.decode(new_refresh, SECRET_KEY, algorithms=[ALGORITHM])
+
+    assert new_payload["jti"] != old_payload["jti"]
+    assert new_payload["user_id"] == old_payload["user_id"]
+
+
+def test_rotated_refresh_token_rejected_with_redis():
+    """Вже ротований refresh токен відхиляється при повторному використанні (з Redis)."""
+    import jwt as _jwt
+    from webapp.api import app
+    from webapp.routers.auth import create_token, SECRET_KEY, ALGORITHM, _REVOKED_JTI_PREFIX
+
+    mock_user = MagicMock()
+    mock_user.id = 10000000022
+    mock_user.role = "user"
+    mock_user.status = "active"
+
+    old_refresh = create_token(10000000022, "replayuser", "user", "refresh")
+    old_payload = _jwt.decode(old_refresh, SECRET_KEY, algorithms=[ALGORITHM])
+    old_jti = old_payload["jti"]
+
+    # Stateful mock: tracks which jtis have been revoked via setex
+    revoked_jtis: set = set()
+
+    async def mock_setex(key, ttl, val):
+        if key.startswith(_REVOKED_JTI_PREFIX):
+            revoked_jtis.add(key[len(_REVOKED_JTI_PREFIX):])
+
+    async def mock_exists(key):
+        if key.startswith(_REVOKED_JTI_PREFIX):
+            return 1 if key[len(_REVOKED_JTI_PREFIX):] in revoked_jtis else 0
+        return 0
+
+    mock_redis = MagicMock()
+    mock_redis.incr = AsyncMock(return_value=1)
+    mock_redis.expire = AsyncMock(return_value=True)
+    mock_redis.setex = mock_setex
+    mock_redis.exists = mock_exists
+
+    original_redis = getattr(app.state, "redis", None)
+    app.state.redis = mock_redis
+    try:
+        client = TestClient(app)
+        # First use — succeeds and rotates (old jti is revoked in mock state)
+        with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+            resp1 = client.post("/api/auth/refresh", json={"refresh_token": old_refresh})
+        assert resp1.status_code == 200
+        # Old jti should now be tracked as revoked
+        assert old_jti in revoked_jtis
+
+        # Second use of same old token — rejected because jti is now revoked
+        with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+            resp2 = client.post("/api/auth/refresh", json={"refresh_token": old_refresh})
+    finally:
+        app.state.redis = original_redis
+
+    assert resp2.status_code == 401
+    assert "анульовано" in resp2.json()["detail"].lower() or "використано" in resp2.json()["detail"].lower()
+
+
+def test_refresh_without_redis_still_works():
+    """Оновлення токена без Redis повертає нові токени (graceful degradation)."""
+    from webapp.api import app
+    from webapp.routers.auth import create_token
+
+    mock_user = MagicMock()
+    mock_user.id = 10000000023
+    mock_user.role = "user"
+    mock_user.status = "active"
+
+    refresh_token = create_token(10000000023, "noredisuser", "user", "refresh")
+
+    # Ensure redis is None (simulating unavailable Redis)
+    original_redis = getattr(app.state, "redis", None)
+    app.state.redis = None
+    try:
+        with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+            client = TestClient(app)
+            resp = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    finally:
+        app.state.redis = original_redis
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert "access_token" in data
+    assert "refresh_token" in data
+
+
+def test_refresh_revokes_old_jti_in_redis():
+    """Після ротації старий jti refresh токена поміщається у Redis-чорний список."""
+    import jwt as _jwt
+    from webapp.api import app
+    from webapp.routers.auth import create_token, SECRET_KEY, ALGORITHM, _REVOKED_JTI_PREFIX
+
+    mock_user = MagicMock()
+    mock_user.id = 10000000024
+    mock_user.role = "user"
+    mock_user.status = "active"
+
+    old_refresh = create_token(10000000024, "revoketest", "user", "refresh")
+    old_payload = _jwt.decode(old_refresh, SECRET_KEY, algorithms=[ALGORITHM])
+    old_jti = old_payload["jti"]
+
+    mock_redis = MagicMock()
+    mock_redis.incr = AsyncMock(return_value=1)
+    mock_redis.expire = AsyncMock(return_value=True)
+    mock_redis.setex = AsyncMock()
+    mock_redis.exists = AsyncMock(return_value=0)
+
+    original_redis = getattr(app.state, "redis", None)
+    app.state.redis = mock_redis
+    try:
+        with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+            client = TestClient(app)
+            resp = client.post("/api/auth/refresh", json={"refresh_token": old_refresh})
+    finally:
+        app.state.redis = original_redis
+
+    assert resp.status_code == 200
+    # Verify the old refresh jti was blacklisted in Redis
+    setex_calls = [call[0] for call in mock_redis.setex.call_args_list]
+    revoked_keys = [args[0] for args in setex_calls]
+    assert any(f"{_REVOKED_JTI_PREFIX}{old_jti}" == key for key in revoked_keys)
+
+
+# ---------------------------------------------------------------------------
+# Logout: refresh token revocation tests (PR #46)
+# ---------------------------------------------------------------------------
+
+def test_logout_with_refresh_token_revokes_both():
+    """Logout із refresh токеном у тілі анулює обидва токени в Redis."""
+    import jwt as _jwt
+    from webapp.api import app
+    from webapp.routers.auth import create_token, SECRET_KEY, ALGORITHM, _REVOKED_JTI_PREFIX
+
+    access_token = create_token(10000000030, "logoutboth", "user", "access")
+    refresh_token = create_token(10000000030, "logoutboth", "user", "refresh")
+
+    access_payload = _jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+    refresh_payload = _jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+
+    mock_redis = MagicMock()
+    mock_redis.setex = AsyncMock()
+    mock_redis.exists = AsyncMock(return_value=0)
+
+    original_redis = getattr(app.state, "redis", None)
+    app.state.redis = mock_redis
+    try:
+        client = TestClient(app)
+        resp = client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"refresh_token": refresh_token},
+        )
+    finally:
+        app.state.redis = original_redis
+
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # Both access and refresh JTIs should be blacklisted
+    setex_calls = [call[0] for call in mock_redis.setex.call_args_list]
+    revoked_keys = {args[0] for args in setex_calls}
+    assert f"{_REVOKED_JTI_PREFIX}{access_payload['jti']}" in revoked_keys
+    assert f"{_REVOKED_JTI_PREFIX}{refresh_payload['jti']}" in revoked_keys
+
+
+def test_logout_without_refresh_token_still_revokes_access():
+    """Logout без refresh токена у тілі все одно анулює access токен."""
+    import jwt as _jwt
+    from webapp.api import app
+    from webapp.routers.auth import create_token, SECRET_KEY, ALGORITHM, _REVOKED_JTI_PREFIX
+
+    access_token = create_token(10000000031, "logoutaccess", "user", "access")
+    access_payload = _jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+
+    mock_redis = MagicMock()
+    mock_redis.setex = AsyncMock()
+    mock_redis.exists = AsyncMock(return_value=0)
+
+    original_redis = getattr(app.state, "redis", None)
+    app.state.redis = mock_redis
+    try:
+        client = TestClient(app)
+        resp = client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    finally:
+        app.state.redis = original_redis
+
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    setex_calls = [call[0] for call in mock_redis.setex.call_args_list]
+    revoked_keys = {args[0] for args in setex_calls}
+    assert f"{_REVOKED_JTI_PREFIX}{access_payload['jti']}" in revoked_keys
+    # Only one revocation (no refresh token provided)
+    assert len(revoked_keys) == 1
+
+
+def test_logout_with_invalid_refresh_token_still_succeeds():
+    """Logout із невалідним refresh токеном у тілі все одно повертає успіх."""
+    from webapp.api import app
+    from webapp.routers.auth import create_token
+
+    access_token = create_token(10000000032, "logoutinvalidrt", "user", "access")
+
+    client = TestClient(app)
+    resp = client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"refresh_token": "invalid.refresh.token"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+
+def test_logout_does_not_revoke_other_users_refresh_token():
+    """Logout не повинен анулювати refresh токен іншого користувача."""
+    import jwt as _jwt
+    from webapp.api import app
+    from webapp.routers.auth import create_token, SECRET_KEY, ALGORITHM, _REVOKED_JTI_PREFIX
+
+    # User A's access token, User B's refresh token
+    user_a_access = create_token(10000000040, "usera", "user", "access")
+    user_b_refresh = create_token(10000000041, "userb", "user", "refresh")
+    user_b_payload = _jwt.decode(user_b_refresh, SECRET_KEY, algorithms=[ALGORITHM])
+
+    mock_redis = MagicMock()
+    mock_redis.setex = AsyncMock()
+    mock_redis.exists = AsyncMock(return_value=0)
+
+    original_redis = getattr(app.state, "redis", None)
+    app.state.redis = mock_redis
+    try:
+        client = TestClient(app)
+        resp = client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {user_a_access}"},
+            json={"refresh_token": user_b_refresh},
+        )
+    finally:
+        app.state.redis = original_redis
+
+    assert resp.status_code == 200
+    # User B's refresh token jti must NOT be in the revocation list
+    setex_calls = [call[0] for call in mock_redis.setex.call_args_list]
+    revoked_keys = {args[0] for args in setex_calls}
+    assert f"{_REVOKED_JTI_PREFIX}{user_b_payload['jti']}" not in revoked_keys
+
+
+def test_refresh_no_store_cache_control():
+    """Відповідь /refresh містить Cache-Control: no-store для обох токенів."""
+    from webapp.api import app
+    from webapp.routers.auth import create_token
+
+    mock_user = MagicMock()
+    mock_user.id = 10000000033
+    mock_user.role = "user"
+    mock_user.status = "active"
+
+    refresh_token = create_token(10000000033, "cachetest", "user", "refresh")
+
+    with patch("webapp.routers.auth.orm_get_user_by_id", new_callable=AsyncMock, return_value=mock_user):
+        client = TestClient(app)
+        resp = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+
+    assert resp.status_code == 200
+    assert resp.headers.get("cache-control") == "no-store"
+
+
 # --- Тести допоміжних функцій ---
 
 def test_password_hashing():

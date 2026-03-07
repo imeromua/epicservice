@@ -14,7 +14,7 @@ from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Body, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -76,6 +76,10 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None
 
 
 # --- Допоміжні функції ---
@@ -141,6 +145,21 @@ async def _check_token_not_revoked(token: str, request: Request) -> None:
             raise HTTPException(status_code=401, detail="Токен анульовано")
     except jwt.InvalidTokenError:
         pass  # Невалідні токени вже оброблені вище
+
+
+async def _revoke_token_jti(redis, payload: dict) -> None:
+    """
+    Додає jti токена до чорного списку Redis із TTL до закінчення дії токена.
+
+    Якщо Redis недоступний або jti відсутній — ігнорується (graceful degradation).
+    """
+    jti = payload.get("jti")
+    if not redis or not jti:
+        return
+    exp = payload.get("exp")
+    if exp:
+        ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
+        await redis.setex(f"{_REVOKED_JTI_PREFIX}{jti}", ttl, "1")
 
 
 # --- Ендпоїнти ---
@@ -231,7 +250,17 @@ async def login(req: LoginRequest, request: Request):
 
 @router.post("/refresh")
 async def refresh(req: RefreshRequest, request: Request):
-    """Оновлення access токена за допомогою refresh токена."""
+    """
+    Оновлення access токена за допомогою refresh токена.
+
+    Реалізує ротацію refresh токенів:
+    - старий refresh токен анулюється в Redis після успішного оновлення;
+    - повертається новий refresh токен разом із новим access токеном;
+    - повторне використання вже ротованого refresh токена відхиляється.
+
+    Якщо Redis недоступний — ротація не відслідковується, але нові токени все одно видаються
+    (graceful degradation: функціональність зберігається, але replay-захист тимчасово недоступний).
+    """
     # Rate limit: protect against refresh token hammering
     redis = getattr(request.app.state, "redis", None)
     client_ip = _get_client_ip(request)
@@ -250,10 +279,21 @@ async def refresh(req: RefreshRequest, request: Request):
 
     user_id = payload.get("user_id")
     login_val = payload.get("login")
-    role = payload.get("role")
+    jti = payload.get("jti")
 
     if not user_id or not login_val:
         raise HTTPException(status_code=401, detail="Невірний токен")
+
+    # Replay detection: reject refresh tokens that have already been rotated
+    if redis and jti:
+        try:
+            if await redis.exists(f"{_REVOKED_JTI_PREFIX}{jti}"):
+                logger.warning("Replay of rotated/revoked refresh token jti=%s user_id=%s", jti, user_id)
+                raise HTTPException(status_code=401, detail="Refresh токен вже використано або анульовано")
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Redis error: allow request (graceful degradation)
 
     # Перевіряємо що користувач все ще існує
     user = await orm_get_user_by_id(user_id)
@@ -263,12 +303,21 @@ async def refresh(req: RefreshRequest, request: Request):
     if user.status == "blocked":
         raise HTTPException(status_code=403, detail="Ваш акаунт заблоковано")
 
-    # Генеруємо новий access токен з актуальною роллю
+    # Revoke old refresh token jti (rotation: old token is now invalid)
+    try:
+        await _revoke_token_jti(redis, payload)
+    except Exception:
+        pass  # Redis error: continue issuing new tokens (graceful degradation)
+    logger.info("Refresh token rotated for user_id=%s", user_id)
+
+    # Генеруємо нові access та refresh токени з актуальною роллю
     access_token = create_token(user.id, login_val, user.role, "access")
+    new_refresh_token = create_token(user.id, login_val, user.role, "refresh")
 
     response = JSONResponse({
         "success": True,
         "access_token": access_token,
+        "refresh_token": new_refresh_token,
     })
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -303,31 +352,50 @@ async def me(request: Request, authorization: str = Header(...)):
 
 
 @router.post("/logout")
-async def logout(request: Request, authorization: str = Header(...)):
+async def logout(
+    request: Request,
+    authorization: str = Header(...),
+    body: Optional[LogoutRequest] = Body(None),
+):
     """
-    Завершення сесії: анулює поточний access токен через Redis-чорний список.
+    Завершення сесії: анулює поточний access токен та, якщо наданий, refresh токен через Redis.
 
-    Якщо Redis недоступний — виконується лише клієнтський logout (токен стає неактивним
+    Прийом:
+    - Authorization: Bearer <access_token> (заголовок, обов'язковий)
+    - Тіло JSON (необов'язкове): { "refresh_token": "<refresh_token>" }
+
+    Якщо Redis недоступний — виконується лише клієнтський logout (токени стають неактивними
     після закінчення терміну дії). Клієнт повинен видалити обидва токени локально.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Невірний формат заголовка Authorization")
 
-    token = authorization[7:]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except jwt.InvalidTokenError:
-        # Токен вже недійсний — logout вважається успішним
-        return JSONResponse({"success": True, "message": "Вихід виконано"})
-
-    jti = payload.get("jti")
     redis = getattr(request.app.state, "redis", None)
-    if redis and jti:
-        exp = payload.get("exp")
-        if exp:
-            ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
-            await redis.setex(f"{_REVOKED_JTI_PREFIX}{jti}", ttl, "1")
-        logger.info("Token revoked for user_id=%s", payload.get("user_id"))
+    token = authorization[7:]
+
+    # Revoke access token
+    access_user_id = None
+    try:
+        access_payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        access_user_id = access_payload.get("user_id")
+        await _revoke_token_jti(redis, access_payload)
+        logger.info("Access token revoked for user_id=%s", access_user_id)
+    except jwt.InvalidTokenError:
+        pass  # Токен вже недійсний — logout вважається успішним
+
+    # Revoke refresh token if provided — only if it belongs to the same user
+    refresh_token_str = body.refresh_token if body else None
+    if refresh_token_str:
+        try:
+            refresh_payload = jwt.decode(refresh_token_str, SECRET_KEY, algorithms=[ALGORITHM])
+            if (
+                refresh_payload.get("type") == "refresh"
+                and refresh_payload.get("user_id") == access_user_id
+            ):
+                await _revoke_token_jti(redis, refresh_payload)
+                logger.info("Refresh token revoked for user_id=%s", refresh_payload.get("user_id"))
+        except jwt.InvalidTokenError:
+            pass  # Невалідний refresh токен — ігноруємо під час logout
 
     return JSONResponse({"success": True, "message": "Вихід виконано"})
 
