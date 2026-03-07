@@ -51,13 +51,66 @@ const API = (function() {
     }
 
     /**
-     * Download a file using fetch (with TMA auth header) and trigger browser download.
-     * Use this instead of window.open() for protected file endpoints.
+     * Download a file using the appropriate method for the current environment.
      *
-     * @param {string} url - The API URL to fetch the file from.
-     * @param {string} defaultFilename - Fallback filename for the download.
+     * In Telegram Mini App (TMA) the embedded WebView blocks programmatic blob
+     * downloads (the `download` attribute on <a> elements is ignored).  Instead
+     * we request a short-lived one-time token from the backend and open the
+     * download URL via Telegram.WebApp.openLink() which launches the user's
+     * external browser where normal file downloads work.
+     *
+     * In a regular browser (standalone / desktop) we keep the existing
+     * fetch-blob-anchor approach.
+     *
+     * @param {string} url              - The API URL to fetch the file from.
+     * @param {string} defaultFilename  - Fallback filename for the download.
+     * @param {string} [tokenEndpoint]  - Backend endpoint to request a download
+     *                                    token from.  Defaults to '/api/download-token'.
+     *                                    Use '/api/admin/download-token' for admin
+     *                                    downloads.
      */
-    async function downloadFile(url, defaultFilename) {
+    async function downloadFile(url, defaultFilename, tokenEndpoint) {
+        const isTMA = !!(window.Telegram?.WebApp?.initData);
+
+        if (isTMA) {
+            // TMA path: obtain a one-time token and open via Telegram.WebApp.openLink()
+            try {
+                const tmaData = window.Telegram.WebApp.initData;
+                const endpoint = tokenEndpoint || '/api/download-token';
+
+                const tokenResp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': tmaData,
+                    },
+                    body: JSON.stringify({ resource_url: url }),
+                });
+
+                if (!tokenResp.ok) {
+                    let errMsg = `HTTP ${tokenResp.status}`;
+                    try {
+                        const errData = await tokenResp.json();
+                        errMsg = errData.detail || errData.error || errMsg;
+                    } catch (_) {}
+                    throw new Error(errMsg);
+                }
+
+                const { token } = await tokenResp.json();
+                const separator = url.includes('?') ? '&' : '?';
+                const downloadUrl = `${url}${separator}dl_token=${encodeURIComponent(token)}`;
+
+                // Open in the user's external browser where downloads work normally.
+                window.Telegram.WebApp.openLink(downloadUrl);
+            } catch (e) {
+                console.error('[API] downloadFile TMA error:', e.message);
+                if (typeof tg !== 'undefined') tg.showAlert('❌ Помилка завантаження: ' + e.message);
+                else alert('❌ Помилка завантаження: ' + e.message);
+            }
+            return;
+        }
+
+        // Non-TMA path: fetch blob and trigger browser download via anchor click.
         try {
             const tmaData = _tmaInitData();
             const dlHeaders = {};

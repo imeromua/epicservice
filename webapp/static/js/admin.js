@@ -224,7 +224,7 @@ async function uploadFile() {
 
 async function exportStock() {
     try {
-        await API.downloadFile('/api/admin/export/stock', `stock_report.xlsx`);
+        await API.downloadFile('/api/admin/export/stock', `stock_report.xlsx`, '/api/admin/download-token');
         tg.HapticFeedback.notificationOccurred('success');
     } catch (error) {
         tg.showAlert('❌ Помилка експорту: ' + error.message);
@@ -425,12 +425,12 @@ function closeAdminArchivesModal() {
 }
 
 function downloadAdminArchive(filename) {
-    API.downloadFile(`/api/admin/archives/download/${filename}`, filename);
+    API.downloadFile(`/api/admin/archives/download/${filename}`, filename, '/api/admin/download-token');
     tg.HapticFeedback.notificationOccurred('success');
 }
 
 function downloadAllAdminArchives() {
-    API.downloadFile('/api/admin/archives/download-all', 'archives.zip');
+    API.downloadFile('/api/admin/archives/download-all', 'archives.zip', '/api/admin/download-token');
     tg.HapticFeedback.notificationOccurred('success');
 }
 
@@ -650,7 +650,7 @@ async function uploadModeratorFile() {
 }
 
 function exportModeratorStock() {
-    API.downloadFile('/api/admin/export/stock', 'stock_report.xlsx');
+    API.downloadFile('/api/admin/export/stock', 'stock_report.xlsx', '/api/admin/download-token');
 }
 
 // === Відняти зібране ===

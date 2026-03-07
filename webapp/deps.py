@@ -185,11 +185,11 @@ def require_tma_admin(user_id: int = Depends(get_tma_user_id)) -> int:
     return user_id
 
 
-async def require_tma_admin_or_moderator(user_id: int = Depends(get_tma_user_id)) -> int:
+async def _verify_admin_or_moderator_role(user_id: int) -> int:
     """
-    Verifies that the TMA-authenticated user is an admin or moderator.
+    Shared role-check: verifies user_id is in ADMIN_IDS or has role admin/moderator in DB.
 
-    Raises HTTP 403 if neither.
+    Raises HTTP 403 if neither condition is met.
     Returns the verified user_id.
     """
     if user_id in ADMIN_IDS:
@@ -202,6 +202,31 @@ async def require_tma_admin_or_moderator(user_id: int = Depends(get_tma_user_id)
         status_code=403,
         detail="Access denied. Admin or moderator rights required.",
     )
+
+
+async def require_tma_admin_or_moderator(user_id: int = Depends(get_tma_user_id)) -> int:
+    """
+    Verifies that the TMA-authenticated user is an admin or moderator.
+
+    Raises HTTP 403 if neither.
+    Returns the verified user_id.
+    """
+    return await _verify_admin_or_moderator_role(user_id)
+
+
+async def check_tma_admin_or_moderator(init_data: str) -> int:
+    """
+    Standalone (non-Depends) version of require_tma_admin_or_moderator.
+
+    Validates TMA initData and checks that the user is an admin or moderator.
+    Suitable for calling directly inside endpoint functions (e.g. when the
+    endpoint must also accept an alternative ``dl_token`` authentication path).
+
+    Returns the verified user_id.
+    Raises HTTP 401 if initData is invalid, HTTP 403 if the user lacks access.
+    """
+    user_id = _validate_tma_init_data(init_data)
+    return await _verify_admin_or_moderator_role(user_id)
 
 
 # ---------------------------------------------------------------------------

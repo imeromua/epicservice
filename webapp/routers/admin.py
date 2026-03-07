@@ -56,6 +56,7 @@ from database.models import Product, ProductPhoto
 from lexicon.lexicon import LEXICON
 from utils.force_save_helper import force_save_user_list_web
 from webapp.deps import (
+    check_tma_admin_or_moderator,
     require_admin,
     require_admin_any_auth,
     require_admin_or_moderator,
@@ -90,6 +91,10 @@ class BroadcastRequest(BaseModel):
 
 class ForceSaveRequest(BaseModel):
     user_id: int | None = None  # kept for backward compat, ignored — admin identity from TMA
+
+
+class DownloadTokenRequest(BaseModel):
+    resource_url: str
 
 
 # === Допоміжні функції ===
@@ -237,6 +242,36 @@ async def broadcast_import_update(result: dict):
 
 # === Ендпоїнти ===
 
+@router.post("/download-token")
+async def create_admin_download_token(
+    body: DownloadTokenRequest,
+    user_id: int = Depends(require_tma_admin_or_moderator),
+):
+    """
+    Видати одноразовий короткостроковий токен для завантаження адміністративного файлу в TMA.
+
+    Telegram Mini App не підтримує завантаження файлів через blob URL у вбудованому
+    WebView.  Цей ендпоїнт видає токен, який клієнт вбудовує в URL завантаження
+    (``?dl_token=...``) і відкриває через Telegram.WebApp.openLink() у зовнішньому
+    браузері, де завантаження файлів працює нормально.
+
+    TTL: 60 секунд, одноразовий.
+    """
+    url = body.resource_url
+    allowed_prefixes = (
+        "/api/admin/export/stock",
+        "/api/admin/archives/download/",
+        "/api/admin/archives/download-all",
+    )
+    valid = any(url == p or url.startswith(p) for p in allowed_prefixes)
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid resource URL")
+
+    role = "admin" if user_id in ADMIN_IDS else "moderator"
+    from webapp.utils.download_tokens import create_download_token
+    token = create_download_token(user_id, url, role=role)
+    return {"token": token, "expires_in": 60}
+
 @router.get("/users")
 async def get_all_users(user_id: int = Depends(require_tma_admin)):
     """
@@ -359,15 +394,34 @@ async def list_archives(user_id: int = Depends(require_tma_admin)):
 
 
 @router.get("/archives/download/{filename}")
-async def download_archive(filename: str, user_id: int = Depends(require_tma_admin)):
+async def download_archive(
+    filename: str,
+    dl_token: Optional[str] = Query(None),
+    x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
+):
     """
     Скачати конкретний файл архіву.
-    Потрібні права адміністратора (TMA initData).
+    Потрібні права адміністратора (TMA initData або одноразовий токен ``dl_token``).
     """
     try:
         # Безпека: перевіряємо що filename не містить шляхи
         if '/' in filename or '\\' in filename or '..' in filename:
             raise HTTPException(status_code=400, detail="Недозволене ім'я файлу")
+
+        # --- Authentication ---
+        if dl_token is not None:
+            from webapp.utils.download_tokens import validate_and_consume_token
+            resource_url = f"/api/admin/archives/download/{filename}"
+            token_data = validate_and_consume_token(dl_token, resource_url)
+            if token_data["role"] != "admin":
+                raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
+        elif x_telegram_init_data:
+            from webapp.deps import _validate_tma_init_data
+            uid = _validate_tma_init_data(x_telegram_init_data)
+            if uid not in ADMIN_IDS:
+                raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
         filepath = os.path.join(ARCHIVES_PATH, "active", filename)
 
@@ -396,14 +450,29 @@ async def download_archive(filename: str, user_id: int = Depends(require_tma_adm
 
 @router.get("/archives/download-all")
 async def download_all_archives(
-    user_id: int = Depends(require_tma_admin),
+    dl_token: Optional[str] = Query(None),
+    x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
     background_tasks: BackgroundTasks = None,
 ):
     """
     Скачати всі архіви одним ZIP файлом.
-    Потрібні права адміністратора (TMA initData).
+    Потрібні права адміністратора (TMA initData або одноразовий токен ``dl_token``).
     """
     try:
+        # --- Authentication ---
+        if dl_token is not None:
+            from webapp.utils.download_tokens import validate_and_consume_token
+            token_data = validate_and_consume_token(dl_token, "/api/admin/archives/download-all")
+            if token_data["role"] != "admin":
+                raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
+        elif x_telegram_init_data:
+            from webapp.deps import _validate_tma_init_data
+            uid = _validate_tma_init_data(x_telegram_init_data)
+            if uid not in ADMIN_IDS:
+                raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         archives_dir = os.path.join(ARCHIVES_PATH, "active")
         
         if not os.path.exists(archives_dir):
@@ -414,10 +483,10 @@ async def download_all_archives(
         zip_path = os.path.join(tempfile.gettempdir(), f"archives_{timestamp}.zip")
         
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for filename in os.listdir(archives_dir):
-                if filename.endswith('.xlsx'):
-                    filepath = os.path.join(archives_dir, filename)
-                    zipf.write(filepath, arcname=filename)
+            for fname in os.listdir(archives_dir):
+                if fname.endswith('.xlsx'):
+                    filepath = os.path.join(archives_dir, fname)
+                    zipf.write(filepath, arcname=fname)
         
         if background_tasks:
             background_tasks.add_task(cleanup_file, zip_path)
@@ -680,15 +749,27 @@ async def subtract_collected(
 
 @router.get("/export/stock")
 async def export_stock_report(
-    user_id: int = Depends(require_tma_admin_or_moderator),
+    dl_token: Optional[str] = Query(None),
+    x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
     background_tasks: BackgroundTasks = None,
 ):
     """
     Експорт звіту про залишки на складі.
     Враховує резерви з temp_list.
-    Потрібні права адміністратора або модератора (TMA initData).
+    Потрібні права адміністратора або модератора (TMA initData або одноразовий токен ``dl_token``).
     """
     try:
+        # --- Authentication ---
+        if dl_token is not None:
+            from webapp.utils.download_tokens import validate_and_consume_token
+            token_data = validate_and_consume_token(dl_token, "/api/admin/export/stock")
+            if token_data["role"] not in ("admin", "moderator"):
+                raise HTTPException(status_code=403, detail="Access denied")
+        elif x_telegram_init_data:
+            await check_tma_admin_or_moderator(x_telegram_init_data)
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         loop = asyncio.get_running_loop()
         report_path = await loop.run_in_executor(None, _create_stock_report_sync)
 
@@ -707,6 +788,8 @@ async def export_stock_report(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Помилка експорту залишків: %s", e, exc_info=True)
         return JSONResponse(
