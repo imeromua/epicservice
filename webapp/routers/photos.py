@@ -1,7 +1,7 @@
 """API endpoints for product photo management."""
 
 import logging
-import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -13,12 +13,21 @@ from config import ADMIN_IDS
 from database.engine import async_session
 from database.models import ProductPhoto, Product, User
 from webapp.deps import get_current_user_id, require_admin_or_moderator
+from webapp.utils.file_safety import (
+    MAX_UPLOAD_BYTES,
+    is_path_within,
+    validate_image_content,
+)
 from webapp.utils.image_processing import compress_image
 
 logger = logging.getLogger(__name__)
 
 # prefix="/photos" + include_router prefix="/api"  =>  "/api/photos/..."
 router = APIRouter(prefix="/photos", tags=["photos"])
+
+# Module-level storage root constants (computed once at import time).
+_WEBAPP_ROOT = Path(__file__).resolve().parent.parent  # webapp/
+_PHOTOS_STORAGE_ROOT = _WEBAPP_ROOT / "static" / "uploads" / "photos"
 
 
 @router.post("/upload")
@@ -31,9 +40,51 @@ async def upload_photo(
     Завантаження фото товару. Максимум 3 фото, автостискання до ~500KB.
     Завжди повертає JSON.
     """
+    temp_path = None
     try:
+        # 1. Content-type pre-check (fast reject; not relied on for final validation)
+        if not photo.content_type or not photo.content_type.startswith('image/'):
+            return JSONResponse(
+                content={"success": False, "message": "Неправильний тип файлу. Оберіть зображення."},
+                status_code=400
+            )
+
+        # 2. Read with size limit — rejects oversized and empty files before
+        #    writing anything to disk.
+        content = await photo.read(MAX_UPLOAD_BYTES + 1)
+        if len(content) == 0:
+            return JSONResponse(
+                content={"success": False, "message": "Файл порожній."},
+                status_code=400
+            )
+        if len(content) > MAX_UPLOAD_BYTES:
+            return JSONResponse(
+                content={
+                    "success": False,
+                    "message": "Файл завеликий. Максимальний розмір: 10 МБ.",
+                },
+                status_code=400
+            )
+
+        # 3. Write to a server-generated temp file (never derived from user input).
+        #    Uses the OS temp directory to keep artifacts outside the app tree.
+        with tempfile.NamedTemporaryFile(suffix=".tmp", delete=False) as tmp:
+            tmp.write(content)
+            temp_path = Path(tmp.name)
+
+        # 4. Validate actual image content with Pillow — this check is
+        #    independent of Content-Type and rejects non-image payloads.
+        if validate_image_content(temp_path) is None:
+            return JSONResponse(
+                content={
+                    "success": False,
+                    "message": "Невалідний файл зображення. Підтримуються формати: JPEG, PNG, WebP, GIF.",
+                },
+                status_code=400
+            )
+
         async with async_session() as session:
-            # Перевірка існування товару
+            # 5. Перевірка існування товару
             prod_result = await session.execute(
                 select(Product).where(Product.артикул == article)
             )
@@ -44,7 +95,7 @@ async def upload_photo(
                     status_code=404
                 )
 
-            # Кількість фото
+            # 6. Кількість фото
             existing_result = await session.execute(
                 select(ProductPhoto).where(
                     ProductPhoto.артикул == article,
@@ -59,57 +110,37 @@ async def upload_photo(
                     "message": "Максимум 3 фото на товар"
                 })
 
-            # Тип файлу
-            if not photo.content_type or not photo.content_type.startswith('image/'):
-                return JSONResponse(content={
-                    "success": False,
-                    "message": "Неправильний тип файлу. Оберіть зображення."
-                })
+            # 7. Стискання
+            compressed = compress_image(str(temp_path), article, len(existing))
 
-            # Тимчасова директорія
-            temp_dir = Path(__file__).resolve().parent.parent / "temp_files"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_path = temp_dir / f"temp_{user_id}_{photo.filename}"
+            # 8. Збереження в БД
+            new_photo = ProductPhoto(
+                артикул=article,
+                file_path=compressed['file_path'],
+                file_size=compressed['file_size'],
+                original_size=compressed['original_size'],
+                photo_order=len(existing),
+                uploaded_by=user_id,
+                uploaded_at=datetime.now(),
+                status='pending'
+            )
+            session.add(new_photo)
+            await session.commit()
 
-            try:
-                with temp_path.open("wb") as buffer:
-                    shutil.copyfileobj(photo.file, buffer)
+            # Схвалені фото
+            approved_result = await session.execute(
+                select(ProductPhoto).where(
+                    ProductPhoto.артикул == article,
+                    ProductPhoto.status == 'approved'
+                ).order_by(ProductPhoto.photo_order)
+            )
+            approved = approved_result.scalars().all()
 
-                # Стискання
-                compressed = compress_image(str(temp_path), article, len(existing))
-
-                # Збереження в БД
-                new_photo = ProductPhoto(
-                    артикул=article,
-                    file_path=compressed['file_path'],
-                    file_size=compressed['file_size'],
-                    original_size=compressed['original_size'],
-                    photo_order=len(existing),
-                    uploaded_by=user_id,
-                    uploaded_at=datetime.now(),
-                    status='pending'
-                )
-                session.add(new_photo)
-                await session.commit()
-
-                # Схвалені фото
-                approved_result = await session.execute(
-                    select(ProductPhoto).where(
-                        ProductPhoto.артикул == article,
-                        ProductPhoto.status == 'approved'
-                    ).order_by(ProductPhoto.photo_order)
-                )
-                approved = approved_result.scalars().all()
-
-                return JSONResponse(content={
-                    "success": True,
-                    "message": "Фото надіслано на модерацію",
-                    "photos": [p.file_path.split('/')[-1] for p in approved]
-                })
-
-            finally:
-                if temp_path.exists():
-                    temp_path.unlink()
+            return JSONResponse(content={
+                "success": True,
+                "message": "Фото надіслано на модерацію",
+                "photos": [p.file_path.split('/')[-1] for p in approved]
+            })
 
     except Exception as e:
         logger.error("ERROR in upload_photo: %s", e, exc_info=True)
@@ -117,6 +148,9 @@ async def upload_photo(
             content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
             status_code=500
         )
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
 
 
 @router.get("/product/{article}")
@@ -260,8 +294,16 @@ async def delete_photo(photo_id: int, user_id: int = Depends(get_current_user_id
 
             # Видаляємо фізичний файл
             # photo.file_path вже містить "uploads/photos/filename.jpg"
-            webapp_root = Path(__file__).resolve().parent.parent
-            full_file_path = webapp_root / "static" / photo.file_path
+            full_file_path = _WEBAPP_ROOT / "static" / photo.file_path
+
+            # Guard: resolved path must stay within the photos storage root.
+            if not is_path_within(_PHOTOS_STORAGE_ROOT, full_file_path):
+                logger.error(
+                    "Blocked unsafe file path in delete_photo %s: file_path=%s",
+                    photo_id,
+                    photo.file_path,
+                )
+                raise HTTPException(status_code=400, detail="Invalid file path")
 
             if full_file_path.exists():
                 full_file_path.unlink()

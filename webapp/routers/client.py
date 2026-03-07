@@ -30,6 +30,7 @@ import traceback
 import zipfile
 from datetime import datetime, timedelta
 from io import BytesIO
+from pathlib import Path
 from typing import List, Optional
 
 import openpyxl
@@ -56,9 +57,13 @@ from database.orm import (
 from utils.archive_manager import ACTIVE_DIR, get_user_archives as fetch_user_archives, parse_filename
 from utils.list_processor import process_and_save_list
 from webapp.deps import get_current_user_id, get_current_user_id_any_auth, get_tma_user_id
+from webapp.utils.file_safety import is_path_within
 
 router = APIRouter()
 bot = Bot(token=BOT_TOKEN)
+
+# Resolved ACTIVE_DIR path for archive path-traversal guards.
+_ACTIVE_DIR_PATH = Path(ACTIVE_DIR).resolve()
 
 
 # === Pydantic Models ===
@@ -729,6 +734,11 @@ async def download_archive(filename: str, user_id: int = Depends(get_current_use
             raise HTTPException(status_code=403, detail="Access denied")
 
         file_path = os.path.join(ACTIVE_DIR, filename)
+
+        # Defense-in-depth: verify resolved path stays within ACTIVE_DIR.
+        if not is_path_within(_ACTIVE_DIR_PATH, Path(file_path)):
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(
@@ -760,6 +770,10 @@ async def delete_archive(filename: str, user_id: int = Depends(get_current_user_
             raise HTTPException(status_code=403, detail="Access denied")
 
         file_path = os.path.join(ACTIVE_DIR, filename)
+
+        # Defense-in-depth: verify resolved path stays within ACTIVE_DIR.
+        if not is_path_within(_ACTIVE_DIR_PATH, Path(file_path)):
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
