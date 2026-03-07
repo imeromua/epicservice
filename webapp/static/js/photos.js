@@ -438,45 +438,58 @@ async function openPhotoUpload(e) {
         if (typeof tg !== 'undefined') tg.showAlert('⏳ Зачекайте, попереднє фото ще завантажується');
         return;
     }
-    
-    // Створюємо прихований file input
+
+    // Використовуємо нативний Telegram попап для вибору джерела
+    if (typeof tg !== 'undefined' && tg.showPopup) {
+        tg.showPopup({
+            title: '📷 Додати фото',
+            message: 'Оберіть джерело фото',
+            buttons: [
+                { id: 'camera',  type: 'default', text: '📷 Камера' },
+                { id: 'gallery', type: 'default', text: '🖼 Галерея' },
+                { id: 'cancel',  type: 'cancel' }
+            ]
+        }, (buttonId) => {
+            if (!buttonId || buttonId === 'cancel') return;
+            _openFileInput(buttonId === 'camera');
+        });
+    } else {
+        // Fallback для браузера (не Telegram)
+        _openFileInput(false);
+    }
+}
+
+function _openFileInput(useCamera) {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*'; // Тільки зображення
+    input.accept = 'image/*';
     input.style.display = 'none';
-    
+
+    if (useCamera) {
+        input.capture = 'environment'; // задня камера
+    }
+    // без capture → галерея
+
     input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        
-        // Валідація типу файлу
+
         if (!file.type.startsWith('image/')) {
-            if (typeof tg !== 'undefined') {
-                tg.showAlert('❌ Оберіть файл зображення (JPG, PNG, WebP)');
-            } else {
-                alert('❌ Оберіть файл зображення (JPG, PNG, WebP)');
-            }
+            if (typeof tg !== 'undefined') tg.showAlert('❌ Оберіть файл зображення (JPG, PNG, WebP)');
+            else alert('❌ Оберіть файл зображення (JPG, PNG, WebP)');
             return;
         }
-        
-        // Валідація розміру (макс 10MB)
-        const maxSize = 10 * 1024 * 1024; // 10MB
-        if (file.size > maxSize) {
-            if (typeof tg !== 'undefined') {
-                tg.showAlert('❌ Файл занадто великий. Максимум 10 MB');
-            } else {
-                alert('❌ Файл занадто великий. Максимум 10 MB');
-            }
+
+        if (file.size > 10 * 1024 * 1024) {
+            if (typeof tg !== 'undefined') tg.showAlert('❌ Файл занадто великий. Максимум 10 MB');
+            else alert('❌ Файл занадто великий. Максимум 10 MB');
             return;
         }
-        
+
         await uploadPhoto(file);
-        
-        // Видаляємо input після використання
         input.remove();
     };
-    
-    // Додаємо input до DOM і клікаємо
+
     document.body.appendChild(input);
     input.click();
 }
