@@ -5,6 +5,7 @@ Phone OTP auth for Android app.
 """
 
 import logging
+import os
 import re
 import secrets
 import uuid
@@ -26,6 +27,7 @@ from database.orm.users import (
     orm_set_user_phone,
 )
 from utils.otp import TooManyAttemptsError, generate_otp, otp_exists, store_otp, verify_otp
+from webapp.utils.rate_limit import is_rate_limited
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,24 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 # Redis key prefix for revoked token jti entries
 _REVOKED_JTI_PREFIX = "revoked_jti:"
+
+# ---------------------------------------------------------------------------
+# Rate limiting configuration (conservative, configurable via env)
+# ---------------------------------------------------------------------------
+
+# OTP request: per IP and per phone limits (defend against OTP spam)
+_OTP_REQ_IP_MAX = int(os.getenv("RATE_OTP_REQ_IP_MAX", "5"))
+_OTP_REQ_IP_WINDOW = int(os.getenv("RATE_OTP_REQ_IP_WINDOW", "600"))       # 10 minutes
+_OTP_REQ_PHONE_MAX = int(os.getenv("RATE_OTP_REQ_PHONE_MAX", "3"))
+_OTP_REQ_PHONE_WINDOW = int(os.getenv("RATE_OTP_REQ_PHONE_WINDOW", "600"))  # 10 minutes
+
+# Login: per IP limit (defend against credential stuffing)
+_LOGIN_IP_MAX = int(os.getenv("RATE_LOGIN_IP_MAX", "10"))
+_LOGIN_IP_WINDOW = int(os.getenv("RATE_LOGIN_IP_WINDOW", "900"))            # 15 minutes
+
+# Refresh: per IP limit (lighter, but still throttle hammering)
+_REFRESH_IP_MAX = int(os.getenv("RATE_REFRESH_IP_MAX", "30"))
+_REFRESH_IP_WINDOW = int(os.getenv("RATE_REFRESH_IP_WINDOW", "900"))        # 15 minutes
 
 
 # --- Pydantic моделі ---
@@ -154,7 +174,7 @@ async def register(req: RegisterRequest):
     access_token = create_token(user.id, req.login, user.role, "access")
     refresh_token = create_token(user.id, req.login, user.role, "refresh")
 
-    return JSONResponse({
+    response = JSONResponse({
         "success": True,
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -166,11 +186,19 @@ async def register(req: RegisterRequest):
             "status": user.status,
         },
     })
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.post("/login")
-async def login(req: LoginRequest):
+async def login(req: LoginRequest, request: Request):
     """Авторизація за логіном та паролем."""
+    # Rate limit: protect against credential stuffing
+    redis = getattr(request.app.state, "redis", None)
+    client_ip = _get_client_ip(request)
+    if await is_rate_limited(redis, "login_ip", client_ip, _LOGIN_IP_MAX, _LOGIN_IP_WINDOW):
+        raise HTTPException(status_code=429, detail="Забагато спроб входу. Спробуйте пізніше.")
+
     user = await orm_get_user_by_login(req.login)
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Невірний логін або пароль")
@@ -185,7 +213,7 @@ async def login(req: LoginRequest):
     access_token = create_token(user.id, req.login, user.role, "access")
     refresh_token = create_token(user.id, req.login, user.role, "refresh")
 
-    return JSONResponse({
+    response = JSONResponse({
         "success": True,
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -197,11 +225,19 @@ async def login(req: LoginRequest):
             "status": user.status,
         },
     })
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.post("/refresh")
-async def refresh(req: RefreshRequest):
+async def refresh(req: RefreshRequest, request: Request):
     """Оновлення access токена за допомогою refresh токена."""
+    # Rate limit: protect against refresh token hammering
+    redis = getattr(request.app.state, "redis", None)
+    client_ip = _get_client_ip(request)
+    if await is_rate_limited(redis, "refresh_ip", client_ip, _REFRESH_IP_MAX, _REFRESH_IP_WINDOW):
+        raise HTTPException(status_code=429, detail="Забагато запитів. Спробуйте пізніше.")
+
     try:
         payload = jwt.decode(req.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.ExpiredSignatureError:
@@ -230,10 +266,12 @@ async def refresh(req: RefreshRequest):
     # Генеруємо новий access токен з актуальною роллю
     access_token = create_token(user.id, login_val, user.role, "access")
 
-    return JSONResponse({
+    response = JSONResponse({
         "success": True,
         "access_token": access_token,
     })
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/me")
@@ -354,6 +392,13 @@ def _get_redis(request: Request):
     return redis
 
 
+def _get_client_ip(request: Request) -> str:
+    """Extracts client IP address for rate limiting purposes."""
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
 async def _send_otp_via_bot(bot, chat_id: int, otp: str) -> bool:
     """Відправляє OTP-код користувачу через Telegram-бот."""
     try:
@@ -374,6 +419,15 @@ async def phone_request_otp(req: PhoneRequestModel, request: Request):
     """
     redis = _get_redis(request)
     phone = req.phone
+    client_ip = _get_client_ip(request)
+
+    # Rate limit by IP: protect against OTP spam from a single source
+    if await is_rate_limited(redis, "otp_req_ip", client_ip, _OTP_REQ_IP_MAX, _OTP_REQ_IP_WINDOW):
+        raise HTTPException(status_code=429, detail="Забагато запитів. Спробуйте пізніше.")
+
+    # Rate limit by phone: protect against targeting a specific number
+    if await is_rate_limited(redis, "otp_req_phone", phone, _OTP_REQ_PHONE_MAX, _OTP_REQ_PHONE_WINDOW):
+        raise HTTPException(status_code=429, detail="Забагато запитів для цього номера. Спробуйте пізніше.")
 
     otp = generate_otp()
     await store_otp(redis, phone, otp)
@@ -452,7 +506,7 @@ async def phone_verify_otp(req: PhoneVerifyModel, request: Request):
     access_token = create_token(user.id, login_val, user.role, "access")
     refresh_token = create_token(user.id, login_val, user.role, "refresh")
 
-    return JSONResponse({
+    response = JSONResponse({
         "success": True,
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -464,3 +518,5 @@ async def phone_verify_otp(req: PhoneVerifyModel, request: Request):
             "status": user.status,
         },
     })
+    response.headers["Cache-Control"] = "no-store"
+    return response
