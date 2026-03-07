@@ -48,8 +48,22 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Telegram-Init-Data"],
 )
+
+
+# --- Security headers middleware ---
+# Adds safe HTTP security headers to all responses.
+# Notes on intentional omissions for Telegram Mini App compatibility:
+#   - X-Frame-Options is NOT set: TMA can run in Telegram's web.telegram.org iframe.
+#   - Content-Security-Policy frame-ancestors is NOT set for the same reason.
+#   - A full CSP is not added to avoid breaking Telegram WebApp runtime scripts.
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 # --- Lifecycle: ініціалізація Redis для OTP-автентифікації ---
