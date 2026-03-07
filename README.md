@@ -70,7 +70,9 @@ epicservice/
 │   └── error_handler.py     # Глобальна обробка помилок
 ├── webapp/
 │   ├── api.py               # FastAPI додаток
+│   ├── deps.py              # Залежності автентифікації (TMA + JWT)
 │   ├── routers/
+│   │   ├── auth.py          # JWT auth (вхід, refresh, вихід, OTP)
 │   │   ├── client.py        # User API endpoints
 │   │   ├── admin.py         # Admin API endpoints
 │   │   ├── photos.py        # Photos API endpoints
@@ -78,7 +80,10 @@ epicservice/
 │   ├── templates/
 │   │   └── index.html       # Mini App frontend
 │   ├── utils/
-│   │   └── image_processing.py # Стиснення/обробка зображень
+│   │   ├── image_processing.py # Стиснення/обробка зображень
+│   │   ├── file_safety.py   # Захист від path traversal, перевірка зображень
+│   │   ├── client_ip.py     # Визначення IP з урахуванням проксі
+│   │   └── rate_limit.py    # Обмеження запитів через Redis
 │   └── static/
 │       ├── admin.html       # Статична адмін-сторінка (frontend)
 │       ├── css/             # CSS файли (в т.ч. photos.css)
@@ -185,27 +190,47 @@ sudo systemctl enable redis
 Створити файл `.env` в кореневій папці:
 
 ```env
-# Telegram Bot
+# --- Середовище ---
+APP_ENV=production
+
+# --- Telegram Bot ---
 BOT_TOKEN=your_bot_token_from_botfather
 ADMIN_IDS=123456789,987654321
 
-# Database
+# --- WebApp ---
+WEBAPP_URL=https://your-domain.com
+SERVER_URL=https://your-backend-domain.com
+
+# --- JWT (для автономного / мобільного клієнта) ---
+JWT_SECRET_KEY=your-strong-random-secret-here
+
+# --- База даних ---
+DB_USER=epicuser
+DB_PASSWORD=your_password
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=epicservice
-DB_USER=epicuser
-DB_PASSWORD=your_password
 
-# Redis
+# --- Redis ---
 REDIS_ENABLED=true
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
 REDIS_PASSWORD=
 
-# WebApp
-WEBAPP_URL=https://your-domain.com
-WEBAPP_ADMIN_IDS=123456789,987654321
+# --- Проксі та CORS ---
+TRUSTED_PROXIES=10.0.0.1
+CORS_ORIGINS=https://your-domain.com
+
+# --- Ліміти запитів (необов'язково, наведено значення за замовчуванням) ---
+RATE_OTP_REQ_IP_MAX=5
+RATE_OTP_REQ_IP_WINDOW=600
+RATE_OTP_REQ_PHONE_MAX=3
+RATE_OTP_REQ_PHONE_WINDOW=600
+RATE_LOGIN_IP_MAX=10
+RATE_LOGIN_IP_WINDOW=900
+RATE_REFRESH_IP_MAX=30
+RATE_REFRESH_IP_WINDOW=900
 ```
 
 ### 6. Запуск сервісів
@@ -291,55 +316,64 @@ server {
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
+> **Автентифікація:** TMA-клієнти передають `X-Telegram-Init-Data` в кожному запиті (вставляється автоматично frontend-перехоплювачем). Автономний/мобільний клієнт використовує `Authorization: Bearer <токен>`. Ідентичність користувача для TMA-маршрутів завжди визначається сервером із валідованих `initData`.
+
 ### Основні ендпоінти:
 
+#### **Auth API** (`/api/auth`)
+- `POST /api/auth/phone/request` — Надіслати OTP на номер телефону
+- `POST /api/auth/login` — Вхід за OTP, повертає access + refresh токени
+- `POST /api/auth/refresh` — Оновлення токена (ротація refresh-токена)
+- `POST /api/auth/logout` — Вихід із відкликанням токенів
+- `GET /api/auth/me` — Інформація про поточного користувача
+
 #### **User API** (`/api`)
-- `POST /api/search` - Пошук товарів
-- `POST /api/products/filter` - Фільтрація товарів
-- `GET /api/products/departments` - Список відділів
-- `GET /api/list/{user_id}` - Поточний список
-- `GET /api/list/department/{user_id}` - Поточний відділ списку
-- `POST /api/add` - Додати товар
-- `POST /api/update` - Оновити кількість
-- `POST /api/delete` - Видалити товар
-- `POST /api/save/{user_id}` - Зберегти список
-- `POST /api/clear/{user_id}` - Очистити список
-- `GET /api/archives/{user_id}` - Архіви користувача
-- `GET /api/archives/download-all/{user_id}` - ZIP всіх архівів
-- `GET /api/archive/stats/{filename}` - Статистика архіву
-- `GET /api/archive/download/{filename}` - Завантажити архів
-- `DELETE /api/archive/delete/{filename}` - Видалити архів
-- `GET /api/statistics/{user_id}` - Статистика користувача
+- `POST /api/search` — Пошук товарів
+- `POST /api/products/filter` — Фільтрація товарів
+- `GET /api/products/departments` — Список відділів
+- `GET /api/list` — Поточний список (ідентифікація з токена/initData)
+- `GET /api/list/department` — Поточний відділ списку
+- `POST /api/add` — Додати товар
+- `POST /api/update` — Оновити кількість
+- `POST /api/delete` — Видалити товар
+- `POST /api/save` — Зберегти список
+- `POST /api/clear` — Очистити список
+- `GET /api/archives` — Архіви користувача
+- `GET /api/archives/download-all` — ZIP всіх архівів
+- `GET /api/archive/stats/{filename}` — Статистика архіву
+- `GET /api/archive/download/{filename}` — Завантажити архів
+- `DELETE /api/archive/delete/{filename}` — Видалити архів
+- `GET /api/statistics` — Статистика користувача
 
 #### **Photos API** (`/api/photos`)
-- `POST /api/photos/upload` - Завантажити фото (multipart: `photo`, `article`, `user_id`)
-- `GET /api/photos/product/{article}` - Отримати approved фото товару
-- `GET /api/photos/moderation/pending` - Черга фото на модерації (admin)
-- `POST /api/photos/moderation/{photo_id}` - Схвалити/відхилити фото (admin)
-- `DELETE /api/photos/{photo_id}` - Видалити фото (admin або автор)
+- `POST /api/photos/upload` — Завантажити фото (multipart: `photo`, `article`)
+- `GET /api/photos/product/{article}` — Отримати затверджені фото товару
+- `GET /api/photos/moderation/pending` — Черга фото на модерації (адмін)
+- `POST /api/photos/moderation/{photo_id}` — Схвалити/відхилити фото (адмін)
+- `DELETE /api/photos/{photo_id}` — Видалити фото (адмін або автор)
 
 #### **Admin API** (`/api/admin`)
-- `GET /api/admin/statistics` - Загальна статистика
-- `GET /api/admin/summary` - Зведена статистика
-- `POST /api/admin/import` - Імпорт з Excel
-- `GET /api/admin/export/stock` - Експорт залишків
-- `POST /api/admin/force-save/{user_id}` - Примусове збереження
-- `POST /api/admin/broadcast` - Розсилка повідомлень
-- `GET /api/admin/users` - Список користувачів
-- `GET /api/admin/users/all` - Всі користувачі (з статистикою)
-- `GET /api/admin/users/active` - Активні списки
-- `GET /api/admin/products/info` - Інфо про товари
-- `GET /api/admin/reserved/by-department` - Резерви по відділах
-- `GET /api/admin/archives` - Всі архіви
-- `GET /api/admin/archives/download/{filename}` - Завантажити архів
-- `GET /api/admin/archives/download-all` - ZIP всіх архівів
+- `GET /api/admin/statistics` — Загальна статистика
+- `GET /api/admin/summary` — Зведена статистика
+- `POST /api/admin/import` — Імпорт з Excel
+- `GET /api/admin/export/stock` — Експорт залишків
+- `POST /api/admin/force-save/{user_id}` — Примусове збереження
+- `POST /api/admin/broadcast` — Розсилка повідомлень
+- `GET /api/admin/users` — Список користувачів
+- `GET /api/admin/users/all` — Всі користувачі (з статистикою)
+- `GET /api/admin/users/active` — Активні списки
+- `GET /api/admin/products/info` — Інфо про товари
+- `GET /api/admin/reserved/by-department` — Резерви по відділах
+- `GET /api/admin/archives` — Всі архіви
+- `GET /api/admin/archives/download/{filename}` — Завантажити архів
+- `GET /api/admin/archives/download-all` — ZIP всіх архівів
 
 #### **User Management API** (`/api/admin/user-management`)
-- `GET /api/admin/user-management/users` - Список користувачів (з RBAC)
-- `POST /api/admin/user-management/approve` - Схвалити користувача
-- `POST /api/admin/user-management/block` - Заблокувати користувача
-- `POST /api/admin/user-management/unblock` - Розблокувати користувача
-- `POST /api/admin/user-management/role` - Змінити роль користувача
+- `GET /api/admin/user-management/users` — Список користувачів (з RBAC)
+- `POST /api/admin/user-management/approve` — Схвалити користувача
+- `POST /api/admin/user-management/block` — Заблокувати користувача
+- `POST /api/admin/user-management/unblock` — Розблокувати користувача
+- `POST /api/admin/user-management/role` — Змінити роль користувача
 
 ---
 
@@ -361,51 +395,48 @@ server {
 
 ## 🔒 Безпека
 
-### Authentication model
+### Модель автентифікації
 
-EpicService uses two parallel auth flows depending on the client:
+EpicService підтримує два паралельні механізми автентифікації залежно від типу клієнта:
 
-| Client | Auth method | Header |
+| Клієнт | Метод автентифікації | Заголовок |
 |---|---|---|
-| Telegram Mini App (TMA) | HMAC-SHA256 validated `initData` | `X-Telegram-Init-Data` |
-| Standalone / Android app | JWT Bearer token (RS256) | `Authorization: Bearer <token>` |
+| Telegram Mini App (TMA) | HMAC-SHA256 валідація `initData` | `X-Telegram-Init-Data` |
+| Автономний / Android-додаток | JWT Bearer (HS256) | `Authorization: Bearer <токен>` |
 
-Most TMA endpoints derive user identity **server-side** from the validated `initData`,
-so client-supplied `user_id` fields in request bodies are intentionally ignored to
-prevent IDOR attacks.
+Для TMA-маршрутів ідентифікація користувача здійснюється **на сервері** з валідованих `initData`. Поля `user_id` у тілі запиту ігноруються — це захищає від IDOR-атак.
 
-### Redis-dependent features
+### Функції, що залежать від Redis
 
-Redis is required for full security operation. Without Redis, these features degrade:
+Redis необхідний для повноцінної безпеки. Без нього деградують такі функції:
 
-| Feature | Degradation |
+| Функція | Деградація |
 |---|---|
-| Rate limiting (OTP / login / refresh) | Disabled — all requests allowed |
-| JWT access-token revocation (`/logout`) | Disabled — tokens valid until expiry |
-| Refresh-token rotation / replay protection | Disabled — rotated tokens can be replayed |
-| OTP `/phone/request` | Returns HTTP 503 |
+| Обмеження запитів (OTP / вхід / refresh) | Вимкнено — всі запити пропускаються |
+| Відкликання JWT-токенів (`/logout`) | Вимкнено — токени дійсні до закінчення терміну дії |
+| Ротація refresh-токенів / захист від replay | Вимкнено — ротовані токени можна повторно використати |
+| OTP `/phone/request` | Повертає HTTP 503 |
 
-Always run Redis in production (`REDIS_ENABLED=true`).
+У продакшні завжди запускайте Redis (`REDIS_ENABLED=true`).
 
-### Production requirements
+### Вимоги до продакшну
 
-- Set `APP_ENV=production` — enforces `JWT_SECRET_KEY` and emits startup warnings for other security misconfigurations.
-- Set `JWT_SECRET_KEY` to a strong random secret — the app **refuses to start** with the insecure default in production.
-- Set `TRUSTED_PROXIES` if running behind nginx/LB — needed for accurate per-IP rate limiting.
-- Set `ADMIN_IDS` — without it the admin panel is inaccessible.
+- Встановіть `APP_ENV=production` — примусово перевіряє `JWT_SECRET_KEY` і виводить попередження при небезпечних налаштуваннях.
+- Встановіть `JWT_SECRET_KEY` у вигляді надійного випадкового значення — додаток **відмовляється запускатись** зі стандартним незахищеним значенням у продакшні.
+- Встановіть `TRUSTED_PROXIES`, якщо запускаєте за nginx/балансувальником — необхідно для точного обмеження запитів за IP.
+- Встановіть `ADMIN_IDS` — без нього адмін-панель недоступна.
 
-### Other hardening
+### Додаткові заходи захисту
 
-- ✅ Pydantic input validation on all request models
-- ✅ SQLAlchemy ORM (no raw SQL / SQL injection protection)
-- ✅ Path traversal protection on file uploads and archive downloads (`webapp/utils/file_safety.py`)
-- ✅ Pillow-validated image content (format + full decode) before storage
-- ✅ Security headers on all responses (`X-Content-Type-Options`, `Referrer-Policy`)
-- ✅ Photo moderation: `pending → approved` flow before public visibility
-- ✅ Blocked users rejected at login and token refresh
+- ✅ Валідація вхідних даних через Pydantic для всіх моделей запитів
+- ✅ SQLAlchemy ORM (без сирого SQL / захист від SQL-ін'єкцій)
+- ✅ Захист від path traversal при завантаженні файлів і архівів (`webapp/utils/file_safety.py`)
+- ✅ Перевірка вмісту зображень через Pillow (формат + повне декодування) перед збереженням
+- ✅ Заголовки безпеки у всіх відповідях (`X-Content-Type-Options`, `Referrer-Policy`)
+- ✅ Модерація фото: процес `pending → approved` перед публічним показом
+- ✅ Заблоковані користувачі відхиляються при вході та оновленні токена
 
-See [`SECURITY_OPERATIONS.md`](SECURITY_OPERATIONS.md) for the full deployment runbook,
-reverse-proxy configuration, rate-limit tuning, and remaining security debt.
+Детальніше про налаштування продакшну, конфігурацію зворотного проксі, тюнінг лімітів запитів та поточний стан безпеки: [`SECURITY_OPERATIONS.md`](SECURITY_OPERATIONS.md).
 
 ---
 
@@ -434,20 +465,20 @@ reverse-proxy configuration, rate-limit tuning, and remaining security debt.
 
 ---
 
-## 🛠️ Maintenance
+## 🛠️ Обслуговування
 
 ### Логи
 
 ```bash
-# Bot logs
+# Логи бота
 journalctl -u epicservice -f
 tail -f bot.log
 
-# WebApp logs
+# Логи WebApp
 journalctl -u webapp -f
 ```
 
-### Backup БД
+### Резервне копіювання БД
 
 ```bash
 pg_dump -U epicuser epicservice > backup_$(date +%Y%m%d).sql
@@ -522,6 +553,6 @@ curl http://localhost:8000/health
 ---
 
 **Версія:** 2.3.0  
-**Останнє оновлення:** 27.02.2026
+**Останнє оновлення:** 07.03.2026
 
 "Зроблено в Україні з ❤️"
