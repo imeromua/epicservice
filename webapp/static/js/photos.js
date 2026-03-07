@@ -451,7 +451,11 @@ async function openPhotoUpload(e) {
             ]
         }, (buttonId) => {
             if (!buttonId || buttonId === 'cancel') return;
-            _openFileInput(buttonId === 'camera');
+            if (buttonId === 'camera') {
+                openCameraCapture();
+            } else {
+                _openFileInput(false);
+            }
         });
     } else {
         // Fallback для браузера (не Telegram)
@@ -492,6 +496,149 @@ function _openFileInput(useCamera) {
 
     document.body.appendChild(input);
     input.click();
+}
+
+/**
+ * Camera capture flow via getUserMedia.
+ * Opens a fullscreen modal with live video preview, capture, retake and confirm buttons.
+ * Falls back to gallery if getUserMedia is unavailable or permission is denied.
+ */
+async function openCameraCapture() {
+    // Check support
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const msg = '📷 Камера недоступна у цьому браузері. Оберіть фото з галереї.';
+        if (typeof tg !== 'undefined' && tg.showPopup) {
+            tg.showPopup({
+                title: '📷 Камера недоступна',
+                message: msg,
+                buttons: [
+                    { id: 'gallery', type: 'default', text: '🖼 Відкрити галерею' },
+                    { id: 'cancel', type: 'cancel' }
+                ]
+            }, (btn) => { if (btn === 'gallery') _openFileInput(false); });
+        } else {
+            if (confirm(msg + '\nВідкрити галерею?')) _openFileInput(false);
+        }
+        return;
+    }
+
+    let stream = null;
+    let capturedBlob = null;
+
+    // Create modal
+    const overlay = document.createElement('div');
+    overlay.id = 'cameraOverlay';
+    overlay.className = 'camera-overlay';
+    overlay.innerHTML = `
+        <div class="camera-modal">
+            <button class="close-btn camera-close-btn" id="cameraCancelBtn">×</button>
+            <div class="camera-preview-wrap" id="cameraPreviewWrap">
+                <video id="cameraVideo" class="camera-video" autoplay playsinline muted></video>
+                <canvas id="cameraCanvas" class="camera-canvas" style="display:none;"></canvas>
+            </div>
+            <div class="camera-controls" id="cameraControls">
+                <button class="btn btn-primary btn-large" id="cameraCaptureBtn">📷 Зняти</button>
+            </div>
+            <div class="camera-controls" id="cameraConfirmControls" style="display:none;">
+                <button class="btn btn-secondary btn-large" id="cameraRetakeBtn">🔄 Повторити</button>
+                <button class="btn btn-primary btn-large" id="cameraUseBtn">✅ Використати</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const video   = document.getElementById('cameraVideo');
+    const canvas  = document.getElementById('cameraCanvas');
+    const captureBtn  = document.getElementById('cameraCaptureBtn');
+    const retakeBtn   = document.getElementById('cameraRetakeBtn');
+    const useBtn      = document.getElementById('cameraUseBtn');
+    const cancelBtn   = document.getElementById('cameraCancelBtn');
+    const controls        = document.getElementById('cameraControls');
+    const confirmControls = document.getElementById('cameraConfirmControls');
+
+    function stopStream() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+    }
+
+    function closeCamera() {
+        stopStream();
+        overlay.remove();
+        capturedBlob = null;
+    }
+
+    function showCapture() {
+        canvas.width  = video.videoWidth  || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                if (typeof tg !== 'undefined') tg.showAlert('❌ Не вдалося зробити знімок. Спробуйте ще раз.');
+                return;
+            }
+            capturedBlob = blob;
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            controls.style.display = 'none';
+            confirmControls.style.display = 'flex';
+        }, 'image/jpeg', 0.92);
+    }
+
+    function showRetake() {
+        capturedBlob = null;
+        canvas.style.display = 'none';
+        video.style.display = 'block';
+        controls.style.display = 'flex';
+        confirmControls.style.display = 'none';
+    }
+
+    cancelBtn.addEventListener('click', closeCamera);
+
+    captureBtn.addEventListener('click', showCapture);
+
+    retakeBtn.addEventListener('click', showRetake);
+
+    useBtn.addEventListener('click', async () => {
+        if (!capturedBlob) return;
+        const file = new File([capturedBlob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        closeCamera();
+        await uploadPhoto(file);
+    });
+
+    // Start camera
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+        });
+        video.srcObject = stream;
+    } catch (err) {
+        closeCamera();
+        console.warn('📷 getUserMedia error:', err);
+        const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+        const isNotFound = err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError';
+        const msg = isDenied
+            ? '🚫 Доступ до камери заборонено. Надайте дозвіл або оберіть фото з галереї.'
+            : isNotFound
+                ? '📷 Камеру не знайдено на цьому пристрої. Оберіть фото з галереї.'
+                : '📷 Не вдалося запустити камеру. Оберіть фото з галереї.';
+        if (typeof tg !== 'undefined' && tg.showPopup) {
+            tg.showPopup({
+                title: '📷 Камера недоступна',
+                message: msg,
+                buttons: [
+                    { id: 'gallery', type: 'default', text: '🖼 Відкрити галерею' },
+                    { id: 'cancel', type: 'cancel' }
+                ]
+            }, (btn) => { if (btn === 'gallery') _openFileInput(false); });
+        } else {
+            if (confirm(msg + '\nВідкрити галерею?')) _openFileInput(false);
+        }
+    }
 }
 
 async function uploadPhoto(file) {
