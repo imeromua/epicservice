@@ -47,3 +47,7 @@ _set_default_env("DB_PASSWORD", "password")
 # Disable redis for tests unless explicitly enabled.
 _set_default_env("REDIS_ENABLED", "false")
 _set_default_env("WEBAPP_ADMIN_IDS", "")
+
+# Use a deterministic non-default JWT secret so tests never rely on the insecure fallback
+# and will work correctly even if APP_ENV=production is set in the environment.
+_set_default_env("JWT_SECRET_KEY", "test-jwt-secret-key-do-not-use-in-production")

@@ -17,7 +17,7 @@ import time
 import urllib.parse
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 
 from config import ADMIN_IDS
 from database.orm.users import orm_get_user_by_id
@@ -100,13 +100,18 @@ def _validate_tma_init_data(init_data: str) -> int:
 # JWT-based dependencies (standalone / mobile app)
 # ---------------------------------------------------------------------------
 
-def get_current_user_id(authorization: str = Header(...)) -> int:
+async def get_current_user_id(
+    authorization: str = Header(...),
+    request: Request = None,
+) -> int:
     """
     Extracts and validates user_id from a JWT Bearer token in the Authorization header.
 
-    Raises HTTP 401 if the header is missing, malformed, or the token is invalid/expired.
+    Also checks the Redis token revocation blacklist (jti) if Redis is available.
+    Raises HTTP 401 if the header is missing, malformed, the token is invalid/expired,
+    or the token has been explicitly revoked via /logout.
     """
-    from webapp.routers.auth import get_current_user  # local import avoids circular deps
+    from webapp.routers.auth import get_current_user, _check_token_not_revoked  # local import avoids circular deps
 
     if not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -114,7 +119,10 @@ def get_current_user_id(authorization: str = Header(...)) -> int:
             detail="Invalid Authorization header format. Expected: Bearer <token>",
         )
     token = authorization[7:]
-    return get_current_user(token)
+    user_id = get_current_user(token)
+    if request is not None:
+        await _check_token_not_revoked(token, request)
+    return user_id
 
 
 def require_admin(user_id: int = Depends(get_current_user_id)) -> int:
@@ -205,25 +213,31 @@ async def require_tma_admin_or_moderator(user_id: int = Depends(get_tma_user_id)
 async def _get_user_id_any_auth(
     authorization: Optional[str] = Header(None),
     x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
+    request: Request = None,
 ) -> int:
     """
     Accepts either a JWT Bearer token (Authorization header) or Telegram initData
     (X-Telegram-Init-Data header) and returns the validated user_id.
 
     TMA header takes priority when present.
+    For JWT tokens, also checks the Redis revocation blacklist when available.
     Raises HTTP 401 if neither valid header is provided.
     """
     if x_telegram_init_data:
         return _validate_tma_init_data(x_telegram_init_data)
 
     if authorization:
-        from webapp.routers.auth import get_current_user  # local import avoids circular deps
+        from webapp.routers.auth import get_current_user, _check_token_not_revoked  # local import avoids circular deps
         if not authorization.startswith("Bearer "):
             raise HTTPException(
                 status_code=401,
                 detail="Invalid Authorization header format. Expected: Bearer <token>",
             )
-        return get_current_user(authorization[7:])
+        token = authorization[7:]
+        user_id = get_current_user(token)
+        if request is not None:
+            await _check_token_not_revoked(token, request)
+        return user_id
 
     raise HTTPException(
         status_code=401,

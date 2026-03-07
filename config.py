@@ -40,10 +40,26 @@ BOT_TOKEN = get_required_env("BOT_TOKEN")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://epicservice.example.com")
 logger.info("WebApp URL: %s", WEBAPP_URL)
 
+# --- Runtime environment (development | staging | production) ---
+APP_ENV = os.getenv("APP_ENV", "development")
+
 # --- JWT Authentication (Standalone App) ---
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "epicservice-standalone-secret-change-in-production")
-if JWT_SECRET_KEY == "epicservice-standalone-secret-change-in-production":
-    logger.warning("JWT_SECRET_KEY не задано! Використовується значення за замовчуванням. Обов'язково змініть для production!")
+_INSECURE_JWT_DEFAULT = "epicservice-standalone-secret-change-in-production"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", _INSECURE_JWT_DEFAULT)
+
+if JWT_SECRET_KEY == _INSECURE_JWT_DEFAULT:
+    if APP_ENV == "production":
+        _err = (
+            "КРИТИЧНА ПОМИЛКА: JWT_SECRET_KEY має бути задано у production. "
+            "Відмова запуску з небезпечним значенням за замовчуванням."
+        )
+        logger.critical(_err)
+        raise ValueError(_err)
+    else:
+        logger.warning(
+            "JWT_SECRET_KEY не задано! Використовується небезпечне значення за замовчуванням. "
+            "НІКОЛИ не використовуйте це у production (встановіть APP_ENV=production для захисту)."
+        )
 
 # URL сервера для мобільного додатку
 SERVER_URL = os.getenv("SERVER_URL", "https://anubis-ua.pp.ua")

@@ -7,6 +7,7 @@ Phone OTP auth for Android app.
 import logging
 import re
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -35,6 +36,9 @@ SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 REFRESH_TOKEN_EXPIRE_DAYS = 30
+
+# Redis key prefix for revoked token jti entries
+_REVOKED_JTI_PREFIX = "revoked_jti:"
 
 
 # --- Pydantic моделі ---
@@ -67,7 +71,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_token(user_id: int, login: str, role: str, token_type: str) -> str:
-    """Генерує JWT токен."""
+    """Генерує JWT токен із унікальним jti для можливості відкликання."""
     if token_type == "access":
         expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     else:
@@ -78,6 +82,7 @@ def create_token(user_id: int, login: str, role: str, token_type: str) -> str:
         "login": login,
         "role": role,
         "type": token_type,
+        "jti": str(uuid.uuid4()),
         "exp": expire,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -97,6 +102,25 @@ def get_current_user(token: str) -> int:
         raise HTTPException(status_code=401, detail="Токен протермінований")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Невірний токен")
+
+
+async def _check_token_not_revoked(token: str, request: Request) -> None:
+    """
+    Перевіряє чи jti токена не знаходиться у чорному списку Redis.
+
+    При відсутності Redis перевірка пропускається (graceful degradation).
+    Raises HTTP 401 якщо токен відкликано.
+    """
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        return
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        jti = payload.get("jti")
+        if jti and await redis.exists(f"{_REVOKED_JTI_PREFIX}{jti}"):
+            raise HTTPException(status_code=401, detail="Токен анульовано")
+    except jwt.InvalidTokenError:
+        pass  # Невалідні токени вже оброблені вище
 
 
 # --- Ендпоїнти ---
@@ -154,6 +178,9 @@ async def login(req: LoginRequest):
     if not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Невірний логін або пароль")
 
+    if user.status == "blocked":
+        raise HTTPException(status_code=403, detail="Ваш акаунт заблоковано")
+
     # Генеруємо токени
     access_token = create_token(user.id, req.login, user.role, "access")
     refresh_token = create_token(user.id, req.login, user.role, "refresh")
@@ -197,6 +224,9 @@ async def refresh(req: RefreshRequest):
     if not user:
         raise HTTPException(status_code=401, detail="Користувача не знайдено")
 
+    if user.status == "blocked":
+        raise HTTPException(status_code=403, detail="Ваш акаунт заблоковано")
+
     # Генеруємо новий access токен з актуальною роллю
     access_token = create_token(user.id, login_val, user.role, "access")
 
@@ -207,7 +237,7 @@ async def refresh(req: RefreshRequest):
 
 
 @router.get("/me")
-async def me(authorization: str = Header(...)):
+async def me(authorization: str = Header(...), request: Request = None):
     """Отримання інформації про поточного користувача."""
     # Витягуємо токен з заголовка "Bearer <token>"
     if not authorization.startswith("Bearer "):
@@ -215,6 +245,7 @@ async def me(authorization: str = Header(...)):
 
     token = authorization[7:]
     user_id = get_current_user(token)
+    await _check_token_not_revoked(token, request)
 
     user = await orm_get_user_by_id(user_id)
     if not user:
@@ -231,6 +262,36 @@ async def me(authorization: str = Header(...)):
             "status": user.status,
         },
     })
+
+
+@router.post("/logout")
+async def logout(authorization: str = Header(...), request: Request = None):
+    """
+    Завершення сесії: анулює поточний access токен через Redis-чорний список.
+
+    Якщо Redis недоступний — виконується лише клієнтський logout (токен стає неактивним
+    після закінчення терміну дії). Клієнт повинен видалити обидва токени локально.
+    """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Невірний формат заголовка Authorization")
+
+    token = authorization[7:]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        # Токен вже недійсний — logout вважається успішним
+        return JSONResponse({"success": True, "message": "Вихід виконано"})
+
+    jti = payload.get("jti")
+    redis = getattr(request.app.state, "redis", None) if request else None
+    if redis and jti:
+        exp = payload.get("exp")
+        if exp:
+            ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
+            await redis.setex(f"{_REVOKED_JTI_PREFIX}{jti}", ttl, "1")
+        logger.info("Token revoked for user_id=%s", payload.get("user_id"))
+
+    return JSONResponse({"success": True, "message": "Вихід виконано"})
 
 
 # ---------------------------------------------------------------------------
@@ -327,8 +388,9 @@ async def phone_request_otp(req: PhoneRequestModel, request: Request):
             sent_via_bot = await _send_otp_via_bot(bot, user.id, otp)
 
     if not sent_via_bot:
-        # Логуємо OTP для dev/ручного тестування (у production замінити на SMS)
-        logger.info("OTP для %s: %s (bot_sent=%s)", phone, otp, sent_via_bot)
+        # Доставка через Telegram не вдалася — НЕ логуємо OTP-код.
+        # Адміністратор може знайти код у Redis або перевірити стан бота.
+        logger.warning("OTP для %s не вдалося доставити через Telegram-бот", phone)
 
     return JSONResponse({
         "success": True,
@@ -337,7 +399,7 @@ async def phone_request_otp(req: PhoneRequestModel, request: Request):
         "sent_via_bot": sent_via_bot,
         "message": (
             "Код надіслано в Telegram-бот" if sent_via_bot
-            else "Код згенеровано. Зверніться до адміністратора або введіть код з логів."
+            else "Не вдалося доставити код через Telegram. Зверніться до адміністратора."
         ),
     })
 
