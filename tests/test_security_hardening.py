@@ -519,3 +519,139 @@ class TestRateLimiterUnit:
         await is_rate_limited(mock_redis, "test_scope", "127.0.0.1", 5, 60)
 
         mock_redis.expire.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Production config validation tests
+# ---------------------------------------------------------------------------
+
+class TestProductionConfigValidation:
+    """_validate_production_config() emits warnings for security-sensitive misconfig."""
+
+    def test_warns_when_webapp_url_is_default(self, monkeypatch, caplog):
+        """A warning is emitted when WEBAPP_URL is still the placeholder default."""
+        import logging
+
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("WEBAPP_URL", "https://epicservice.example.com")
+        monkeypatch.setenv("REDIS_ENABLED", "true")
+        monkeypatch.setenv("ADMIN_IDS", "12345")
+        monkeypatch.setenv("TRUSTED_PROXIES", "10.0.0.1")
+
+        import importlib
+        import sys
+        # Remove cached config module so env changes take effect
+        for mod in list(sys.modules.keys()):
+            if mod == "config":
+                del sys.modules[mod]
+
+        with caplog.at_level(logging.WARNING, logger="config"):
+            import config as cfg  # noqa: F401
+
+        assert any("WEBAPP_URL" in r.message for r in caplog.records if r.levelno >= logging.WARNING)
+
+    def test_warns_when_redis_disabled_in_production(self, monkeypatch, caplog):
+        """A warning is emitted when Redis is disabled in production."""
+        import logging
+
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("WEBAPP_URL", "https://real.example.com")
+        monkeypatch.setenv("REDIS_ENABLED", "false")
+        monkeypatch.setenv("ADMIN_IDS", "12345")
+        monkeypatch.setenv("TRUSTED_PROXIES", "10.0.0.1")
+
+        import sys
+        for mod in list(sys.modules.keys()):
+            if mod == "config":
+                del sys.modules[mod]
+
+        with caplog.at_level(logging.WARNING, logger="config"):
+            import config as cfg  # noqa: F401
+
+        assert any("REDIS_ENABLED" in r.message for r in caplog.records if r.levelno >= logging.WARNING)
+
+    def test_warns_when_admin_ids_empty_in_production(self, monkeypatch, caplog):
+        """A warning is emitted when ADMIN_IDS is empty in production."""
+        import logging
+
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("WEBAPP_URL", "https://real.example.com")
+        monkeypatch.setenv("REDIS_ENABLED", "true")
+        monkeypatch.setenv("ADMIN_IDS", "")
+        monkeypatch.setenv("TRUSTED_PROXIES", "10.0.0.1")
+
+        import sys
+        for mod in list(sys.modules.keys()):
+            if mod == "config":
+                del sys.modules[mod]
+
+        with caplog.at_level(logging.WARNING, logger="config"):
+            import config as cfg  # noqa: F401
+
+        assert any("ADMIN_IDS" in r.message for r in caplog.records if r.levelno >= logging.WARNING)
+
+    def test_warns_when_trusted_proxies_not_set_in_production(self, monkeypatch, caplog):
+        """A warning is emitted when TRUSTED_PROXIES is unset in production."""
+        import logging
+
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("WEBAPP_URL", "https://real.example.com")
+        monkeypatch.setenv("REDIS_ENABLED", "true")
+        monkeypatch.setenv("ADMIN_IDS", "12345")
+        monkeypatch.delenv("TRUSTED_PROXIES", raising=False)
+
+        import sys
+        for mod in list(sys.modules.keys()):
+            if mod == "config":
+                del sys.modules[mod]
+
+        with caplog.at_level(logging.WARNING, logger="config"):
+            import config as cfg  # noqa: F401
+
+        assert any("TRUSTED_PROXIES" in r.message for r in caplog.records if r.levelno >= logging.WARNING)
+
+    def test_no_production_warnings_when_config_is_correct(self, monkeypatch, caplog):
+        """No [production config] warnings when all settings are properly configured."""
+        import logging
+
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("WEBAPP_URL", "https://real.example.com")
+        monkeypatch.setenv("REDIS_ENABLED", "true")
+        monkeypatch.setenv("ADMIN_IDS", "12345")
+        monkeypatch.setenv("TRUSTED_PROXIES", "10.0.0.1")
+
+        import sys
+        for mod in list(sys.modules.keys()):
+            if mod == "config":
+                del sys.modules[mod]
+
+        with caplog.at_level(logging.WARNING, logger="config"):
+            import config as cfg  # noqa: F401
+
+        prod_warnings = [
+            r for r in caplog.records
+            if r.levelno >= logging.WARNING and "[production config]" in r.message
+        ]
+        assert prod_warnings == []
+
+    def test_no_production_guardrails_in_development(self, monkeypatch, caplog):
+        """_validate_production_config is not called in development mode."""
+        import logging
+
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.delenv("TRUSTED_PROXIES", raising=False)
+        monkeypatch.setenv("REDIS_ENABLED", "false")
+
+        import sys
+        for mod in list(sys.modules.keys()):
+            if mod == "config":
+                del sys.modules[mod]
+
+        with caplog.at_level(logging.WARNING, logger="config"):
+            import config as cfg  # noqa: F401
+
+        prod_warnings = [
+            r for r in caplog.records
+            if r.levelno >= logging.WARNING and "[production config]" in r.message
+        ]
+        assert prod_warnings == []
