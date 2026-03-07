@@ -135,7 +135,7 @@ async function loadPhotoModeration() {
         const data = await safeParseResponse(response);
 
         if (!data.success) {
-            container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${data.message || 'Невідома'}</div>`;
+            container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${data.message || data.detail || 'Невідома'}</div>`;
             return;
         }
 
@@ -317,7 +317,7 @@ async function moderatePhotoFromPopup(status) {
                 tg.HapticFeedback.notificationOccurred('success');
             }
         } else {
-            if (typeof tg !== 'undefined') tg.showAlert('❌ ' + (data.message || 'Помилка'));
+            if (typeof tg !== 'undefined') tg.showAlert('❌ ' + (data.message || data.detail || 'Помилка'));
         }
     } catch (error) {
         console.error('❌ moderatePhoto error:', error);
@@ -558,7 +558,7 @@ async function loadModeratorPhotoModeration() {
         const data = await safeParseResponse(response);
 
         if (!data.success) {
-            container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${data.message || 'Невідома'}</div>`;
+            container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Помилка: ${data.message || data.detail || 'Невідома'}</div>`;
             return;
         }
 

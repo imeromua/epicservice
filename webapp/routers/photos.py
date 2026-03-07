@@ -12,7 +12,7 @@ from sqlalchemy import select
 from config import ADMIN_IDS
 from database.engine import async_session
 from database.models import ProductPhoto, Product, User
-from webapp.deps import get_current_user_id, require_admin_or_moderator
+from webapp.deps import get_current_user_id, require_admin_or_moderator, require_admin_or_moderator_any_auth
 from webapp.utils.file_safety import (
     MAX_UPLOAD_BYTES,
     is_path_within,
@@ -179,8 +179,8 @@ async def get_product_photos(article: str):
 
 
 @router.get("/moderation/pending")
-async def get_pending_photos(user_id: int = Depends(require_admin_or_moderator)):
-    """Фото на модерації (адмін або модератор). Вимагає JWT Bearer токен."""
+async def get_pending_photos(user_id: int = Depends(require_admin_or_moderator_any_auth)):
+    """Фото на модерації (адмін або модератор). Підтримує JWT Bearer або TMA initData."""
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -224,9 +224,9 @@ async def moderate_photo(
     photo_id: int,
     status: str = Form(...),
     reason: str = Form(None),
-    user_id: int = Depends(require_admin_or_moderator),
+    user_id: int = Depends(require_admin_or_moderator_any_auth),
 ):
-    """Модерація: схвалити або відхилити (адмін або модератор). Вимагає JWT Bearer токен."""
+    """Модерація: схвалити або відхилити (адмін або модератор). Підтримує JWT Bearer або TMA initData."""
     try:
         async with async_session() as session:
             result = await session.execute(
