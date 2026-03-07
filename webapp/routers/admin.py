@@ -62,6 +62,7 @@ from webapp.deps import (
     require_tma_admin,
     require_tma_admin_or_moderator,
 )
+from webapp.utils.file_safety import is_path_within
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -69,6 +70,10 @@ bot = Bot(token=BOT_TOKEN)
 
 # Базова директорія webapp/ для побудови повних шляхів до фото
 _BASE_DIR = Path(__file__).resolve().parent.parent  # webapp/
+# Allowed root for stored product photos — used to guard DB-derived paths.
+_PHOTOS_STORAGE_ROOT = _BASE_DIR / "static" / "uploads" / "photos"
+# Resolved archives/active directory for path safety checks.
+_ARCHIVES_ACTIVE_DIR = Path(ARCHIVES_PATH, "active")
 
 
 # === Middleware ===
@@ -391,9 +396,13 @@ async def download_archive(filename: str, user_id: int = Depends(require_tma_adm
         # Безпека: перевіряємо що filename не містить шляхи
         if '/' in filename or '\\' in filename or '..' in filename:
             raise HTTPException(status_code=400, detail="Недозволене ім'я файлу")
-        
+
         filepath = os.path.join(ARCHIVES_PATH, "active", filename)
-        
+
+        # Defense-in-depth: verify resolved path stays within the archives dir.
+        if not is_path_within(_ARCHIVES_ACTIVE_DIR, Path(filepath)):
+            raise HTTPException(status_code=400, detail="Недозволений шлях до файлу")
+
         if not os.path.exists(filepath):
             raise HTTPException(status_code=404, detail="Файл не знайдено")
         
@@ -1215,6 +1224,13 @@ async def danger_delete_all_photos(user_id: int = Depends(require_admin_any_auth
             for relative_path in file_paths:
                 try:
                     full_path = _BASE_DIR / "static" / relative_path
+                    # Guard: path must stay within the photos storage root.
+                    if not is_path_within(_PHOTOS_STORAGE_ROOT, full_path):
+                        logger.error(
+                            "Skipping unsafe DB photo path in delete-all-photos: %s",
+                            relative_path,
+                        )
+                        continue
                     if full_path.exists():
                         full_path.unlink()
                         deleted_files += 1
@@ -1354,6 +1370,13 @@ async def danger_full_wipe(user_id: int = Depends(require_admin_any_auth)):
             for relative_path in file_paths:
                 try:
                     full_path = _BASE_DIR / "static" / relative_path
+                    # Guard: path must stay within the photos storage root.
+                    if not is_path_within(_PHOTOS_STORAGE_ROOT, full_path):
+                        logger.error(
+                            "Skipping unsafe DB photo path in full-wipe: %s",
+                            relative_path,
+                        )
+                        continue
                     if full_path.exists():
                         full_path.unlink()
                         deleted_photo_files += 1
