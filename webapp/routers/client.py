@@ -35,7 +35,7 @@ from typing import List, Optional
 
 import openpyxl
 from aiogram import Bot
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
@@ -100,6 +100,10 @@ class FilterProductsRequest(BaseModel):
     limit: int = 500
 
 
+class DownloadTokenRequest(BaseModel):
+    resource_url: str
+
+
 # === Ендпоїнти ===
 
 @router.get("/user/role")
@@ -109,6 +113,35 @@ async def get_user_role(tma_user_id: int = Depends(get_tma_user_id)):
     if not user:
         return JSONResponse(content={"role": "user"})
     return JSONResponse(content={"role": user.role or "user"})
+
+
+@router.post("/download-token")
+async def create_user_download_token(
+    body: DownloadTokenRequest,
+    tma_user_id: int = Depends(get_tma_user_id),
+):
+    """
+    Видати одноразовий короткостроковий токен для завантаження файлу в TMA.
+
+    Telegram Mini App не підтримує завантаження файлів через blob URL у вбудованому
+    WebView.  Цей ендпоїнт видає токен, який клієнт вбудовує в URL завантаження
+    (``?dl_token=...``) і відкриває через Telegram.WebApp.openLink() у зовнішньому
+    браузері, де завантаження файлів працює нормально.
+
+    Токен прив'язаний до конкретного URL ресурсу та до TMA-ідентичності користувача.
+    TTL: 60 секунд, одноразовий.
+    """
+    url = body.resource_url
+    allowed = (
+        url == f"/api/archives/download-all/{tma_user_id}"
+        or url.startswith("/api/archive/download/")
+    )
+    if not allowed:
+        raise HTTPException(status_code=400, detail="Invalid resource URL")
+
+    from webapp.utils.download_tokens import create_download_token
+    token = create_download_token(tma_user_id, url, role="user")
+    return {"token": token, "expires_in": 60}
 
 
 @router.post("/search")
@@ -632,11 +665,29 @@ async def get_user_statistics(user_id: int, tma_user_id: int = Depends(get_tma_u
 
 
 @router.get("/archives/download-all/{user_id}")
-async def download_all_archives(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+async def download_all_archives(
+    user_id: int,
+    dl_token: Optional[str] = Query(None),
+    x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
+):
     """Завантажити всі архіви користувача як ZIP.
     Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    Приймає або X-Telegram-Init-Data header (TMA), або одноразовий токен ``dl_token``
+    (для Telegram.WebApp.openLink() у зовнішньому браузері).
     """
     try:
+        # --- Authentication ---
+        if dl_token is not None:
+            from webapp.utils.download_tokens import validate_and_consume_token
+            resource_url = f"/api/archives/download-all/{user_id}"
+            token_data = validate_and_consume_token(dl_token, resource_url)
+            tma_user_id = token_data["user_id"]
+        elif x_telegram_init_data:
+            from webapp.deps import _validate_tma_init_data
+            tma_user_id = _validate_tma_init_data(x_telegram_init_data)
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         archives = fetch_user_archives(tma_user_id)
         
         if not archives:
@@ -718,15 +769,37 @@ async def get_archive_stats(filename: str, tma_user_id: int = Depends(get_tma_us
 
 
 @router.get("/archive/download/{filename}")
-async def download_archive(filename: str, user_id: int = Depends(get_current_user_id_any_auth)):
+async def download_archive(
+    filename: str,
+    dl_token: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
+    x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
+):
     """
     Завантажити архівний файл.
-    Вимагає JWT Bearer токен або Telegram initData.
+    Вимагає JWT Bearer токен, Telegram initData, або одноразовий токен ``dl_token``.
     Користувач може завантажувати тільки власні архіви.
     """
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
+
+        # --- Authentication ---
+        if dl_token is not None:
+            from webapp.utils.download_tokens import validate_and_consume_token
+            resource_url = f"/api/archive/download/{filename}"
+            token_data = validate_and_consume_token(dl_token, resource_url)
+            user_id = token_data["user_id"]
+        elif x_telegram_init_data:
+            from webapp.deps import _validate_tma_init_data
+            user_id = _validate_tma_init_data(x_telegram_init_data)
+        elif authorization:
+            from webapp.routers.auth import get_current_user
+            if not authorization.startswith("Bearer "):
+                raise HTTPException(status_code=401, detail="Invalid Authorization header")
+            user_id = get_current_user(authorization[7:])
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
         # Verify ownership: filename must belong to this user
         parsed = parse_filename(filename)
