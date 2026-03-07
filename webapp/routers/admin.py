@@ -76,34 +76,6 @@ _PHOTOS_STORAGE_ROOT = _BASE_DIR / "static" / "uploads" / "photos"
 _ARCHIVES_ACTIVE_DIR = Path(ARCHIVES_PATH, "active")
 
 
-# === Middleware ===
-
-def verify_admin(user_id: int) -> int:
-    """
-    Перевіряє, чи є користувач адміністратором.
-    Викидає HTTPException(403) якщо користувач не має прав адміністратора.
-    """
-    if user_id not in ADMIN_IDS:
-        logger.warning(f"Unauthorized admin access attempt by user {user_id}")
-        raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
-    return user_id
-
-
-async def verify_admin_or_moderator(user_id: int) -> int:
-    """
-    Перевіряє, чи є користувач адміністратором або модератором.
-    Адміни перевіряються за ADMIN_IDS, модератори — за роллю в БД.
-    Викидає HTTPException(403) якщо доступ заборонено.
-    """
-    if user_id in ADMIN_IDS:
-        return user_id
-    user = await orm_get_user_by_id(user_id)
-    if user and user.role == "moderator":
-        return user_id
-    logger.warning(f"Unauthorized access attempt by user {user_id}")
-    raise HTTPException(status_code=403, detail="Access denied. Admin or moderator rights required.")
-
-
 # === Pydantic Models ===
 
 class AdminActionRequest(BaseModel):

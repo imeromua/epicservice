@@ -361,13 +361,51 @@ server {
 
 ## 🔒 Безпека
 
-- ✅ Перевірка `user_id` на всіх ендпоінтах
-- ✅ ADMIN_IDS для обмеження доступу до адмін-функцій
-- ✅ Валідація вхідних даних (Pydantic)
-- ✅ SQL injection захист (ORM)
-- ✅ HTTPS only для production
-- ✅ Безпечне зберігання паролів БД
-- ✅ Фото: перевірка типу файлу (тільки `image/*`), ліміт кількості фото на товар, модерація перед публікацією
+### Authentication model
+
+EpicService uses two parallel auth flows depending on the client:
+
+| Client | Auth method | Header |
+|---|---|---|
+| Telegram Mini App (TMA) | HMAC-SHA256 validated `initData` | `X-Telegram-Init-Data` |
+| Standalone / Android app | JWT Bearer token (RS256) | `Authorization: Bearer <token>` |
+
+Most TMA endpoints derive user identity **server-side** from the validated `initData`,
+so client-supplied `user_id` fields in request bodies are intentionally ignored to
+prevent IDOR attacks.
+
+### Redis-dependent features
+
+Redis is required for full security operation. Without Redis, these features degrade:
+
+| Feature | Degradation |
+|---|---|
+| Rate limiting (OTP / login / refresh) | Disabled — all requests allowed |
+| JWT access-token revocation (`/logout`) | Disabled — tokens valid until expiry |
+| Refresh-token rotation / replay protection | Disabled — rotated tokens can be replayed |
+| OTP `/phone/request` | Returns HTTP 503 |
+
+Always run Redis in production (`REDIS_ENABLED=true`).
+
+### Production requirements
+
+- Set `APP_ENV=production` — enforces `JWT_SECRET_KEY` and emits startup warnings for other security misconfigurations.
+- Set `JWT_SECRET_KEY` to a strong random secret — the app **refuses to start** with the insecure default in production.
+- Set `TRUSTED_PROXIES` if running behind nginx/LB — needed for accurate per-IP rate limiting.
+- Set `ADMIN_IDS` — without it the admin panel is inaccessible.
+
+### Other hardening
+
+- ✅ Pydantic input validation on all request models
+- ✅ SQLAlchemy ORM (no raw SQL / SQL injection protection)
+- ✅ Path traversal protection on file uploads and archive downloads (`webapp/utils/file_safety.py`)
+- ✅ Pillow-validated image content (format + full decode) before storage
+- ✅ Security headers on all responses (`X-Content-Type-Options`, `Referrer-Policy`)
+- ✅ Photo moderation: `pending → approved` flow before public visibility
+- ✅ Blocked users rejected at login and token refresh
+
+See [`SECURITY_OPERATIONS.md`](SECURITY_OPERATIONS.md) for the full deployment runbook,
+reverse-proxy configuration, rate-limit tuning, and remaining security debt.
 
 ---
 

@@ -70,30 +70,30 @@ _ACTIVE_DIR_PATH = Path(ACTIVE_DIR).resolve()
 
 class SearchRequest(BaseModel):
     query: str
-    user_id: int
+    user_id: Optional[int] = None  # legacy field — sent by old clients; ignored server-side (TMA identity used)
     offset: int = 0
     limit: int = 500
 
 
 class AddToListRequest(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None  # legacy field — sent by old clients; ignored server-side (TMA identity used)
     product_id: int
     quantity: int
 
 
 class UpdateQuantityRequest(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None  # legacy field — sent by old clients; ignored server-side (TMA identity used)
     product_id: int
     quantity: int
 
 
 class DeleteItemRequest(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None  # legacy field — sent by old clients; ignored server-side (TMA identity used)
     product_id: int
 
 
 class FilterProductsRequest(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None  # legacy field — sent by old clients; ignored server-side (TMA identity used)
     departments: List[str] = []  # ["10", "20", "310"]
     sort_by: str = "balance_sum"  # balance_sum, months_without_movement, quantity, article
     offset: int = 0
