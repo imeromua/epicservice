@@ -237,15 +237,15 @@ async def refresh(req: RefreshRequest):
 
 
 @router.get("/me")
-async def me(authorization: str = Header(...), request: Request = None):
+async def me(request: Request, authorization: str = Header(...)):
     """Отримання інформації про поточного користувача."""
     # Витягуємо токен з заголовка "Bearer <token>"
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Невірний формат заголовка Authorization")
 
     token = authorization[7:]
-    user_id = get_current_user(token)
     await _check_token_not_revoked(token, request)
+    user_id = get_current_user(token)
 
     user = await orm_get_user_by_id(user_id)
     if not user:
@@ -265,7 +265,7 @@ async def me(authorization: str = Header(...), request: Request = None):
 
 
 @router.post("/logout")
-async def logout(authorization: str = Header(...), request: Request = None):
+async def logout(request: Request, authorization: str = Header(...)):
     """
     Завершення сесії: анулює поточний access токен через Redis-чорний список.
 
@@ -283,7 +283,7 @@ async def logout(authorization: str = Header(...), request: Request = None):
         return JSONResponse({"success": True, "message": "Вихід виконано"})
 
     jti = payload.get("jti")
-    redis = getattr(request.app.state, "redis", None) if request else None
+    redis = getattr(request.app.state, "redis", None)
     if redis and jti:
         exp = payload.get("exp")
         if exp:

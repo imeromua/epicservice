@@ -101,8 +101,8 @@ def _validate_tma_init_data(init_data: str) -> int:
 # ---------------------------------------------------------------------------
 
 async def get_current_user_id(
+    request: Request,
     authorization: str = Header(...),
-    request: Request = None,
 ) -> int:
     """
     Extracts and validates user_id from a JWT Bearer token in the Authorization header.
@@ -119,10 +119,8 @@ async def get_current_user_id(
             detail="Invalid Authorization header format. Expected: Bearer <token>",
         )
     token = authorization[7:]
-    user_id = get_current_user(token)
-    if request is not None:
-        await _check_token_not_revoked(token, request)
-    return user_id
+    await _check_token_not_revoked(token, request)
+    return get_current_user(token)
 
 
 def require_admin(user_id: int = Depends(get_current_user_id)) -> int:
@@ -211,9 +209,9 @@ async def require_tma_admin_or_moderator(user_id: int = Depends(get_tma_user_id)
 # ---------------------------------------------------------------------------
 
 async def _get_user_id_any_auth(
+    request: Request,
     authorization: Optional[str] = Header(None),
     x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
-    request: Request = None,
 ) -> int:
     """
     Accepts either a JWT Bearer token (Authorization header) or Telegram initData
@@ -234,10 +232,8 @@ async def _get_user_id_any_auth(
                 detail="Invalid Authorization header format. Expected: Bearer <token>",
             )
         token = authorization[7:]
-        user_id = get_current_user(token)
-        if request is not None:
-            await _check_token_not_revoked(token, request)
-        return user_id
+        await _check_token_not_revoked(token, request)
+        return get_current_user(token)
 
     raise HTTPException(
         status_code=401,
