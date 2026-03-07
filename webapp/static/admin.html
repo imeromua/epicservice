@@ -456,7 +456,7 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        const userId = tg.initDataUnsafe.user?.id || 0;
+        const userId = tg.initDataUnsafe.user?.id ?? null;
 
         // ==================== ADMIN TOKEN MANAGEMENT ====================
         // Danger Zone and User Management operations require a valid JWT
@@ -503,6 +503,20 @@
                 statusEl.textContent = 'Не встановлено';
                 statusEl.className = 'token-status';
             }
+        }
+
+        /** Checks auth-related HTTP status codes and shows an appropriate alert.
+         *  Returns true if the response indicates an auth error (caller should stop). */
+        function _handleAuthErrors(response) {
+            if (response.status === 401) {
+                tg.showAlert('❌ Токен недійсний або протермінований. Оновіть токен адміністратора.');
+                return true;
+            }
+            if (response.status === 403) {
+                tg.showAlert('❌ Доступ заборонено. Переконайтеся, що токен належить адміністратору.');
+                return true;
+            }
+            return false;
         }
 
         // Initialize token status on load
@@ -700,14 +714,7 @@
                 });
                 const data = await response.json();
                 
-                if (response.status === 401) {
-                    tg.showAlert('❌ Токен недійсний або протермінований. Оновіть токен.');
-                    return;
-                }
-                if (response.status === 403) {
-                    tg.showAlert('❌ Доступ заборонено. Перевірте, що токен належить адміністратору.');
-                    return;
-                }
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ База даних очищена!\n\nВидалено товарів: ${data.deleted_count}`);
                     await loadStatistics();
@@ -732,8 +739,7 @@
                 });
                 const data = await response.json();
                 
-                if (response.status === 401) { tg.showAlert('❌ Токен недійсний або протермінований.'); return; }
-                if (response.status === 403) { tg.showAlert('❌ Доступ заборонено.'); return; }
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ Всі фото видалено!\n\nВидалено файлів: ${data.deleted_count}`);
                 } else {
@@ -777,8 +783,7 @@
                 });
                 const data = await response.json();
                 
-                if (response.status === 401) { tg.showAlert('❌ Токен недійсний або протермінований.'); return; }
-                if (response.status === 403) { tg.showAlert('❌ Доступ заборонено.'); return; }
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ Всі архіви видалено!\n\nВидалено файлів: ${data.deleted_count}`);
                 } else {
@@ -808,8 +813,7 @@
                 });
                 const data = await response.json();
                 
-                if (response.status === 401) { tg.showAlert('❌ Токен недійсний або протермінований.'); return; }
-                if (response.status === 403) { tg.showAlert('❌ Доступ заборонено.'); return; }
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ Повне очищення завершено!\n\n` +
                         `Видалено товарів: ${data.deleted_products}\n` +

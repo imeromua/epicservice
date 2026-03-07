@@ -27,7 +27,7 @@ from typing import List, Optional
 
 import openpyxl
 from aiogram import Bot
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
@@ -48,6 +48,7 @@ from database.orm import (
 )
 from utils.archive_manager import ACTIVE_DIR, get_user_archives as fetch_user_archives, parse_filename
 from utils.list_processor import process_and_save_list
+from webapp.deps import get_current_user_id
 
 router = APIRouter()
 bot = Bot(token=BOT_TOKEN)
@@ -682,12 +683,11 @@ async def get_archive_stats(filename: str, user_id: int):
 
 
 @router.get("/archive/download/{filename}")
-async def download_archive(filename: str, authorization: str = Header(...)):
+async def download_archive(filename: str, user_id: int = Depends(get_current_user_id)):
     """
     Завантажити архівний файл.
     Вимагає JWT Bearer токен. Користувач може завантажувати тільки власні архіви.
     """
-    user_id = _get_user_id_from_token(authorization)
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
@@ -713,12 +713,11 @@ async def download_archive(filename: str, authorization: str = Header(...)):
 
 
 @router.delete("/archive/delete/{filename}")
-async def delete_archive(filename: str, authorization: str = Header(...)):
+async def delete_archive(filename: str, user_id: int = Depends(get_current_user_id)):
     """
     Видалити архівний файл.
     Вимагає JWT Bearer токен. Користувач може видаляти тільки власні архіви.
     """
-    user_id = _get_user_id_from_token(authorization)
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
