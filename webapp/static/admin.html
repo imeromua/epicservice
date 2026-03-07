@@ -280,6 +280,81 @@
             color: #ff3b30;
             line-height: 1.5;
         }
+
+        /* Admin Token */
+        .token-section {
+            background: var(--tg-theme-secondary-bg-color, #fff);
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .token-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .token-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            background: #ff9800;
+            color: #fff;
+        }
+
+        .token-status.active {
+            background: #4caf50;
+        }
+
+        .token-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: monospace;
+            background: var(--tg-theme-bg-color, #f5f5f5);
+            color: var(--tg-theme-text-color, #000);
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
+
+        .token-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-token-save {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: #4caf50;
+            color: #fff;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-token-clear {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.1);
+            color: var(--tg-theme-text-color, #000);
+            cursor: pointer;
+        }
+
+        .token-hint {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -330,6 +405,29 @@
         <div class="user-list" id="activeUsersList"></div>
     </div>
 
+    <!-- Admin Security Token — required for Danger Zone operations -->
+    <div class="token-section">
+        <div class="token-section-title">
+            🔑 Токен адміністратора
+            <span class="token-status" id="tokenStatus">Не встановлено</span>
+        </div>
+        <input
+            type="password"
+            id="adminTokenInput"
+            class="token-input"
+            placeholder="Вставте JWT access_token адміністратора..."
+            autocomplete="off"
+        >
+        <div class="token-row">
+            <button class="btn-token-save" onclick="saveAdminToken()">💾 Зберегти</button>
+            <button class="btn-token-clear" onclick="clearAdminToken()">✕ Очистити</button>
+        </div>
+        <div class="token-hint">
+            Токен потрібен для Danger Zone операцій та управління користувачами.<br>
+            Отримайте token через /api/auth/login або /api/auth/phone/verify.
+        </div>
+    </div>
+
     <!-- Danger Zone -->
     <div class="danger-zone">
         <div class="danger-zone-header">
@@ -358,7 +456,71 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        const userId = tg.initDataUnsafe.user?.id || 1962821395;
+        const userId = tg.initDataUnsafe.user?.id ?? null;
+
+        // ==================== ADMIN TOKEN MANAGEMENT ====================
+        // Danger Zone and User Management operations require a valid JWT
+        // Bearer token for the admin. Obtain it via /api/auth/login or
+        // /api/auth/phone/verify and paste it here. The token is stored in
+        // localStorage and sent as Authorization: Bearer <token>.
+
+        const TOKEN_KEY = 'epicservice_admin_token';
+
+        function getAdminToken() {
+            return localStorage.getItem(TOKEN_KEY) || '';
+        }
+
+        function getAuthHeaders() {
+            const token = getAdminToken();
+            if (!token) return {};
+            return { 'Authorization': `Bearer ${token}` };
+        }
+
+        function saveAdminToken() {
+            const token = document.getElementById('adminTokenInput').value.trim();
+            if (!token) {
+                alert('⚠️ Введіть токен');
+                return;
+            }
+            localStorage.setItem(TOKEN_KEY, token);
+            document.getElementById('adminTokenInput').value = '';
+            updateTokenStatus();
+            alert('✅ Токен збережено');
+        }
+
+        function clearAdminToken() {
+            localStorage.removeItem(TOKEN_KEY);
+            document.getElementById('adminTokenInput').value = '';
+            updateTokenStatus();
+        }
+
+        function updateTokenStatus() {
+            const statusEl = document.getElementById('tokenStatus');
+            if (getAdminToken()) {
+                statusEl.textContent = '✓ Встановлено';
+                statusEl.className = 'token-status active';
+            } else {
+                statusEl.textContent = 'Не встановлено';
+                statusEl.className = 'token-status';
+            }
+        }
+
+        /** Checks auth-related HTTP status codes and shows an appropriate alert.
+         *  Returns true if the response indicates an auth error (caller should stop). */
+        function _handleAuthErrors(response) {
+            if (response.status === 401) {
+                tg.showAlert('❌ Токен недійсний або протермінований. Оновіть токен адміністратора.');
+                return true;
+            }
+            if (response.status === 403) {
+                tg.showAlert('❌ Доступ заборонено. Переконайтеся, що токен належить адміністратору.');
+                return true;
+            }
+            return false;
+        }
+
+        // Initialize token status on load
+        updateTokenStatus();
 
         // Завантаження статистики
         async function loadStatistics() {
@@ -530,17 +692,29 @@
         }
 
         // ==================== DANGER ZONE ====================
+        // All danger zone operations require a valid admin JWT token.
+
+        function _requireToken() {
+            if (!getAdminToken()) {
+                alert('🔑 Для цієї операції необхідно встановити токен адміністратора.\n\nВведіть JWT токен у секції "Токен адміністратора" вище.');
+                return false;
+            }
+            return true;
+        }
 
         async function clearDatabase() {
+            if (!_requireToken()) return;
             if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ товари з бази даних!\n\nПродовжити?')) return;
             if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nДані НЕ можна буде відновити!\n\nТочно видалити всі товари?')) return;
             
             try {
-                const response = await fetch(`/api/admin/danger/clear-database?user_id=${userId}`, {
-                    method: 'POST'
+                const response = await fetch(`/api/admin/danger/clear-database`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
                 });
                 const data = await response.json();
                 
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ База даних очищена!\n\nВидалено товарів: ${data.deleted_count}`);
                     await loadStatistics();
@@ -554,15 +728,18 @@
         }
 
         async function deleteAllPhotos() {
+            if (!_requireToken()) return;
             if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ фото з сервера!\n\nПродовжити?')) return;
             if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nФото НЕ можна буде відновити!\n\nТочно видалити всі фото?')) return;
             
             try {
-                const response = await fetch(`/api/admin/danger/delete-all-photos?user_id=${userId}`, {
-                    method: 'POST'
+                const response = await fetch(`/api/admin/danger/delete-all-photos`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
                 });
                 const data = await response.json();
                 
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ Всі фото видалено!\n\nВидалено файлів: ${data.deleted_count}`);
                 } else {
@@ -595,15 +772,18 @@
         }
 
         async function deleteAllArchives() {
+            if (!_requireToken()) return;
             if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦе видалить ВСІ архіви користувачів!\n\nПродовжити?')) return;
             if (!confirm('🚨 ОСТАННЯ ПЕРЕВІРКА!\n\nАрхіви НЕ можна буде відновити!\n\nТочно видалити?')) return;
             
             try {
-                const response = await fetch(`/api/admin/danger/delete-all-archives?user_id=${userId}`, {
-                    method: 'POST'
+                const response = await fetch(`/api/admin/danger/delete-all-archives`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
                 });
                 const data = await response.json();
                 
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ Всі архіви видалено!\n\nВидалено файлів: ${data.deleted_count}`);
                 } else {
@@ -616,6 +796,7 @@
         }
 
         async function fullWipe() {
+            if (!_requireToken()) return;
             if (!confirm('🚨🚨🚨 КРИТИЧНА ОПЕРАЦІЯ! 🚨🚨🚨\n\nЦе видалить:\n• ВСІ товари з БД\n• ВСІ фото\n• ВСІ архіви\n• ВСІ дані модерації\n\nПродовжити?')) return;
             if (!confirm('🚨 ОСТАННЄ ПОПЕРЕДЖЕННЯ! 🚨\n\nВСЕ буде незворотно видалено!\n\nВи ТОЧНО впевнені?')) return;
             
@@ -626,11 +807,13 @@
             }
             
             try {
-                const response = await fetch(`/api/admin/danger/full-wipe?user_id=${userId}`, {
-                    method: 'POST'
+                const response = await fetch(`/api/admin/danger/full-wipe`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
                 });
                 const data = await response.json();
                 
+                if (_handleAuthErrors(response)) return;
                 if (data.success) {
                     tg.showAlert(`✅ Повне очищення завершено!\n\n` +
                         `Видалено товарів: ${data.deleted_products}\n` +

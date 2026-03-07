@@ -1,31 +1,24 @@
 """API endpoints for product photo management."""
 
+import logging
 import shutil
-import traceback
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from config import ADMIN_IDS
 from database.engine import async_session
 from database.models import ProductPhoto, Product, User
+from webapp.deps import get_current_user_id, require_admin_or_moderator
 from webapp.utils.image_processing import compress_image
+
+logger = logging.getLogger(__name__)
 
 # prefix="/photos" + include_router prefix="/api"  =>  "/api/photos/..."
 router = APIRouter(prefix="/photos", tags=["photos"])
-
-
-async def _is_admin_or_moderator(user_id: int) -> bool:
-    """Перевірка: чи є користувач адміністратором або модератором."""
-    if user_id in ADMIN_IDS:
-        return True
-    async with async_session() as session:
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        return user is not None and user.role in ("admin", "moderator")
 
 
 @router.post("/upload")
@@ -119,10 +112,9 @@ async def upload_photo(
                     temp_path.unlink()
 
     except Exception as e:
-        print(f"❌ ERROR in upload_photo: {type(e).__name__}: {e}")
-        traceback.print_exc()
+        logger.error("ERROR in upload_photo: %s", e, exc_info=True)
         return JSONResponse(
-            content={"success": False, "message": f"Помилка сервера: {str(e)}"},
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
             status_code=500
         )
 
@@ -153,10 +145,8 @@ async def get_product_photos(article: str):
 
 
 @router.get("/moderation/pending")
-async def get_pending_photos(user_id: int = Query(...)):
-    """Фото на модерації (адмін або модератор)."""
-    if not await _is_admin_or_moderator(user_id):
-        raise HTTPException(status_code=403, detail="Доступ заборонено")
+async def get_pending_photos(user_id: int = Depends(require_admin_or_moderator)):
+    """Фото на модерації (адмін або модератор). Вимагає JWT Bearer токен."""
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -191,7 +181,7 @@ async def get_pending_photos(user_id: int = Query(...)):
 
             return JSONResponse(content={"success": True, "photos": result_list})
     except Exception as e:
-        print(f"❌ ERROR in get_pending_photos: {e}")
+        logger.error("ERROR in get_pending_photos: %s", e, exc_info=True)
         return JSONResponse(content={"success": False, "photos": []}, status_code=500)
 
 
@@ -200,11 +190,9 @@ async def moderate_photo(
     photo_id: int,
     status: str = Form(...),
     reason: str = Form(None),
-    user_id: int = Form(...),
+    user_id: int = Depends(require_admin_or_moderator),
 ):
-    """Модерація: схвалити або відхилити (адмін або модератор)."""
-    if not await _is_admin_or_moderator(user_id):
-        raise HTTPException(status_code=403, detail="Доступ заборонено")
+    """Модерація: схвалити або відхилити (адмін або модератор). Вимагає JWT Bearer токен."""
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -231,13 +219,19 @@ async def moderate_photo(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ ERROR in moderate_photo: {e}")
-        return JSONResponse(content={"success": False, "message": str(e)}, status_code=500)
+        logger.error("ERROR in moderate_photo: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
+            status_code=500
+        )
 
 
 @router.delete("/{photo_id}")
-async def delete_photo(photo_id: int, user_id: int):
-    """Видалення фото (адмін або автор)."""
+async def delete_photo(photo_id: int, user_id: int = Depends(get_current_user_id)):
+    """
+    Видалення фото.
+    Вимагає JWT Bearer токен. Дозволено тільки автору або адміністратору/модератору.
+    """
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -248,16 +242,31 @@ async def delete_photo(photo_id: int, user_id: int):
             if not photo:
                 raise HTTPException(status_code=404, detail="Photo not found")
 
+            # Check: user is author OR admin/moderator
+            is_author = (photo.uploaded_by == user_id)
+            is_privileged = user_id in ADMIN_IDS
+            if not is_privileged and not is_author:
+                # Also check DB role for moderators/admins
+                user_result = await session.execute(select(User).where(User.id == user_id))
+                db_user = user_result.scalar_one_or_none()
+                is_privileged = db_user is not None and db_user.role in ("admin", "moderator")
+
+            if not is_author and not is_privileged:
+                logger.warning(
+                    "User %s attempted to delete photo %s owned by %s — denied",
+                    user_id, photo_id, photo.uploaded_by,
+                )
+                raise HTTPException(status_code=403, detail="Access denied. You can only delete your own photos.")
+
             # Видаляємо фізичний файл
             # photo.file_path вже містить "uploads/photos/filename.jpg"
             webapp_root = Path(__file__).resolve().parent.parent
             full_file_path = webapp_root / "static" / photo.file_path
-            
+
             if full_file_path.exists():
                 full_file_path.unlink()
-                print(f"✅ Фото видалено: {full_file_path}")
             else:
-                print(f"⚠️ Файл не знайдено: {full_file_path}")
+                logger.warning("Photo file not found on disk: %s", full_file_path)
 
             # Видаляємо запис з БД
             await session.delete(photo)
@@ -267,6 +276,8 @@ async def delete_photo(photo_id: int, user_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ ERROR in delete_photo: {e}")
-        traceback.print_exc()
-        return JSONResponse(content={"success": False, "message": str(e)}, status_code=500)
+        logger.error("ERROR in delete_photo: %s", e, exc_info=True)
+        return JSONResponse(
+            content={"success": False, "message": "Помилка сервера. Деталі у серверних логах."},
+            status_code=500
+        )
