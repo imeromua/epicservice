@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EpicService - Адмін-панель</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/static/js/api.js"></script>
     <style>
         * {
             margin: 0;
@@ -630,16 +631,16 @@
         }
 
         function downloadArchive(filename) {
-            window.location.href = `/api/admin/archives/download/${filename}?user_id=${userId}`;
+            API.downloadFile(`/api/admin/archives/download/${encodeURIComponent(filename)}`, filename);
         }
 
         function downloadAllArchives() {
-            window.location.href = `/api/admin/archives/download-all?user_id=${userId}`;
+            API.downloadFile('/api/admin/archives/download-all', 'archives.zip');
         }
 
         // Скачати Excel звіт
         function downloadStockReport() {
-            window.location.href = `/api/admin/export/stock?user_id=${userId}`;
+            API.downloadFile('/api/admin/export/stock', 'stock_report.xlsx');
         }
 
         // Завантаження файлу
