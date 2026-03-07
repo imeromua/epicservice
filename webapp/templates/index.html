@@ -296,6 +296,28 @@ if (!tg.initData) {
         document.body.style.overflow = 'hidden';
     }
 }
+
+// Intercept all fetch() calls to /api/* to add TMA auth header automatically.
+// This ensures every request carries the validated Telegram initData regardless
+// of which JS module makes the call.
+(function() {
+    const _origFetch = window.fetch;
+    window.fetch = function(input, init) {
+        const url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (url.startsWith('/api')) {
+            const initData = tg.initData;
+            if (initData) {
+                init = init ? Object.assign({}, init) : {};
+                init.headers = init.headers ? Object.assign({}, init.headers) : {};
+                // Do not override if caller already set the header explicitly
+                if (!init.headers['X-Telegram-Init-Data']) {
+                    init.headers['X-Telegram-Init-Data'] = initData;
+                }
+            }
+        }
+        return _origFetch.call(this, input, init);
+    };
+})();
 </script>
     <script src="/static/js/core.js"></script>
     <script src="/static/js/search.js"></script>

@@ -3,19 +3,26 @@
 Клієнтський роутер для обслуговування користувачів Telegram Mini App.
 Містить ендпоїнти для пошуку товарів, управління списками та архівами.
 
-Security hardening status (first pass):
-- SECURED (JWT Bearer token required, with ownership check):
-    GET /archive/download/{filename}    — user can only download their own archive
-    DELETE /archive/delete/{filename}   — user can only delete their own archive
-- TODO (still accept user_id from URL path/body — Telegram Mini App compatibility layer,
-  migrate to server-side identity in follow-up PR):
-    POST /save/{user_id}                — IDOR: anyone can save as another user's ID
-    POST /clear/{user_id}              — IDOR: anyone can clear another user's list
-    GET /archives/{user_id}            — IDOR: anyone can list another user's archives
-    GET /statistics/{user_id}          — IDOR: anyone can read another user's stats
-    GET /archive/stats/{filename}      — partially protected via parse_filename check
-    GET /list/{user_id}                — IDOR: list contents
-    POST /add, POST /update, POST /delete — IDOR: operate on arbitrary user lists
+Security hardening status (second pass — TMA initData auth applied):
+- SECURED (TMA X-Telegram-Init-Data header required, user identity server-derived):
+    POST /search                        — user identity from TMA, not client body
+    POST /add, POST /update, POST /delete — user identity from TMA, not client body
+    GET /list/{user_id}                 — path user_id ignored; TMA identity used
+    GET /list/department/{user_id}      — path user_id ignored; TMA identity used
+    POST /save/{user_id}               — path user_id ignored; TMA identity used
+    POST /clear/{user_id}              — path user_id ignored; TMA identity used
+    GET /archives/{user_id}            — path user_id ignored; TMA identity used
+    GET /archives/download-all/{user_id} — path user_id ignored; TMA identity used
+    GET /statistics/{user_id}          — path user_id ignored; TMA identity used
+    GET /archive/stats/{filename}      — query user_id ignored; TMA identity used
+    GET /user/role                     — TMA identity used
+    POST /products/filter              — body user_id ignored; TMA identity used
+- SECURED (JWT Bearer OR TMA initData, ownership check):
+    GET /archive/download/{filename}
+    DELETE /archive/delete/{filename}
+- JWT-only (standalone / mobile app):
+    GET /products/search, GET /products/{article}
+    GET /saved-lists, POST /saved-lists, GET /saved-lists/{id}/download
 """
 
 import os
@@ -48,7 +55,7 @@ from database.orm import (
 )
 from utils.archive_manager import ACTIVE_DIR, get_user_archives as fetch_user_archives, parse_filename
 from utils.list_processor import process_and_save_list
-from webapp.deps import get_current_user_id
+from webapp.deps import get_current_user_id, get_current_user_id_any_auth, get_tma_user_id
 
 router = APIRouter()
 bot = Bot(token=BOT_TOKEN)
@@ -91,22 +98,23 @@ class FilterProductsRequest(BaseModel):
 # === Ендпоїнти ===
 
 @router.get("/user/role")
-async def get_user_role(user_id: int):
-    """Повертає роль користувача з бази даних."""
-    user = await orm_get_user_by_id(user_id)
+async def get_user_role(tma_user_id: int = Depends(get_tma_user_id)):
+    """Повертає роль користувача з бази даних (TMA auth)."""
+    user = await orm_get_user_by_id(tma_user_id)
     if not user:
         return JSONResponse(content={"role": "user"})
     return JSONResponse(content={"role": user.role or "user"})
 
 
 @router.post("/search")
-async def search_products(req: SearchRequest):
+async def search_products(req: SearchRequest, tma_user_id: int = Depends(get_tma_user_id)):
     """
     Пошук товарів за артикулом або назвою з підтримкою пагінації.
     Повертає список товарів з детальною інформацією + має has_more для infinite scroll.
+    User identity is derived from validated TMA initData; req.user_id is ignored.
     """
     try:
-        print(f"🔍 Search request: query='{req.query}', user_id={req.user_id}, offset={req.offset}, limit={req.limit}")
+        print(f"🔍 Search request: query='{req.query}', tma_user_id={tma_user_id}, offset={req.offset}, limit={req.limit}")
         
         all_products = await orm_find_products(req.query)
         print(f"✅ orm_find_products returned {len(all_products) if all_products else 0} total products")
@@ -122,11 +130,11 @@ async def search_products(req: SearchRequest):
         
         # Отримуємо temp_list користувача для підрахунку резерву
         async with async_session() as session:
-            temp_list = await orm_get_temp_list(req.user_id, session=session)
+            temp_list = await orm_get_temp_list(tma_user_id, session=session)
             user_reserved = {item.product_id: item.quantity for item in temp_list} if temp_list else {}
         
         # Отримуємо відділ поточного списку
-        current_department = await orm_get_temp_list_department(req.user_id)
+        current_department = await orm_get_temp_list_department(tma_user_id)
         
         # Формуємо відповідь з детальною інформацією
         result = []
@@ -186,13 +194,14 @@ async def search_products(req: SearchRequest):
 
 
 @router.post("/products/filter")
-async def filter_products(req: FilterProductsRequest):
+async def filter_products(req: FilterProductsRequest, tma_user_id: int = Depends(get_tma_user_id)):
     """
     Фільтрація товарів за відділами з сортуванням та пагінацією.
     Повертає список товарів + статистику по фільтру.
+    User identity is derived from validated TMA initData; req.user_id is ignored.
     """
     try:
-        print(f"🎛️ Filter request: user_id={req.user_id}, departments={req.departments}, sort_by={req.sort_by}, offset={req.offset}, limit={req.limit}")
+        print(f"🎛️ Filter request: tma_user_id={tma_user_id}, departments={req.departments}, sort_by={req.sort_by}, offset={req.offset}, limit={req.limit}")
         
         async with async_session() as session:
             # Базовий запит - рахуємо тільки товари, де є ДОСТУПНИЙ залишок (кількість - відкладено > 0)
@@ -230,12 +239,12 @@ async def filter_products(req: FilterProductsRequest):
             result = await session.execute(query)
             products = result.scalars().all()
             
-            # Отримуємо temp_list користувача для резерву
-            temp_list = await orm_get_temp_list(req.user_id, session=session)
+            # Отримуємо temp_list користувача для резерву (TMA identity)
+            temp_list = await orm_get_temp_list(tma_user_id, session=session)
             user_reserved = {item.product_id: item.quantity for item in temp_list} if temp_list else {}
             
             # Отримуємо відділ поточного списку
-            current_department = await orm_get_temp_list_department(req.user_id)
+            current_department = await orm_get_temp_list_department(tma_user_id)
             
             # Статистика по фільтру
             stats_query = select(
@@ -357,10 +366,12 @@ async def get_departments():
 
 
 @router.get("/list/{user_id}")
-async def get_user_list(user_id: int):
-    """Отримати поточний список товарів користувача."""
+async def get_user_list(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+    """Отримати поточний список товарів користувача.
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    """
     try:
-        temp_list = await orm_get_temp_list(user_id)
+        temp_list = await orm_get_temp_list(tma_user_id)
         if not temp_list:
             return JSONResponse(content={"items": [], "total": 0}, status_code=200)
         items = []
@@ -382,21 +393,25 @@ async def get_user_list(user_id: int):
 
 
 @router.get("/list/department/{user_id}")
-async def get_user_list_department(user_id: int):
-    """Отримати відділ поточного списку користувача."""
+async def get_user_list_department(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+    """Отримати відділ поточного списку користувача.
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    """
     try:
-        department = await orm_get_temp_list_department(user_id)
+        department = await orm_get_temp_list_department(tma_user_id)
         return JSONResponse(content={"department": department}, status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 @router.post("/add")
-async def add_to_list(req: AddToListRequest):
-    """Додати товар до списку."""
+async def add_to_list(req: AddToListRequest, tma_user_id: int = Depends(get_tma_user_id)):
+    """Додати товар до списку.
+    req.user_id is ignored; TMA identity is used to prevent IDOR.
+    """
     try:
-        print(f"➕ Add to list: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
-        await orm_add_item_to_temp_list(user_id=req.user_id, product_id=req.product_id, quantity=req.quantity)
+        print(f"➕ Add to list: tma_user_id={tma_user_id}, product_id={req.product_id}, quantity={req.quantity}")
+        await orm_add_item_to_temp_list(user_id=tma_user_id, product_id=req.product_id, quantity=req.quantity)
         print(f"✅ Successfully added to temp list")
         return JSONResponse(content={"success": True, "message": f"Додано {req.quantity} шт."}, status_code=200)
     except ValueError as e:
@@ -410,12 +425,14 @@ async def add_to_list(req: AddToListRequest):
 
 
 @router.post("/update")
-async def update_item_quantity(req: UpdateQuantityRequest):
-    """Оновити кількість товару."""
+async def update_item_quantity(req: UpdateQuantityRequest, tma_user_id: int = Depends(get_tma_user_id)):
+    """Оновити кількість товару.
+    req.user_id is ignored; TMA identity is used to prevent IDOR.
+    """
     try:
         if req.quantity < 1:
             return JSONResponse(content={"success": False, "message": "Кількість має бути більше 0"}, status_code=400)
-        await orm_update_temp_list_item_quantity(user_id=req.user_id, product_id=req.product_id, new_quantity=req.quantity)
+        await orm_update_temp_list_item_quantity(user_id=tma_user_id, product_id=req.product_id, new_quantity=req.quantity)
         return JSONResponse(content={"success": True, "message": f"Кількість оновлено: {req.quantity} шт."}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in update_item_quantity: {type(e).__name__}: {e}")
@@ -424,10 +441,12 @@ async def update_item_quantity(req: UpdateQuantityRequest):
 
 
 @router.post("/delete")
-async def delete_item(req: DeleteItemRequest):
-    """Видалити товар зі списку."""
+async def delete_item(req: DeleteItemRequest, tma_user_id: int = Depends(get_tma_user_id)):
+    """Видалити товар зі списку.
+    req.user_id is ignored; TMA identity is used to prevent IDOR.
+    """
     try:
-        await orm_delete_temp_list_item(user_id=req.user_id, product_id=req.product_id)
+        await orm_delete_temp_list_item(user_id=tma_user_id, product_id=req.product_id)
         return JSONResponse(content={"success": True, "message": "Товар видалено"}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in delete_item: {type(e).__name__}: {e}")
@@ -436,10 +455,12 @@ async def delete_item(req: DeleteItemRequest):
 
 
 @router.post("/clear/{user_id}")
-async def clear_list(user_id: int):
-    """Очистити список."""
+async def clear_list(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+    """Очистити список.
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    """
     try:
-        await orm_clear_temp_list(user_id)
+        await orm_clear_temp_list(tma_user_id)
         return JSONResponse(content={"success": True, "message": "Список очищено"}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in clear_list: {type(e).__name__}: {e}")
@@ -448,19 +469,20 @@ async def clear_list(user_id: int):
 
 
 @router.post("/save/{user_id}")
-async def save_list_to_excel(user_id: int):
+async def save_list_to_excel(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
     """
     Зберегти список в Excel.
     WebApp: НЕ відправляє в Telegram, тільки зберігає в archives/active/.
     Файл доступний через вкладку "Архів".
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
     """
     try:
-        print(f"💾 Save list request for user_id={user_id} (webapp - archive only)")
+        print(f"💾 Save list request for tma_user_id={tma_user_id} (webapp - archive only)")
         async with async_session() as session:
             async with session.begin():
-                main_list_path, surplus_list_path = await process_and_save_list(session, user_id)
+                main_list_path, surplus_list_path = await process_and_save_list(session, tma_user_id)
         if not main_list_path and not surplus_list_path:
-            print(f"⚠️ List is empty for user {user_id}")
+            print(f"⚠️ List is empty for tma_user_id {tma_user_id}")
             return JSONResponse(content={"success": False, "message": "Список порожній"}, status_code=400)
         print(f"✅ Files saved: main={main_list_path}, surplus={surplus_list_path}")
         return JSONResponse(content={
@@ -477,11 +499,13 @@ async def save_list_to_excel(user_id: int):
 
 
 @router.get("/archives/{user_id}")
-async def get_user_archives(user_id: int):
-    """Отримати список архівних файлів користувача."""
+async def get_user_archives(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+    """Отримати список архівних файлів користувача.
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    """
     try:
-        print(f"📁 Archives request for user_id={user_id}")
-        archives = fetch_user_archives(user_id)
+        print(f"📁 Archives request for tma_user_id={tma_user_id}")
+        archives = fetch_user_archives(tma_user_id)
         if not archives:
             return JSONResponse(content={"archives": []}, status_code=200)
         result = []
@@ -503,10 +527,12 @@ async def get_user_archives(user_id: int):
 
 
 @router.get("/statistics/{user_id}")
-async def get_user_statistics(user_id: int):
-    """Отримати статистику користувача: кількість списків, загальна сума, популярні відділи."""
+async def get_user_statistics(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+    """Отримати статистику користувача: кількість списків, загальна сума, популярні відділи.
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    """
     try:
-        archives = fetch_user_archives(user_id)
+        archives = fetch_user_archives(tma_user_id)
         
         if not archives:
             return JSONResponse(content={
@@ -583,7 +609,7 @@ async def get_user_statistics(user_id: int):
         
         popular_department = max(departments, key=departments.get) if departments else None
         
-        print(f"📊 Stats for user {user_id}: {total_lists} lists, {total_amount:.2f} грн, dept: {popular_department}")
+        print(f"📊 Stats for tma_user_id {tma_user_id}: {total_lists} lists, {total_amount:.2f} грн, dept: {popular_department}")
         
         return JSONResponse(content={
             "total_lists": total_lists,
@@ -601,10 +627,12 @@ async def get_user_statistics(user_id: int):
 
 
 @router.get("/archives/download-all/{user_id}")
-async def download_all_archives(user_id: int):
-    """Завантажити всі архіви користувача як ZIP."""
+async def download_all_archives(user_id: int, tma_user_id: int = Depends(get_tma_user_id)):
+    """Завантажити всі архіви користувача як ZIP.
+    Path user_id is kept for URL compatibility but ignored; TMA identity is used.
+    """
     try:
-        archives = fetch_user_archives(user_id)
+        archives = fetch_user_archives(tma_user_id)
         
         if not archives:
             raise HTTPException(status_code=404, detail="No archives found")
@@ -618,9 +646,9 @@ async def download_all_archives(user_id: int):
                     zip_file.write(file_path, filename)
         
         zip_buffer.seek(0)
-        zip_filename = f"epicservice_archives_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        zip_filename = f"epicservice_archives_{tma_user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
         
-        print(f"📦 Created ZIP with {len(archives)} files for user {user_id}")
+        print(f"📦 Created ZIP with {len(archives)} files for tma_user_id {tma_user_id}")
         
         return Response(
             content=zip_buffer.getvalue(),
@@ -637,14 +665,16 @@ async def download_all_archives(user_id: int):
 
 
 @router.get("/archive/stats/{filename}")
-async def get_archive_stats(filename: str, user_id: int):
-    """Отримати статистику з Excel файлу архіву."""
+async def get_archive_stats(filename: str, tma_user_id: int = Depends(get_tma_user_id)):
+    """Отримати статистику з Excel файлу архіву.
+    Query user_id (if present) is ignored; TMA identity is used for ownership check.
+    """
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
         
         parsed = parse_filename(filename)
-        if not parsed or parsed["user_id"] != user_id:
+        if not parsed or parsed["user_id"] != tma_user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
         file_path = os.path.join(ACTIVE_DIR, filename)
@@ -665,13 +695,13 @@ async def get_archive_stats(filename: str, user_id: int):
         wb.close()
         department = parsed.get("department", "Невідомо")
         
-        print(f"📊 Stats for {filename}: {items_count} items, department={department}, author={user_id}")
+        print(f"📊 Stats for {filename}: {items_count} items, department={department}, tma_author={tma_user_id}")
         
         return JSONResponse(content={
             "success": True,
             "items_count": items_count,
             "department": str(department),
-            "author_id": user_id
+            "author_id": tma_user_id
         }, status_code=200)
         
     except HTTPException:
@@ -683,10 +713,11 @@ async def get_archive_stats(filename: str, user_id: int):
 
 
 @router.get("/archive/download/{filename}")
-async def download_archive(filename: str, user_id: int = Depends(get_current_user_id)):
+async def download_archive(filename: str, user_id: int = Depends(get_current_user_id_any_auth)):
     """
     Завантажити архівний файл.
-    Вимагає JWT Bearer токен. Користувач може завантажувати тільки власні архіви.
+    Вимагає JWT Bearer токен або Telegram initData.
+    Користувач може завантажувати тільки власні архіви.
     """
     try:
         if ".." in filename or "/" in filename or "\\" in filename:
@@ -713,10 +744,11 @@ async def download_archive(filename: str, user_id: int = Depends(get_current_use
 
 
 @router.delete("/archive/delete/{filename}")
-async def delete_archive(filename: str, user_id: int = Depends(get_current_user_id)):
+async def delete_archive(filename: str, user_id: int = Depends(get_current_user_id_any_auth)):
     """
     Видалити архівний файл.
-    Вимагає JWT Bearer токен. Користувач може видаляти тільки власні архіви.
+    Вимагає JWT Bearer токен або Telegram initData.
+    Користувач може видаляти тільки власні архіви.
     """
     try:
         if ".." in filename or "/" in filename or "\\" in filename:

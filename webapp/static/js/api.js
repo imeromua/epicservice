@@ -7,6 +7,11 @@
 const API = (function() {
     const BASE_URL = '/api';
 
+    // Helper: get validated Telegram initData for TMA auth header
+    function _tmaInitData() {
+        return window.Telegram?.WebApp?.initData || null;
+    }
+
     // Внутрішній метод для виконання запитів із базовою обробкою помилок
     async function request(endpoint, options = {}) {
         const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
@@ -15,6 +20,12 @@ const API = (function() {
             'Accept': 'application/json',
             ...options.headers
         };
+
+        // Automatically add TMA initData header for all /api requests
+        const tmaData = _tmaInitData();
+        if (tmaData && !headers['X-Telegram-Init-Data']) {
+            headers['X-Telegram-Init-Data'] = tmaData;
+        }
 
         // Автоматично серіалізуємо об'єкти в JSON (окрім FormData для файлів)
         if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
@@ -39,8 +50,52 @@ const API = (function() {
         }
     }
 
+    /**
+     * Download a file using fetch (with TMA auth header) and trigger browser download.
+     * Use this instead of window.open() for protected file endpoints.
+     *
+     * @param {string} url - The API URL to fetch the file from.
+     * @param {string} defaultFilename - Fallback filename for the download.
+     */
+    async function downloadFile(url, defaultFilename) {
+        try {
+            const tmaData = _tmaInitData();
+            const dlHeaders = {};
+            if (tmaData) dlHeaders['X-Telegram-Init-Data'] = tmaData;
+
+            const resp = await fetch(url, { headers: dlHeaders });
+            if (!resp.ok) {
+                let errMsg = `HTTP ${resp.status}`;
+                try {
+                    const errData = await resp.json();
+                    errMsg = errData.detail || errData.error || errMsg;
+                } catch (_) {}
+                throw new Error(errMsg);
+            }
+
+            const contentDisposition = resp.headers.get('Content-Disposition') || '';
+            const fnMatch = contentDisposition.match(/filename[^;=\n]*=(?:(['"])(.+?)\1|([^;\n]*))/i);
+            const filename = (fnMatch && (fnMatch[2] || fnMatch[3])) || defaultFilename;
+
+            const blob = await resp.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(objectUrl);
+        } catch (e) {
+            console.error('[API] downloadFile error:', e.message);
+            if (typeof tg !== 'undefined') tg.showAlert('❌ Помилка завантаження: ' + e.message);
+            else alert('❌ Помилка завантаження: ' + e.message);
+        }
+    }
+
     // Публічний інтерфейс модула
     return {
+        downloadFile,
         // КЛІЄНТСЬКА ЧАСТИНА (клієнтські запити)
         client: {
             searchProducts: (query, userId, offset = 0, limit = 500) => 

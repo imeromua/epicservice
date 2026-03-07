@@ -20,7 +20,8 @@ let userRole = 'user';
 async function checkUserRole() {
     if (!userId) return;
     try {
-        const resp = await fetch(`/api/user/role?user_id=${userId}`);
+        // TMA auth header is added by the fetch interceptor in index.html
+        const resp = await fetch('/api/user/role');
         const data = await resp.json();
         userRole = String(data.role || 'user').trim().toLowerCase();
         if (userRole === 'moderator') {
