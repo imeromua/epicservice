@@ -631,16 +631,16 @@
         }
 
         function downloadArchive(filename) {
-            API.downloadFile(`/api/admin/archives/download/${encodeURIComponent(filename)}`, filename);
+            API.downloadFile(`/api/admin/archives/download/${encodeURIComponent(filename)}`, filename, '/api/admin/download-token');
         }
 
         function downloadAllArchives() {
-            API.downloadFile('/api/admin/archives/download-all', 'archives.zip');
+            API.downloadFile('/api/admin/archives/download-all', 'archives.zip', '/api/admin/download-token');
         }
 
         // Скачати Excel звіт
         function downloadStockReport() {
-            API.downloadFile('/api/admin/export/stock', 'stock_report.xlsx');
+            API.downloadFile('/api/admin/export/stock', 'stock_report.xlsx', '/api/admin/download-token');
         }
 
         // Завантаження файлу
