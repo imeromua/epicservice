@@ -67,6 +67,8 @@ const PhoneAuth = (function () {
                 const refreshResp = await EpicAPI.post('/api/auth/refresh', { refresh_token: refreshToken });
                 if (refreshResp.success) {
                     localStorage.setItem(TOKEN_KEY, refreshResp.access_token);
+                    // Persist rotated refresh token if server returned one
+                    if (refreshResp.refresh_token) localStorage.setItem(REFRESH_KEY, refreshResp.refresh_token);
                     const meResp = await EpicAPI.get('/api/auth/me', refreshResp.access_token);
                     if (meResp.success) {
                         saveSession({ user: meResp.user });
@@ -401,6 +403,8 @@ const PhoneAuth = (function () {
 
     // --- Вихід ---
     function logout() {
+        const token = getToken();
+        const refreshToken = getRefreshToken();
         clearSession();
         _currentPhone = '';
         _stopOtpTimer();
@@ -412,6 +416,15 @@ const PhoneAuth = (function () {
         document.querySelectorAll('.otp-digit').forEach(d => { d.value = ''; d.classList.remove('filled'); });
         if (typeof App !== 'undefined') App.reset();
         App.toast('Ви вийшли з системи', 'info');
+        // Notify server to revoke both tokens (fire-and-forget; ignore errors)
+        if (token) {
+            const body = refreshToken ? JSON.stringify({ refresh_token: refreshToken }) : undefined;
+            fetch(SERVER + '/api/auth/logout', {
+                method: 'POST',
+                headers: Object.assign({ 'Authorization': 'Bearer ' + token }, body ? { 'Content-Type': 'application/json' } : {}),
+                body,
+            }).catch(() => {});
+        }
     }
 
     // --- Хелпер: стан кнопки ---
