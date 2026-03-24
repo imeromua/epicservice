@@ -12,6 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
+# УВАГА: цей ID є умовним — замініть на реальний хеш після `alembic revision --autogenerate`
 revision: str = "a1b2c3d4e5f6"
 down_revision: Union[str, None] = "f3e4d5c6b7a8"
 branch_labels: Union[str, Sequence[str], None] = None

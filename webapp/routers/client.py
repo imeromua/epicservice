@@ -73,6 +73,11 @@ class FilterProductsRequest(BaseModel):
     limit: int = 500
 
 
+def _qty_unit(quantity: float) -> str:
+    """Повертає одиницю виміру: 'кг' для дробових, 'шт.' для цілих."""
+    return "кг" if quantity != int(quantity) else "шт."
+
+
 # === Ендпоїнти ===
 
 @router.get("/user/role")
@@ -382,8 +387,9 @@ async def add_to_list(req: AddToListRequest):
     try:
         print(f"➕ Add to list: user_id={req.user_id}, product_id={req.product_id}, quantity={req.quantity}")
         await orm_add_item_to_temp_list(user_id=req.user_id, product_id=req.product_id, quantity=req.quantity)
+        unit = _qty_unit(req.quantity)
         print(f"✅ Successfully added to temp list")
-        return JSONResponse(content={"success": True, "message": f"Додано {req.quantity} шт."}, status_code=200)
+        return JSONResponse(content={"success": True, "message": f"Додано {req.quantity} {unit}"}, status_code=200)
     except ValueError as e:
         # Помилка валідації відділу
         print(f"⚠️ Validation error: {e}")
@@ -401,7 +407,8 @@ async def update_item_quantity(req: UpdateQuantityRequest):
         if req.quantity <= 0:
             return JSONResponse(content={"success": False, "message": "Кількість має бути більше 0"}, status_code=400)
         await orm_update_temp_list_item_quantity(user_id=req.user_id, product_id=req.product_id, new_quantity=req.quantity)
-        return JSONResponse(content={"success": True, "message": f"Кількість оновлено: {req.quantity} шт."}, status_code=200)
+        unit = _qty_unit(req.quantity)
+        return JSONResponse(content={"success": True, "message": f"Кількість оновлено: {req.quantity} {unit}"}, status_code=200)
     except Exception as e:
         print(f"❌ ERROR in update_item_quantity: {type(e).__name__}: {e}")
         traceback.print_exc()

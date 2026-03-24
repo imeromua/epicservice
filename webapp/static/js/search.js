@@ -189,12 +189,13 @@ async function search(query) {
     } 
 }
 
-function openAddModal(product) { selectedProduct = product; currentQuantity = 1; document.getElementById('modalTitle').textContent = product.article; document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`; document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} шт.`; document.getElementById('qtyDisplay').textContent = 1; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; document.getElementById('customQtyInput').value = ''; document.getElementById('addModal').classList.add('active'); }
+function isWeightProduct(product) { return product && !Number.isInteger(product.available); }
+function openAddModal(product) { selectedProduct = product; currentQuantity = isWeightProduct(product) ? 0.1 : 1; document.getElementById('modalTitle').textContent = product.article; document.getElementById('modalPrice').textContent = `Ціна: ${product.price.toFixed(2)} грн`; document.getElementById('modalAvailable').textContent = `Доступно: ${product.available} ${isWeightProduct(product) ? 'кг' : 'шт.'}`; document.getElementById('qtyDisplay').textContent = currentQuantity; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; document.getElementById('customQtyInput').value = ''; document.getElementById('addModal').classList.add('active'); }
 function closeModal() { document.getElementById('addModal').classList.remove('active'); }
-function changeQty(d) { currentQuantity = Math.max(1, Math.min(selectedProduct.available, currentQuantity + d)); document.getElementById('qtyDisplay').textContent = currentQuantity; }
+function changeQty(d) { const step = isWeightProduct(selectedProduct) ? 0.1 : 1; const min = isWeightProduct(selectedProduct) ? 0.1 : 1; currentQuantity = Math.round((Math.max(min, Math.min(selectedProduct.available, currentQuantity + step * d))) * 1000) / 1000; document.getElementById('qtyDisplay').textContent = currentQuantity; }
 function addAllAvailable() { currentQuantity = selectedProduct.available; document.getElementById('qtyDisplay').textContent = currentQuantity; tg.HapticFeedback.notificationOccurred('success'); }
 function showCustomInput() { document.getElementById('customInputBox').style.display = 'block'; document.getElementById('normalSelector').style.display = 'none'; document.getElementById('customQtyInput').focus(); }
-function applyCustomQty() { const v = parseFloat(document.getElementById('customQtyInput').value); if (isNaN(v) || v <= 0) { tg.showAlert('❌ Введіть коректне число'); return; } if (v > selectedProduct.available) { tg.showAlert(`⚠️ Максимум: ${selectedProduct.available} шт.`); return; } currentQuantity = v; document.getElementById('qtyDisplay').textContent = v; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; tg.HapticFeedback.notificationOccurred('success'); }
+function applyCustomQty() { const v = parseFloat(document.getElementById('customQtyInput').value); if (isNaN(v) || v <= 0) { tg.showAlert('❌ Введіть коректне число'); return; } if (v > selectedProduct.available) { tg.showAlert(`⚠️ Максимум: ${selectedProduct.available} ${isWeightProduct(selectedProduct) ? 'кг' : 'шт.'}`); return; } currentQuantity = v; document.getElementById('qtyDisplay').textContent = v; document.getElementById('customInputBox').style.display = 'none'; document.getElementById('normalSelector').style.display = 'block'; tg.HapticFeedback.notificationOccurred('success'); }
 
 async function confirmAdd() { 
     try { 
@@ -250,7 +251,7 @@ async function confirmAdd() {
 
 function openEditModal(item) { editingItem = item; editQuantity = item.quantity; document.getElementById('editModalTitle').textContent = item.article; document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`; document.getElementById('editQtyDisplay').textContent = editQuantity; document.getElementById('editModal').classList.add('active'); }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
-function changeEditQty(d) { editQuantity = Math.max(1, editQuantity + d); document.getElementById('editQtyDisplay').textContent = editQuantity; }
+function changeEditQty(d) { const isWeight = !Number.isInteger(editingItem.quantity); const step = isWeight ? 0.1 : 1; const min = isWeight ? 0.1 : 1; editQuantity = Math.round((Math.max(min, editQuantity + step * d)) * 1000) / 1000; document.getElementById('editQtyDisplay').textContent = editQuantity; }
 async function confirmUpdate() { 
     const oldQuantity = editingItem.quantity;
     try { 
