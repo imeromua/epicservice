@@ -68,7 +68,7 @@ class Product(Base):
     група: Mapped[str] = mapped_column(String(100))
     # String(50) навмисно — зберігає дробові значення у вигляді рядка для гнучкості відображення
     кількість: Mapped[str] = mapped_column(String(50))
-    відкладено: Mapped[int] = mapped_column(Integer, default=0)
+    відкладено: Mapped[float] = mapped_column(Float, default=0.0)
 
     місяці_без_руху: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     сума_залишку: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
@@ -123,7 +123,7 @@ class SavedListItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     list_id: Mapped[int] = mapped_column(ForeignKey("saved_lists.id"))
     article_name: Mapped[str] = mapped_column(String(255))
-    quantity: Mapped[int] = mapped_column(Integer)
+    quantity: Mapped[float] = mapped_column(Float)
 
     saved_list: Mapped["SavedList"] = relationship(back_populates="items")
 
@@ -136,7 +136,7 @@ class TempList(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     # index=True — прискорює запити пошуку за product_id та перевірки резервів
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
-    quantity: Mapped[int] = mapped_column(Integer)
+    quantity: Mapped[float] = mapped_column(Float)
 
     product: Mapped["Product"] = relationship()
     user: Mapped["User"] = relationship(back_populates="temp_list_items")

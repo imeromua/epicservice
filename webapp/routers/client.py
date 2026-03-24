@@ -51,13 +51,13 @@ class SearchRequest(BaseModel):
 class AddToListRequest(BaseModel):
     user_id: int
     product_id: int
-    quantity: int
+    quantity: float
 
 
 class UpdateQuantityRequest(BaseModel):
     user_id: int
     product_id: int
-    quantity: int
+    quantity: float
 
 
 class DeleteItemRequest(BaseModel):
@@ -398,7 +398,7 @@ async def add_to_list(req: AddToListRequest):
 async def update_item_quantity(req: UpdateQuantityRequest):
     """Оновити кількість товару."""
     try:
-        if req.quantity < 1:
+        if req.quantity <= 0:
             return JSONResponse(content={"success": False, "message": "Кількість має бути більше 0"}, status_code=400)
         await orm_update_temp_list_item_quantity(user_id=req.user_id, product_id=req.product_id, new_quantity=req.quantity)
         return JSONResponse(content={"success": True, "message": f"Кількість оновлено: {req.quantity} шт."}, status_code=200)
