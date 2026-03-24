@@ -32,7 +32,7 @@ async def orm_clear_temp_list(user_id: int, session: Optional[AsyncSession] = No
             await session.commit()
 
 
-async def orm_add_item_to_temp_list(user_id: int, product_id: int, quantity: int):
+async def orm_add_item_to_temp_list(user_id: int, product_id: int, quantity: float):
     """
     Додає товар до тимчасового списку користувача.
     Перевіряє правило: один список = один відділ.
@@ -86,7 +86,7 @@ async def orm_add_item_to_temp_list(user_id: int, product_id: int, quantity: int
 
 # --- Нові функції для редагування ---
 
-async def orm_update_temp_list_item_quantity(user_id: int, product_id: int, new_quantity: int):
+async def orm_update_temp_list_item_quantity(user_id: int, product_id: int, new_quantity: float):
     """
     Оновлює кількість конкретного товару в тимчасовому списку.
     """
@@ -149,7 +149,7 @@ async def orm_get_temp_list_department(user_id: int) -> int | None:
         return first_item.product.відділ if first_item and first_item.product else None
 
 
-async def orm_get_temp_list_item_quantity(user_id: int, product_id: int) -> int:
+async def orm_get_temp_list_item_quantity(user_id: int, product_id: int) -> float:
     """
     Отримує кількість конкретного товару в тимчасовому списку поточного користувача.
     """
@@ -162,7 +162,7 @@ async def orm_get_temp_list_item_quantity(user_id: int, product_id: int) -> int:
         return quantity or 0
 
 
-async def orm_get_total_temp_reservation_for_product(product_id: int) -> int:
+async def orm_get_total_temp_reservation_for_product(product_id: int) -> float:
     """
     Отримує сумарну кількість товару у всіх тимчасових списках ВСІХ користувачів.
     """
