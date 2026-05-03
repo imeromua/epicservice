@@ -1,5 +1,3 @@
-# epicservice/handlers/admin/report_handlers.py
-
 import asyncio
 import logging
 import os
@@ -40,7 +38,7 @@ class AdminReportStates(StatesGroup):
 def _create_stock_report_sync() -> Optional[str]:
     """
     Створює звіт про залишки на складі.
-    Формат: Відділ | Група | Артикул | Назва | Залишок (кількість) | Сума залишку (грн)
+    Формат: Відділ | Група | Артикул | Назва | Залишок (кількість) | Сума залишку (грн) | Місяців без руху
     """
     try:
         products = orm_get_all_products_sync()
@@ -67,7 +65,8 @@ def _create_stock_report_sync() -> Optional[str]:
                 "Артикул": product.артикул,
                 "Назва": product.назва,
                 "Залишок (кількість)": int(available) if available == int(available) else available,
-                "Сума залишку (грн)": round(available_sum, 2)
+                "Сума залишку (грн)": round(available_sum, 2),
+                "Місяців без руху": product.місяці_без_руху or 0
             })
 
         df = pd.DataFrame(report_data)
