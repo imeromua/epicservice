@@ -163,7 +163,8 @@ def _create_stock_report_sync() -> Optional[str]:
                 "Артикул": product.артикул,
                 "Назва": product.назва,
                 "Залишок (кількість)": int(available) if available == int(available) else available,
-                "Сума залишку (грн)": round(available_sum, 2)
+                "Сума залишку (грн)": round(available_sum, 2),
+                "Місяців без руху": product.місяці_без_руху or 0
             })
 
         df = pd.DataFrame(report_data)

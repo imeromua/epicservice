@@ -143,7 +143,14 @@ async def proceed_with_collected_export(callback: CallbackQuery, bot: Bot, state
         else:
             df = pd.DataFrame(collected_items)
             df.rename(
-                columns={"department": "Відділ", "group": "Група", "name": "Назва", "quantity": "Кількість"},
+                columns={
+                    "department": "Відділ",
+                    "group": "Група",
+                    "article": "Артикул",
+                    "name": "Назва",
+                    "quantity": "Кількість",
+                    "months_without_sale": "Місяців без руху"
+                },
                 inplace=True
             )
             os.makedirs(ARCHIVES_PATH, exist_ok=True)

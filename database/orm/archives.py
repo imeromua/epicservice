@@ -152,7 +152,17 @@ def orm_get_all_collected_items_sync():
                 .group_by(Product.id)
             )
             result = session.execute(stmt).all()
-            return result
+            return [
+                {
+                    "department": product.відділ,
+                    "group": product.група,
+                    "article": product.артикул,
+                    "name": product.назва,
+                    "quantity": qty,
+                    "months_without_sale": product.місяці_без_руху or 0
+                }
+                for product, qty in result
+            ]
     except Exception as e:
         logger.error(f"Помилка отримання зібраних товарів: {e}", exc_info=True)
         return []
