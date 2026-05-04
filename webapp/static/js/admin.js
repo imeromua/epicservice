@@ -781,9 +781,14 @@ document.addEventListener('DOMContentLoaded', () => {
 let reportOptions = {};
 
 async function openReportMaster() {
-    document.getElementById('reportMasterModal').classList.add('active');
-    
     try {
+        const modal = document.getElementById('reportMasterModal');
+        if (!modal) {
+            tg.showAlert('❌ Не знайдено вікно майстра звітів у DOM!');
+            return;
+        }
+        modal.classList.add('active');
+        
         const response = await fetch(`/api/admin/report-master/options?user_id=${userId}`);
         const data = await response.json();
         
@@ -797,11 +802,11 @@ async function openReportMaster() {
             }
             updateReportMasterGroups();
         } else {
-            tg.showAlert('❌ ' + (data.error || 'Помилка завантаження даних'));
+            tg.showAlert('❌ ' + (data.error || 'Помилка завантаження даних (success=false)'));
         }
     } catch (error) {
         console.error('Error fetching report master options:', error);
-        tg.showAlert('❌ Помилка завантаження даних');
+        tg.showAlert(`❌ Критична помилка відкриття майстра: ${error.message}`);
     }
 }
 
@@ -843,6 +848,7 @@ function generateCustomReport() {
         sort_by: sort
     });
     
-    window.location.href = `/api/admin/report-master/generate?${params.toString()}`;
+    window.open(`/api/admin/report-master/generate?${params.toString()}`, '_blank');
     closeReportMaster();
+    tg.HapticFeedback.notificationOccurred('success');
 }
