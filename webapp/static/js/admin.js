@@ -776,3 +776,73 @@ document.addEventListener('DOMContentLoaded', () => {
     _initSubtractCollectedButton('btn-subtract-collected', 'subtract-file-input', 'subtractAlert');
     _initSubtractCollectedButton('btn-moderator-subtract-collected', 'moderator-subtract-file-input', 'moderatorSubtractAlert');
 });
+
+// ==================== МАСТЕР ЗВІТІВ ====================
+let reportOptions = {};
+
+async function openReportMaster() {
+    document.getElementById('reportMasterModal').classList.add('active');
+    
+    try {
+        const response = await fetch(`/api/admin/report-master/options?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            reportOptions = data.options;
+            const deptSelect = document.getElementById('rm-department');
+            
+            deptSelect.innerHTML = '<option value="">Всі відділи</option>';
+            for (const dept of Object.keys(reportOptions).sort()) {
+                deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
+            }
+            updateReportMasterGroups();
+        } else {
+            tg.showAlert('❌ ' + (data.error || 'Помилка завантаження даних'));
+        }
+    } catch (error) {
+        console.error('Error fetching report master options:', error);
+        tg.showAlert('❌ Помилка завантаження даних');
+    }
+}
+
+function closeReportMaster() {
+    document.getElementById('reportMasterModal').classList.remove('active');
+}
+
+function updateReportMasterGroups() {
+    const dept = document.getElementById('rm-department').value;
+    const groupSelect = document.getElementById('rm-group');
+    
+    groupSelect.innerHTML = '<option value="">Всі групи</option>';
+    
+    if (dept && reportOptions[dept]) {
+        for (const group of reportOptions[dept]) {
+            groupSelect.innerHTML += `<option value="${group}">${group}</option>`;
+        }
+    } else if (!dept) {
+        const allGroups = new Set();
+        for (const deptGroups of Object.values(reportOptions)) {
+            deptGroups.forEach(g => allGroups.add(g));
+        }
+        const sortedGroups = Array.from(allGroups).sort();
+        for (const group of sortedGroups) {
+            groupSelect.innerHTML += `<option value="${group}">${group}</option>`;
+        }
+    }
+}
+
+function generateCustomReport() {
+    const dept = document.getElementById('rm-department').value;
+    const group = document.getElementById('rm-group').value;
+    const sort = document.getElementById('rm-sort').value;
+    
+    const params = new URLSearchParams({
+        user_id: userId,
+        department: dept,
+        group: group,
+        sort_by: sort
+    });
+    
+    window.location.href = `/api/admin/report-master/generate?${params.toString()}`;
+    closeReportMaster();
+}

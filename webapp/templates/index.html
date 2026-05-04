@@ -229,6 +229,7 @@
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="showAdminArchives()">🗄 Архіви користувачів</button>
                 <button class="btn btn-secondary" style="background: #8e8e93;" onclick="exportStock()">📊 Звіт про залишки (Excel)</button>
+                <button class="btn btn-primary" onclick="openReportMaster()" style="background: #9c27b0;">🧙‍♂️ Мастер звітів</button>
                 <!-- FIX: label відкриває file dialog нативно без .click() — сумісно з Telegram WebApp -->
                 <label for="subtract-file-input" class="btn btn-secondary" id="btn-subtract-collected" style="background: #5856d6; cursor: pointer;">📉 Відняти зібране</label>
                 <input type="file" id="subtract-file-input" accept=".xlsx" style="display:none">
@@ -270,6 +271,41 @@
     <div id="editModal" class="modal"><div class="modal-content"><h2 id="editModalTitle"></h2><p id="editModalPrice"></p><div class="quantity-selector"><button class="qty-btn" onclick="changeEditQty(-1)">−</button><div class="qty-display" id="editQtyDisplay">1</div><button class="qty-btn" onclick="changeEditQty(1)">+</button></div><button class="add-btn" style="margin-top:0" onclick="confirmUpdate()">✅ Зберегти</button><button class="add-btn delete-btn" onclick="confirmDelete()">🗑️ Видалити</button><button class="add-btn cancel-btn" onclick="closeEditModal()">Скасувати</button></div></div>
     <div id="statsModal" class="modal"><div class="modal-content" id="statsModalContent"></div></div>
     <div id="adminArchivesModal" class="modal"><div class="modal-content" id="adminArchivesModalContent"></div></div>
+    
+    <!-- Report Master Modal -->
+    <div id="reportMasterModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeReportMaster()" style="float: right; cursor: pointer; font-size: 24px; opacity: 0.6;">&times;</span>
+            <div class="modal-title" style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">🧙‍♂️ Мастер звітів</div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Відділ:</label>
+                <select id="rm-department" onchange="updateReportMasterGroups()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                    <option value="">Завантаження...</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Група:</label>
+                <select id="rm-group" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                    <option value="">Всі групи</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Сортування за:</label>
+                <select id="rm-sort" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                    <option value="name">Назвою (А-Я)</option>
+                    <option value="sum">Сумою залишку (спадання)</option>
+                    <option value="quantity">Кількістю (спадання)</option>
+                    <option value="months">Місяцями без руху (спадання)</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-primary" onclick="generateCustomReport()" style="width: 100%;">📥 Згенерувати звіт</button>
+        </div>
+    </div>
+
     <div class="total-box" id="totalBox" style="display:none"><div class="total-text">Всього: <span id="totalSum">0</span> грн</div><div style="font-size:14px; color:var(--hint-color)"><span id="totalItems">0</span> товарів</div></div>
     <!-- Photo Gallery Modal -->
     <div id="photoModal" class="modal">
