@@ -1453,7 +1453,7 @@ async def get_report_master_options(user_id: int = Query(...)):
         
         departments_dict = {}
         for p in all_products:
-            dept = p.відділ if p.відділ else "Невідомий відділ"
+            dept = str(p.відділ) if p.відділ else "Невідомий відділ"
             group = p.група if p.група else "Без групи"
             
             if dept not in departments_dict:
@@ -1495,7 +1495,7 @@ async def generate_custom_report(
             # Фільтрація
             filtered_data = []
             for product in products:
-                if department and product.відділ != department and department != "Всі":
+                if department and str(product.відділ) != department and department != "Всі":
                     continue
                 if group and product.група != group and group != "Всі":
                     continue
