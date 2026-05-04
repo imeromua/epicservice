@@ -310,6 +310,7 @@
         <div class="section-title">📊 Звіти та Архіви</div>
         <button class="btn btn-primary" onclick="showArchives()">🗄 Архіви користувачів</button>
         <button class="btn btn-secondary" onclick="downloadStockReport()">📥 Звіт про залишки (Excel)</button>
+        <button class="btn btn-primary" onclick="openReportMaster()" style="background: #9c27b0;">🧙‍♂️ Мастер звітів</button>
     </div>
 
     <div class="section">
@@ -352,6 +353,39 @@
             <div class="modal-title">🗄 Архіви користувачів</div>
             <button class="btn btn-primary" onclick="downloadAllArchives()" style="margin-bottom: 16px;">📥 Скачати всі (ZIP)</button>
             <div id="archivesContent"></div>
+        </div>
+    </div>
+
+    <div class="modal hidden" id="reportMasterModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeReportMaster()">&times;</span>
+            <div class="modal-title">🧙‍♂️ Мастер звітів</div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Відділ:</label>
+                <select id="rm-department" onchange="updateReportMasterGroups()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                    <option value="">Завантаження...</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Група:</label>
+                <select id="rm-group" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                    <option value="">Всі групи</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Сортування за:</label>
+                <select id="rm-sort" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                    <option value="name">Назвою (А-Я)</option>
+                    <option value="sum">Сумою залишку (спадання)</option>
+                    <option value="quantity">Кількістю (спадання)</option>
+                    <option value="months">Місяцями без руху (спадання)</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-primary" onclick="generateCustomReport()">📥 Згенерувати звіт</button>
         </div>
     </div>
 
@@ -475,9 +509,79 @@
             window.location.href = `/api/admin/archives/download-all?user_id=${userId}`;
         }
 
-        // Скачати Excel звіт
         function downloadStockReport() {
             window.location.href = `/api/admin/export/stock?user_id=${userId}`;
+        }
+
+        // ==================== МАСТЕР ЗВІТІВ ====================
+        let reportOptions = {};
+        
+        async function openReportMaster() {
+            document.getElementById('reportMasterModal').classList.remove('hidden');
+            
+            try {
+                const response = await fetch(`/api/admin/report-master/options?user_id=${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    reportOptions = data.options;
+                    const deptSelect = document.getElementById('rm-department');
+                    
+                    deptSelect.innerHTML = '<option value="">Всі відділи</option>';
+                    for (const dept of Object.keys(reportOptions).sort()) {
+                        deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
+                    }
+                    updateReportMasterGroups();
+                } else {
+                    tg.showAlert('❌ ' + (data.error || 'Помилка завантаження даних'));
+                }
+            } catch (error) {
+                console.error('Error fetching report master options:', error);
+                tg.showAlert('❌ Помилка завантаження даних');
+            }
+        }
+        
+        function closeReportMaster() {
+            document.getElementById('reportMasterModal').classList.add('hidden');
+        }
+        
+        function updateReportMasterGroups() {
+            const dept = document.getElementById('rm-department').value;
+            const groupSelect = document.getElementById('rm-group');
+            
+            groupSelect.innerHTML = '<option value="">Всі групи</option>';
+            
+            if (dept && reportOptions[dept]) {
+                for (const group of reportOptions[dept]) {
+                    groupSelect.innerHTML += `<option value="${group}">${group}</option>`;
+                }
+            } else if (!dept) {
+                // Якщо відділ не обрано, можна показати всі групи всіх відділів або залишити "Всі групи"
+                const allGroups = new Set();
+                for (const deptGroups of Object.values(reportOptions)) {
+                    deptGroups.forEach(g => allGroups.add(g));
+                }
+                const sortedGroups = Array.from(allGroups).sort();
+                for (const group of sortedGroups) {
+                    groupSelect.innerHTML += `<option value="${group}">${group}</option>`;
+                }
+            }
+        }
+        
+        function generateCustomReport() {
+            const dept = document.getElementById('rm-department').value;
+            const group = document.getElementById('rm-group').value;
+            const sort = document.getElementById('rm-sort').value;
+            
+            const params = new URLSearchParams({
+                user_id: userId,
+                department: dept,
+                group: group,
+                sort_by: sort
+            });
+            
+            window.location.href = `/api/admin/report-master/generate?${params.toString()}`;
+            closeReportMaster();
         }
 
         // Завантаження файлу

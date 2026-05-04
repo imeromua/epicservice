@@ -1435,3 +1435,133 @@ async def mobile_admin_stats(authorization: str = Header(...)):
     except Exception as e:
         logger.error("Помилка отримання статистики (mobile): %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Помилка отримання статистики")
+
+
+# ===========================================================================
+# Report Master Endpoints
+# ===========================================================================
+
+@router.get("/report-master/options")
+async def get_report_master_options(user_id: int = Query(...)):
+    """
+    Отримати список відділів та відповідних груп для Майстра звітів.
+    """
+    verify_admin(user_id)
+    try:
+        loop = asyncio.get_running_loop()
+        all_products = await loop.run_in_executor(None, orm_get_all_products_sync)
+        
+        departments_dict = {}
+        for p in all_products:
+            dept = p.відділ if p.відділ else "Невідомий відділ"
+            group = p.група if p.група else "Без групи"
+            
+            if dept not in departments_dict:
+                departments_dict[dept] = set()
+            departments_dict[dept].add(group)
+            
+        options = {
+            dept: sorted(list(groups))
+            for dept, groups in departments_dict.items()
+        }
+        
+        return JSONResponse(content={"success": True, "options": options})
+    except Exception as e:
+        logger.error("Помилка отримання опцій для Майстра звітів: %s", e, exc_info=True)
+        return JSONResponse(content={"error": "Помилка отримання опцій"}, status_code=500)
+
+
+@router.get("/report-master/generate")
+async def generate_custom_report(
+    user_id: int = Query(...),
+    department: str = Query(""),
+    group: str = Query(""),
+    sort_by: str = Query("name"),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Згенерувати кастомний звіт через Майстер звітів.
+    """
+    verify_admin(user_id)
+    try:
+        def _generate_sync():
+            products = orm_get_all_products_sync()
+            temp_list_items = orm_get_all_temp_list_items_sync()
+
+            temp_reservations = {}
+            for item in temp_list_items:
+                temp_reservations[item.product_id] = temp_reservations.get(item.product_id, 0) + item.quantity
+
+            # Фільтрація
+            filtered_data = []
+            for product in products:
+                if department and product.відділ != department and department != "Всі":
+                    continue
+                if group and product.група != group and group != "Всі":
+                    continue
+
+                try:
+                    stock_qty = float(str(product.кількість).replace(',', '.'))
+                except (ValueError, TypeError):
+                    stock_qty = 0
+
+                reserved = (product.відкладено or 0) + temp_reservations.get(product.id, 0)
+                available = stock_qty - reserved
+                available_sum = available * (product.ціна or 0.0)
+
+                filtered_data.append({
+                    "Відділ": product.відділ,
+                    "Група": product.група,
+                    "Артикул": product.артикул,
+                    "Назва": product.назва,
+                    "Залишок (кількість)": int(available) if available == int(available) else available,
+                    "Сума залишку (грн)": round(available_sum, 2),
+                    "Місяців без руху": product.місяці_без_руху or 0
+                })
+
+            # Сортування
+            if sort_by == "name":
+                filtered_data.sort(key=lambda x: str(x.get("Назва", "")))
+            elif sort_by == "sum":
+                filtered_data.sort(key=lambda x: x.get("Сума залишку (грн)", 0), reverse=True)
+            elif sort_by == "quantity":
+                filtered_data.sort(key=lambda x: float(x.get("Залишок (кількість)", 0)), reverse=True)
+            elif sort_by == "months":
+                filtered_data.sort(key=lambda x: int(x.get("Місяців без руху", 0)), reverse=True)
+
+            df = pd.DataFrame(filtered_data)
+            os.makedirs(ARCHIVES_PATH, exist_ok=True)
+            report_path = os.path.join(ARCHIVES_PATH, f"custom_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
+            
+            # Якщо датафрейм пустий, створюємо пустий файл з колонками
+            if df.empty:
+                df = pd.DataFrame(columns=["Відділ", "Група", "Артикул", "Назва", "Залишок (кількість)", "Сума залишку (грн)", "Місяців без руху"])
+                
+            df.to_excel(report_path, index=False)
+            
+            try:
+                from utils.excel_formatting import format_stock_report
+                format_stock_report(report_path)
+            except Exception as fmt_e:
+                logger.error("Не вдалося відформатувати кастомний звіт: %s", fmt_e)
+                
+            return report_path
+
+        loop = asyncio.get_running_loop()
+        report_path = await loop.run_in_executor(None, _generate_sync)
+
+        if not report_path:
+            return JSONResponse(content={"error": "Не вдалося створити звіт"}, status_code=500)
+
+        if background_tasks:
+            background_tasks.add_task(cleanup_file, report_path)
+
+        return FileResponse(
+            path=report_path,
+            filename=os.path.basename(report_path),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        logger.error("Помилка генерації кастомного звіту: %s", e, exc_info=True)
+        return JSONResponse(content={"error": "Помилка створення звіту"}, status_code=500)
+
