@@ -171,6 +171,13 @@ def _create_stock_report_sync() -> Optional[str]:
         os.makedirs(ARCHIVES_PATH, exist_ok=True)
         report_path = os.path.join(ARCHIVES_PATH, f"stock_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
         df.to_excel(report_path, index=False)
+        
+        try:
+            from utils.excel_formatting import format_stock_report
+            format_stock_report(report_path)
+        except Exception as fmt_e:
+            logger.error("Не вдалося відформатувати звіт про залишки: %s", fmt_e)
+            
         return report_path
     except Exception as e:
         logger.error("Помилка створення звіту про залишки: %s", e, exc_info=True)
