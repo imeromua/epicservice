@@ -1,6 +1,14 @@
 // EpicService - Search Module
 // Product search, rendering, and pull-to-refresh
 
+// === Стан пошуку — зберігається при переключенні вкладок ===
+let savedSearchState = {
+    query: '',
+    results: [],
+    scrollTop: 0,
+    filterActive: false
+};
+
 // Pull-to-refresh
 document.addEventListener('touchstart', e => {
     if (window.scrollY === 0) {
@@ -84,23 +92,96 @@ function updateListBadge(count) {
 function updateSearchBoxVisibility() {
     document.getElementById('searchBoxContainer').style.display = currentTab === 'search' ? 'block' : 'none';
 }
+
+// === Збереження стану пошуку перед виходом зі вкладки ===
+function saveSearchState() {
+    savedSearchState.query = document.getElementById('searchInput').value;
+    savedSearchState.results = cachedProducts.slice();
+    savedSearchState.scrollTop = window.scrollY;
+    savedSearchState.filterActive = !!(window.filterState && window.filterState.isActive);
+    savedSearchState.filteredProducts = (window.filteredProducts || []).slice();
+    savedSearchState.filterStateSnapshot = window.filterState ? Object.assign({}, window.filterState) : null;
+}
+
+// === Відновлення стану пошуку при поверненні на вкладку ===
+function restoreSearchState() {
+    const state = savedSearchState;
+    if (!state.query && state.results.length === 0 && !state.filterActive) return;
+
+    // Відновлюємо поле пошуку
+    if (state.query) {
+        document.getElementById('searchInput').value = state.query;
+    }
+
+    if (state.filterActive && state.filteredProducts && state.filteredProducts.length > 0) {
+        // Відновлення після фільтрів
+        cachedProducts = state.results.slice();
+        window.filteredProducts = state.filteredProducts.slice();
+        if (window.filterState && state.filterStateSnapshot) {
+            Object.assign(window.filterState, state.filterStateSnapshot);
+            window.filterState.isActive = true;
+        }
+        displayFilteredProducts(window.filteredProducts, true);
+    } else if (state.results.length > 0) {
+        // Відновлення звичайного пошуку
+        cachedProducts = state.results.slice();
+        updateSearchResults();
+    }
+
+    // Відновлення позиції скролу
+    if (state.scrollTop > 0) {
+        requestAnimationFrame(() => {
+            window.scrollTo(0, state.scrollTop);
+        });
+    }
+}
+
 function switchTab(tab) {
+    // Зберігаємо стан пошуку перед виходом
+    if (currentTab === 'search') {
+        saveSearchState();
+    }
+
     currentTab = tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-    const tabs = {'search': ['searchTabBtn','searchTab'], 'list': ['listTabBtn','listTab'], 'archives': ['archivesTabBtn','archivesTab'], 'moderation': ['moderationTabBtn','moderationContent'], 'admin': ['adminTabBtn','adminContent']};
+    const tabs = {
+        'search': ['searchTabBtn','searchTab'],
+        'list': ['listTabBtn','listTab'],
+        'archives': ['archivesTabBtn','archivesTab'],
+        'moderation': ['moderationTabBtn','moderationContent'],
+        'admin': ['adminTabBtn','adminContent']
+    };
     const [btnId, id] = tabs[tab];
     document.getElementById(btnId).classList.add('active');
     document.getElementById(id).classList.add('active');
     updateSearchBoxVisibility();
     if (typeof updateFiltersButtonVisibility === 'function') updateFiltersButtonVisibility();
+
+    if (tab === 'search') {
+        // Відновлюємо стан пошуку при поверненні
+        restoreSearchState();
+    }
     if (tab === 'list') loadList();
     if (tab === 'archives') loadArchives();
     if (tab === 'moderation') loadModeratorPhotoModeration();
     if (tab === 'admin' && isAdmin) loadAdminData();
 }
 function goToArchives() { document.getElementById('successModal').classList.remove('active'); switchTab('archives'); }
-function startNewSearch() { document.getElementById('successModal').classList.remove('active'); switchTab('search'); document.getElementById('searchInput').focus(); }
+function startNewSearch() {
+    document.getElementById('successModal').classList.remove('active');
+    // Скидаємо збережений стан при явному новому пошуку
+    savedSearchState = { query: '', results: [], scrollTop: 0, filterActive: false };
+    switchTab('search');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+    cachedProducts = [];
+    if (window.filterState) {
+        window.filterState.isActive = false;
+        window.filteredProducts = [];
+    }
+    document.getElementById('searchInput').focus();
+}
 document.getElementById('searchInput').addEventListener('input', (e) => {
     clearTimeout(searchTimeout);
     const query = e.target.value.trim();
@@ -110,8 +191,8 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 // === Утиліти для вагових товарів ===
 function fmtQty(value, isWeight) {
-    if (isWeight) return Math.round(value * 100) / 100;  // округлення до 2 знаків
-    return Math.round(value);                             // ціле для штучних
+    if (isWeight) return Math.round(value * 100) / 100;
+    return Math.round(value);
 }
 function unitLabel(isWeight) { return isWeight ? 'кг' : 'шт.'; }
 
@@ -170,6 +251,8 @@ function updateSearchResults() {
 async function search(query) {
     const results = document.getElementById('searchResults');
     results.innerHTML = '<div class="loader">🔍 Пошук...</div>';
+    // Скидаємо фільтри при новому пошуку
+    if (window.filterState) window.filterState.isActive = false;
     try {
         const response = await fetch('/api/search', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -274,9 +357,10 @@ async function confirmAdd() {
 function openEditModal(item) {
     editingItem = item;
     editQuantity = item.quantity;
+    const isWeight = item.is_weight;
     document.getElementById('editModalTitle').textContent = item.article;
     document.getElementById('editModalPrice').textContent = `Ціна: ${item.price.toFixed(2)} грн`;
-    document.getElementById('editQtyDisplay').textContent = fmtQty(editQuantity, item.is_weight);
+    document.getElementById('editQtyDisplay').textContent = fmtQty(editQuantity, isWeight);
     document.getElementById('editModal').classList.add('active');
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
@@ -287,6 +371,7 @@ function changeEditQty(d) {
     editQuantity = fmtQty(Math.max(min, editQuantity + step * d), isWeight);
     document.getElementById('editQtyDisplay').textContent = editQuantity;
 }
+
 async function confirmUpdate() {
     const oldQuantity = editingItem.quantity;
     try {
@@ -298,6 +383,7 @@ async function confirmUpdate() {
         if (d.success) {
             tg.showAlert(`✅ ${d.message}`);
             closeEditModal();
+            // Оновлюємо картку у пошуку динамічно
             const productIndex = cachedProducts.findIndex(p => p.id === editingItem.product_id);
             if (productIndex !== -1) {
                 const isWeight = editingItem.is_weight;
@@ -313,10 +399,18 @@ async function confirmUpdate() {
                     updateSearchResults();
                 }
             }
+            // Також оновлюємо filteredProducts якщо фільтр активний
+            if (window.filterState && window.filterState.isActive && window.filteredProducts) {
+                const fi = window.filteredProducts.findIndex(p => p.id === editingItem.product_id);
+                if (fi !== -1) {
+                    window.filteredProducts[fi] = cachedProducts.find(p => p.id === editingItem.product_id) || window.filteredProducts[fi];
+                }
+            }
             loadList();
         } else { tg.showAlert('❌ ' + d.message); }
     } catch (e) { tg.showAlert('❌ ' + e.message); }
 }
+
 async function confirmDelete() {
     if (!confirm('Видалити товар зі списку?')) return;
     try {
@@ -342,6 +436,7 @@ async function confirmDelete() {
         } else { tg.showAlert('❌ ' + d.message); }
     } catch (e) { tg.showAlert('❌ ' + e.message); }
 }
+
 async function saveList() {
     try {
         const r = await fetch(`/api/save/${userId}`, { method: 'POST' });
@@ -353,6 +448,7 @@ async function saveList() {
         } else { tg.showAlert('❌ ' + d.message); }
     } catch (e) { tg.showAlert('❌ ' + e.message); }
 }
+
 async function clearList() {
     if (!confirm('Очистити весь список?')) return;
     try {
