@@ -68,6 +68,7 @@ class DeleteItemRequest(BaseModel):
 class FilterProductsRequest(BaseModel):
     user_id: int
     departments: List[str] = []
+    groups: List[str] = []
     sort_by: str = "balance_sum"
     offset: int = 0
     limit: int = 500
@@ -184,10 +185,10 @@ async def search_products(req: SearchRequest):
 @router.post("/products/filter")
 async def filter_products(req: FilterProductsRequest):
     """
-    Фільтрація товарів за відділами з сортуванням та пагінацією.
+    Фільтрація товарів за відділами та групами з сортуванням та пагінацією.
     """
     try:
-        print(f"🎛️ Filter request: user_id={req.user_id}, departments={req.departments}, sort_by={req.sort_by}")
+        print(f"🎛️ Filter request: user_id={req.user_id}, departments={req.departments}, groups={req.groups}, sort_by={req.sort_by}")
 
         async with async_session() as session:
             query = select(Product).where(
@@ -195,9 +196,13 @@ async def filter_products(req: FilterProductsRequest):
                 (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0
             )
 
+            dept_integers = None
             if req.departments:
                 dept_integers = [int(d) for d in req.departments]
                 query = query.where(Product.відділ.in_(dept_integers))
+
+            if req.groups:
+                query = query.where(Product.група.in_(req.groups))
 
             count_query = select(func.count()).select_from(query.subquery())
             total_count_result = await session.execute(count_query)
@@ -231,8 +236,10 @@ async def filter_products(req: FilterProductsRequest):
                 Product.активний == True,
                 (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0
             )
-            if req.departments:
+            if dept_integers:
                 stats_query = stats_query.where(Product.відділ.in_(dept_integers))
+            if req.groups:
+                stats_query = stats_query.where(Product.група.in_(req.groups))
 
             stats_result = await session.execute(stats_query)
             stats = stats_result.first()
@@ -328,6 +335,38 @@ async def get_departments():
         print(f"❌ ERROR in get_departments: {type(e).__name__}: {e}")
         traceback.print_exc()
         return JSONResponse(content={"error": "Помилка отримання відділів"}, status_code=500)
+
+
+@router.get("/products/groups")
+async def get_groups():
+    """Отримати список всіх доступних груп з кількістю товарів."""
+    try:
+        async with async_session() as session:
+            query = select(
+                Product.група,
+                func.count(Product.id).label('count')
+            ).where(
+                Product.активний == True,
+                (cast(Product.кількість, Float) - func.coalesce(cast(Product.відкладено, Float), 0.0)) > 0,
+                Product.група.isnot(None),
+                Product.група != ''
+            ).group_by(Product.група).order_by(Product.група)
+
+            result = await session.execute(query)
+            groups = result.all()
+
+            group_list = [
+                {"group": g.група, "count": g.count}
+                for g in groups
+            ]
+
+            print(f"📂 Returning {len(group_list)} groups")
+            return JSONResponse(content={"groups": group_list}, status_code=200)
+
+    except Exception as e:
+        print(f"❌ ERROR in get_groups: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return JSONResponse(content={"error": "Помилка отримання груп"}, status_code=500)
 
 
 @router.get("/list/{user_id}")
